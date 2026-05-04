@@ -1,0 +1,47 @@
+import { notFound, redirect } from "next/navigation";
+
+import { auth } from "@/auth";
+import {
+  OnliveLogViewerPage,
+  type OnliveLogViewerData,
+} from "@/components/onlive/onlive-room-page";
+import { toJstWallTimeIsoString } from "@/lib/jst";
+import { getUserOnliveLog } from "@/lib/onlive-log";
+
+export const dynamic = "force-dynamic";
+
+function toViewerData(log: NonNullable<Awaited<ReturnType<typeof getUserOnliveLog>>>): OnliveLogViewerData {
+  return {
+    capturedAt: toJstWallTimeIsoString(log.capturedAt),
+    createdAt: toJstWallTimeIsoString(log.createdAt),
+    id: log.id,
+    liveId: log.liveId,
+    liveStartedAt: log.liveStartedAt,
+    log: log.log,
+    room: log.room,
+    roomId: log.roomId,
+    updatedAt: toJstWallTimeIsoString(log.updatedAt),
+  };
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ logId: string }>;
+}) {
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    redirect("/");
+  }
+
+  const { logId } = await params;
+  const log = await getUserOnliveLog(userId, logId);
+
+  if (!log) {
+    notFound();
+  }
+
+  return <OnliveLogViewerPage data={toViewerData(log)} />;
+}

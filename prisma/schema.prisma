@@ -1,0 +1,242 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum DashboardNoticeTarget {
+  AUTHENTICATED
+  LOGIN
+  ALL
+}
+
+model User {
+  id                String              @id @default(cuid())
+  name              String?
+  email             String?             @unique
+  emailVerified     DateTime?           @map("email_verified")
+  image             String?
+  accounts          Account[]
+  sessions          Session[]
+  registeredRoom    UserRegisteredRoom?
+  invitationCodes   InvitationCode[]    @relation("InvitationCodeInviter")
+  usedInviteCodes   InvitationCode[]    @relation("InvitationCodeUsedBy")
+  userRoles         UserRole[]          @relation("UserRoleUser")
+  assignedUserRoles UserRole[]          @relation("UserRoleAssignedBy")
+  auditLogs         AuditLog[]          @relation("ActorAuditLogs")
+  userBlocks        UserBlock[]         @relation("UserBlocks")
+  createdAt         DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt         DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model UserRegisteredRoom {
+  id           String          @id @default(cuid())
+  userId       String          @unique @map("user_id")
+  roomId       String          @map("room_id")
+  roomUrl      String          @map("room_url")
+  roomName     String?         @map("room_name")
+  imageUrl     String?         @map("image_url") @db.Text
+  inviteCodeId String?         @unique @map("invite_code_id")
+  createdAt    DateTime        @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt    DateTime        @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inviteCode   InvitationCode? @relation(fields: [inviteCodeId], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+  @@map("user_registered_rooms")
+}
+
+model InvitationCode {
+  id             String              @id @default(cuid())
+  code           String              @unique @db.VarChar(10)
+  inviterUserId  String?             @map("inviter_user_id")
+  usedByUserId   String?             @map("used_by_user_id")
+  usedAt         DateTime?           @map("used_at")
+  isDeleted      Boolean             @default(false) @map("is_deleted")
+  createdAt      DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt      DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  inviter        User?               @relation("InvitationCodeInviter", fields: [inviterUserId], references: [id], onDelete: SetNull)
+  usedBy         User?               @relation("InvitationCodeUsedBy", fields: [usedByUserId], references: [id], onDelete: SetNull)
+  registeredRoom UserRegisteredRoom?
+
+  @@index([inviterUserId, createdAt])
+  @@index([usedByUserId])
+  @@index([isDeleted, usedAt])
+  @@map("invitation_codes")
+}
+
+model UserBlock {
+  id                      String   @id @default(cuid())
+  blockerUserId           String   @map("blocker_user_id")
+  blockedShowroomUserId   String   @map("blocked_showroom_user_id")
+  blockedShowroomUserName String   @map("blocked_showroom_user_name")
+  createdAt               DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt               DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  blocker                 User     @relation("UserBlocks", fields: [blockerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerUserId, blockedShowroomUserId])
+  @@index([blockedShowroomUserId])
+  @@index([blockerUserId, createdAt])
+  @@map("user_blocks")
+}
+
+model DashboardNotice {
+  id            Int                   @id @default(autoincrement())
+  title         String
+  content       String                @db.Text
+  displayTarget DashboardNoticeTarget @default(AUTHENTICATED) @map("display_target")
+  publishedAt   DateTime              @map("published_at")
+  expiresAt     DateTime?             @map("expires_at")
+  linkUrl       String?               @map("link_url") @db.Text
+  createdAt     DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt     DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+
+  @@index([displayTarget, publishedAt])
+  @@index([publishedAt])
+  @@index([expiresAt])
+  @@map("dashboard_notices")
+}
+
+model MaintenanceWindow {
+  id        String   @id @default(cuid())
+  title     String   @default("システムメンテナンス")
+  message   String?  @db.Text
+  startsAt  DateTime @map("starts_at")
+  endsAt    DateTime @map("ends_at")
+  isEnabled Boolean  @default(true) @map("is_enabled")
+  createdAt DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+
+  @@index([isEnabled, startsAt, endsAt])
+  @@map("maintenance_windows")
+}
+
+model OnliveLog {
+  id         String   @id @default(cuid())
+  roomId     String   @map("room_id")
+  liveId     String   @map("live_id")
+  capturedAt DateTime @map("captured_at")
+  log        Json
+  isDeleted  Boolean  @default(false) @map("is_deleted")
+  createdAt  DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt  DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+
+  @@unique([roomId, liveId, capturedAt])
+  @@index([roomId, liveId])
+  @@index([roomId, isDeleted, capturedAt])
+  @@map("onlive_logs")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Role {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  description     String?
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+  createdAt       DateTime         @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt       DateTime         @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+
+  @@map("roles")
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  action          String           @unique
+  description     String?
+  rolePermissions RolePermission[]
+  createdAt       DateTime         @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt       DateTime         @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  roleId           String   @map("role_id")
+  assignedByUserId String?  @map("assigned_by_user_id")
+  assignedAt       DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("assigned_at")
+  user             User     @relation("UserRoleUser", fields: [userId], references: [id], onDelete: Cascade)
+  role             Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedBy       User?    @relation("UserRoleAssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+  @@index([assignedByUserId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String     @map("role_id")
+  permissionId String     @map("permission_id")
+  createdAt    DateTime   @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?  @map("actor_user_id")
+  action      String
+  resource    String
+  resourceId  String?  @map("resource_id")
+  detail      Json
+  createdAt   DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  actor       User?    @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([action])
+  @@index([resource, resourceId])
+  @@map("audit_logs")
+}
