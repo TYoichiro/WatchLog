@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -1983,7 +1982,8 @@ function SocialLinksSection({
             className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
             title={item.name ?? "SNS"}
           >
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src={item.icon}
               alt={item.name ?? "SNS"}
               width={18}
@@ -2116,7 +2116,8 @@ function UserProfileModalLegacy({
                           className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white transition hover:border-sky-300 hover:bg-sky-50"
                           title="Open social link"
                         >
-                          <Image
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
                             src={sns.icon}
                             alt="SNS"
                             width={20}
@@ -2180,7 +2181,8 @@ function UserProfileModalLegacy({
                         rel="noreferrer"
                         className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
                       >
-                        <Image
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
                           src={sns.icon}
                           alt=""
                           width={16}
@@ -2515,7 +2517,8 @@ export function UserProfileModal({
                 <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
                   <div className="space-y-4">
                     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
-                      <Image
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
                         src={roomImageUrl}
                         alt={`${roomDisplayName} room image`}
                         width={480}
@@ -2553,7 +2556,8 @@ export function UserProfileModal({
                                 rel="noreferrer"
                                 className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-sky-300"
                               >
-                                <Image
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
                                   src={banner.imageUrl}
                                   alt={`${roomDisplayName} banner ${index + 1}`}
                                   width={640}
@@ -2566,7 +2570,8 @@ export function UserProfileModal({
                                 key={`${banner.imageUrl}-${index}`}
                                 className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
                               >
-                                <Image
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
                                   src={banner.imageUrl}
                                   alt={`${roomDisplayName} banner ${index + 1}`}
                                   width={640}

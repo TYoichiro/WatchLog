@@ -1,11 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import type { SubmitEvent } from "react";
 import { Hash, KeyRound, Loader2, Search } from "lucide-react";
-
 import { AppShell } from "@/components/navigation/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,15 +24,15 @@ const INVITE_CODE_LOCK_FAILURE_COUNT = 4;
 const INVITE_CODE_LOCKED_MESSAGE =
   "登録はできません。招待コードの入力に4回失敗しました。";
 
-export function hasRoomResults(items: readonly RoomResult[]): boolean {
+function hasRoomResults(items: readonly RoomResult[]): boolean {
   return items.length > 0;
 }
 
-export function getRoomResultCount(items: readonly RoomResult[]): number {
+function getRoomResultCount(items: readonly RoomResult[]): number {
   return items.length;
 }
 
-export function canRegisterRoom(room: RoomResult | null): room is RoomResult {
+function canRegisterRoom(room: RoomResult | null): room is RoomResult {
   return room !== null;
 }
 
@@ -101,7 +99,7 @@ function SearchArea({
 }: {
   isLoading: boolean;
   onQueryChange: (query: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmit: (event: SubmitEvent<HTMLFormElement>) => void;
   query: string;
 }) {
   return (
@@ -155,20 +153,25 @@ function InvitationCodeModal({
 }) {
   const [inviteCode, setInviteCode] = useState("");
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSubmit(inviteCode);
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/50 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="invite-code-title"
+      className="fixed inset-0 z-120 flex items-center justify-center bg-slate-900/50 p-4"
+    >
       <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
         <div className="flex items-start gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
             <KeyRound className="size-5" aria-hidden />
           </div>
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 id="invite-code-title" className="text-lg font-semibold text-slate-900">
               招待コードを入力
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -233,10 +236,23 @@ function ConfirmRegisterModal({
   onConfirm: (room: RoomResult) => void;
   room: RoomResult;
 }) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-register-title"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-slate-900/40 p-4"
+    >
       <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
-        <h2 className="text-lg font-semibold text-slate-900">
+        <h2 id="confirm-register-title" className="text-lg font-semibold text-slate-900">
           登録しますか？
         </h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -277,10 +293,23 @@ function RegisterErrorModal({
   message: string;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="register-error-title"
+      className="fixed inset-0 z-110 flex items-center justify-center bg-slate-900/40 p-4"
+    >
       <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
-        <h2 className="text-lg font-semibold text-slate-900">
+        <h2 id="register-error-title" className="text-lg font-semibold text-slate-900">
           登録できません
         </h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">{message}</p>
@@ -307,10 +336,11 @@ function RoomCard({
     <button
       type="button"
       onClick={() => onClick(room)}
-      className="group overflow-hidden rounded-xl bg-white text-left shadow-sm ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md"
+      className="group overflow-hidden cursor-pointer rounded-xl bg-white text-left shadow-sm ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="aspect-video w-full overflow-hidden bg-slate-100">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src={room.imageUrl}
           alt={roomTitle}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
@@ -465,8 +495,7 @@ function RoomSearchBody() {
     }
 
     setInviteCodeErrorMessage(
-      `招待コードが正しくありません。残り${
-        INVITE_CODE_LOCK_FAILURE_COUNT - nextFailureCount
+      `招待コードが正しくありません。残り${INVITE_CODE_LOCK_FAILURE_COUNT - nextFailureCount
       }回入力できます。`
     );
   };
@@ -507,7 +536,7 @@ function RoomSearchBody() {
     }
   };
 
-  const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSearch = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const keyword = query.trim();
@@ -647,7 +676,7 @@ export default function ShowroomRoomSearchPage() {
 
         setCanShowSearch(true);
       } catch (error) {
-        if ((error as Error).name === "AbortError" || !isActive) {
+        if (!isActive || (error instanceof DOMException && error.name === "AbortError")) {
           return;
         }
 
