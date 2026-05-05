@@ -105,16 +105,6 @@ npm run dev
 | `npm run prisma:migrate` | Prisma migration を適用 |
 | `npm run prisma:seed` | シードデータを投入 |
 
-## Docker
-
-本番向けの standalone ビルド用 `Dockerfile` と `compose.yml` を含んでいます。`compose.yml` は外部ネットワーク `nginx-proxy` と `.env.production` を前提にしています。
-
-```bash
-docker compose up -d --build
-```
-
-必要に応じて、`compose.yml` のネットワーク名や公開ポートを運用環境に合わせて変更してください。
-
 ## ディレクトリ構成
 
 ```text
