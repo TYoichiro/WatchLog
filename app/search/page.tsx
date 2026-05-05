@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
@@ -310,7 +309,8 @@ function RoomCard({
       className="group overflow-hidden rounded-xl bg-white text-left shadow-sm ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="aspect-video w-full overflow-hidden bg-slate-100">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src={room.imageUrl}
           alt={roomTitle}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
