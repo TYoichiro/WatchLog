@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+
+export const metadata: Metadata = {
+  title: "配信ログ詳細 | WatchLog",
+};
 import {
   OnliveLogViewerPage,
   type OnliveLogViewerData,

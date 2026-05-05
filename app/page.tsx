@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import { auth, signIn } from "@/auth";
 import { NoticeListCard } from "@/components/notices/notice-list-card";
 import { Button } from "@/components/ui/button";
 import { getLoginNotices, type AppNotice } from "@/lib/dashboard-notices";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = {
+  title: "WatchLog",
+};
 
 function GoogleIcon() {
   return (

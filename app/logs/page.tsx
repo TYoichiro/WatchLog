@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+
+export const metadata: Metadata = {
+  title: "配信ログ | WatchLog",
+};
 import { LogListPage, type LogListItem } from "@/components/logs/log-list-page";
 import { AppShell } from "@/components/navigation/app-sidebar";
 import { toJstWallTimeIsoString } from "@/lib/jst";

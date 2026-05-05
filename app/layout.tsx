@@ -11,7 +11,7 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const maintenancePath = "/maintenance";
 
 export const metadata: Metadata = {
-  title: "WathLog",
+  title: "WatchLog",
   description: "SRの配信ログを保存できるツールです",
 };
 
