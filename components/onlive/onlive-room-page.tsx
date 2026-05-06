@@ -1554,7 +1554,7 @@ function useShowroomRealtimeFeed(roomId: number) {
 
     async function connect() {
       try {
-        const liveInfoResponse = await fetch(`/api/live/liveinfo?room_id=${roomId}`, {
+        const liveInfoResponse = await fetch(`/api/live/liveinfo?room_id=${roomId}&initial=1`, {
           cache: "no-store",
           signal: controller.signal,
         });

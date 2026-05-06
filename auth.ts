@@ -5,6 +5,7 @@ import Google from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { assertRequiredEnv, requiredEnv } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 assertRequiredEnv([
   "DATABASE_URL",
@@ -44,6 +45,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return;
       }
 
+      logger.info("User created", { userId, email: user.email, provider: "google" });
+
       await prisma.$transaction(async (tx) => {
         const defaultRole = await tx.role.upsert({
           where: {
@@ -58,6 +61,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             id: true,
           },
         });
+
+        logger.debug("Default role assigned", { userId, roleId: defaultRole.id });
 
         await tx.userRole.upsert({
           where: {
@@ -95,6 +100,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return;
       }
 
+      logger.info("User signed in", { userId, provider: account?.provider ?? "unknown" });
+
       await writeAuditLog({
         actorUserId: userId,
         action: "auth.sign_in",
@@ -110,11 +117,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return;
       }
 
+      const userId = message.session.userId;
+      logger.info("User signed out", { userId });
+
       await writeAuditLog({
-        actorUserId: message.session.userId,
+        actorUserId: userId,
         action: "auth.sign_out",
         resource: "user",
-        resourceId: message.session.userId,
+        resourceId: userId,
         detail: {
           sessionDeleted: true,
         },

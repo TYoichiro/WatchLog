@@ -1,6 +1,7 @@
 // app/api/admin/audit-logs/route.ts
 import { authzErrorResponse, requirePermission } from "@/lib/authz";
 import { toJstWallTimeIsoString } from "@/lib/jst";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
       return authzResponse;
     }
 
-    console.error(error);
+    logger.error("Admin audit-logs fetch failed", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

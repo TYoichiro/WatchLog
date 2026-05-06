@@ -7,6 +7,27 @@ export const proxy = auth((request) => {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-watchlog-pathname", pathname);
 
+  if (pathname.startsWith("/api/")) {
+    const userId = request.auth?.user?.id;
+    const ip =
+      request.headers.get("x-forwarded-for") ??
+      request.headers.get("x-real-ip") ??
+      "unknown";
+    const ua = request.headers.get("user-agent") ?? undefined;
+    console.log(
+      JSON.stringify({
+        time: new Date().toISOString(),
+        level: "info",
+        msg: "API request",
+        method: request.method,
+        path: pathname,
+        userId,
+        ip,
+        ua,
+      })
+    );
+  }
+
   if (request.auth || pathname === "/" || pathname === "/maintenance") {
     return NextResponse.next({
       request: {
