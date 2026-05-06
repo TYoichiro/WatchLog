@@ -1,6 +1,7 @@
 // app/api/admin/users/route.ts
 import { authzErrorResponse, requirePermission } from "@/lib/authz";
 import { toJstWallTimeIsoString } from "@/lib/jst";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +58,7 @@ export async function GET() {
       return authzResponse;
     }
 
-    console.error(error);
+    logger.error("Admin user list failed", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

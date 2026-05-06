@@ -1,5 +1,6 @@
 import { writeAuditLog } from "@/lib/audit";
 import { TOP_ADMIN_ROLE_NAME, authzErrorResponse, requirePermission } from "@/lib/authz";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import type { AssignRoleResult, RouteContext } from "@/types/api/admin-users-roles";
 
@@ -10,6 +11,10 @@ export async function POST(request: Request, context: RouteContext) {
     const actor = await requirePermission("role.assign");
     const { userId } = await context.params;
     const roleId = await readRoleId(request);
+
+    if (roleId) {
+      logger.info("Role assign attempt", { actorId: actor.id, userId, roleId });
+    }
 
     if (!roleId) {
       return Response.json({ error: "Invalid request body" }, { status: 400 });
@@ -95,20 +100,33 @@ export async function POST(request: Request, context: RouteContext) {
     });
 
     if (result.status === "target_user_not_found") {
+      logger.warn("Role assign failed: target user not found", { userId });
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
     if (result.status === "role_not_found") {
+      logger.warn("Role assign failed: role not found", { roleId });
       return Response.json({ error: "Role not found" }, { status: 404 });
     }
 
     if (result.status === "admin_role_not_assignable") {
+      logger.warn("Role assign rejected: admin role cannot be assigned via API", {
+        actorId: actor.id,
+        userId,
+        roleId,
+      });
       return Response.json(
         { error: "Admin role must be assigned directly in the database" },
         { status: 403 },
       );
     }
 
+    logger.info("Role assigned", {
+      actorId: actor.id,
+      userId,
+      roleId: result.role?.id,
+      roleName: result.role?.name,
+    });
     return Response.json({
       userRole: {
         id: result.userRoleId,
@@ -121,7 +139,7 @@ export async function POST(request: Request, context: RouteContext) {
       return authzResponse;
     }
 
-    console.error(error);
+    logger.error("Role assign failed", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

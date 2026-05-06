@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import type { Prisma } from "@/app/generated/prisma/client";
 
 import { auth } from "@/auth";
+import { logger } from "@/lib/logger";
 import { saveOnliveLog } from "@/lib/onlive-log";
 import { filterBlockedShowroomItems } from "@/lib/showroom-block-filter";
 import {
@@ -144,8 +145,11 @@ export async function POST(request: NextRequest) {
   const registeredRoom = await getUserRegisteredRoom(userId);
 
   if (!registeredRoom || registeredRoom.roomId !== roomId) {
+    logger.warn("Onlive log rejected: room not registered for user", { userId, roomId });
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  logger.info("Onlive log save attempt", { userId, roomId, liveId });
 
   let totalRanking: JsonValue = [];
   let totalRankingFetchedAt: string | null = null;
@@ -161,8 +165,9 @@ export async function POST(request: NextRequest) {
         filterBlockedShowroomItems(ranking, new Set(blockedUserIds))
       ) ?? [];
     totalRankingFetchedAt = toJstIsoString();
-  } catch {
+  } catch (error) {
     totalRankingFetchError = "Failed to fetch total ranking";
+    logger.warn("Total ranking fetch failed", { userId, roomId, liveId, error: String(error) });
   }
 
   const log = mergeServerRankingSnapshot(
@@ -180,6 +185,8 @@ export async function POST(request: NextRequest) {
       roomId,
     });
 
+    logger.info("Onlive log saved", { userId, roomId, liveId, logId: savedLog.id });
+
     return Response.json({
       log: {
         ...savedLog,
@@ -188,7 +195,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error(error);
+    logger.error("Onlive log save failed", { userId, roomId, liveId, error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

@@ -7,6 +7,7 @@ import {
   ensureUserInvitationCodes,
   InvalidInvitationCodeError,
 } from "@/lib/invitations";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import {
   getRegisteredRoomOwner,
@@ -76,12 +77,18 @@ export async function PUT(request: NextRequest) {
     );
   }
 
+  logger.info("Room registration attempt", { userId, roomId });
+
   const [currentUserRoom, isTopAdmin] = await Promise.all([
     getUserRegisteredRoom(userId),
     hasTopAdminRole(userId),
   ]);
 
   if (currentUserRoom) {
+    logger.warn("Room registration rejected: user already has a registered room", {
+      userId,
+      existingRoomId: currentUserRoom.roomId,
+    });
     return Response.json(
       { error: ROOM_ALREADY_REGISTERED_MESSAGE },
       { status: 409 }
@@ -92,6 +99,11 @@ export async function PUT(request: NextRequest) {
     const existingOwner = await getRegisteredRoomOwner(userId, roomId, roomUrl);
 
     if (existingOwner) {
+      logger.warn("Room registration rejected: room already registered by another user", {
+        userId,
+        roomId,
+        existingOwnerUserId: existingOwner.userId,
+      });
       return Response.json(
         { error: ROOM_ALREADY_REGISTERED_MESSAGE },
         { status: 409 }
@@ -106,6 +118,8 @@ export async function PUT(request: NextRequest) {
         userId,
         tx
       );
+      logger.debug("Invitation code consumed", { userId, inviteCodeId: consumedInviteCode.id });
+
       const registeredRoom = await saveUserRegisteredRoom(
         userId,
         {
@@ -139,12 +153,15 @@ export async function PUT(request: NextRequest) {
       return registeredRoom;
     });
 
+    logger.info("Room registration succeeded", { userId, roomId: room.roomId, roomName: room.roomName });
     return Response.json({ room });
   } catch (error) {
     if (error instanceof InvalidInvitationCodeError) {
+      logger.warn("Room registration rejected: invalid invitation code", { userId, roomId });
       return Response.json({ error: error.message }, { status: error.status });
     }
 
+    logger.error("Room registration failed", { userId, roomId, error: String(error) });
     throw error;
   }
 }

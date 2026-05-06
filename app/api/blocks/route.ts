@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { authzErrorResponse, requireUser } from "@/lib/authz";
+import { logger } from "@/lib/logger";
 import {
   createUserBlock,
   DeveloperBlockForbiddenError,
@@ -57,11 +58,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const user = await requireUser();
+
+    logger.info("Block create attempt", { userId: user.id, blockedUserId, blockedUserName });
+
     const block = await createUserBlock(user.id, {
       blockedUserId,
       blockedUserName,
     });
 
+    logger.info("Block created", { userId: user.id, blockId: block.id, blockedUserId });
     return Response.json({ block: serializeUserBlock(block) });
   } catch (error) {
     const response = authzErrorResponse(error);
@@ -71,12 +76,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (error instanceof DeveloperBlockForbiddenError) {
+      logger.warn("Block rejected: developer user cannot be blocked", { blockedUserId });
       return Response.json(
         { error: "開発者はブロックできません" },
         { status: error.status }
       );
     }
 
+    logger.error("Block create failed", { blockedUserId, error: String(error) });
     return Response.json({ error: "Failed to create block" }, { status: 500 });
   }
 }
