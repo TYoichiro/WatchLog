@@ -157,6 +157,71 @@ export async function listUserOnliveLogs(
   }));
 }
 
+export async function listAllOnliveLogs(): Promise<OnliveLogListItem[]> {
+  const [logs, registeredRooms] = await Promise.all([
+    prisma.onliveLog.findMany({
+      where: { isDeleted: false },
+      orderBy: { capturedAt: "desc" },
+      take: 500,
+      select: {
+        id: true,
+        roomId: true,
+        liveId: true,
+        capturedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        log: true,
+      },
+    }),
+    prisma.userRegisteredRoom.findMany({
+      select: { roomId: true, roomName: true },
+    }),
+  ]);
+
+  const roomNameMap = new Map(
+    registeredRooms.map((r) => [r.roomId, r.roomName])
+  );
+
+  return logs.map((log) => ({
+    ...log,
+    ...getLogSummaryCounts(log.log),
+    roomName: roomNameMap.get(log.roomId) ?? null,
+  }));
+}
+
+export async function getAnyOnliveLog(
+  logId: string
+): Promise<OnliveLogDetail | null> {
+  const log = await prisma.onliveLog.findFirst({
+    where: { id: logId, isDeleted: false },
+    select: {
+      id: true,
+      roomId: true,
+      liveId: true,
+      capturedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      log: true,
+    },
+  });
+
+  if (!log) {
+    return null;
+  }
+
+  const registeredRoom = await prisma.userRegisteredRoom.findFirst({
+    where: { roomId: log.roomId },
+    select: { roomId: true, roomName: true, roomUrl: true, imageUrl: true },
+  });
+
+  return {
+    ...log,
+    liveStartedAt: getLogLiveStartedAt(log.log),
+    log: getJsonRecord(log.log),
+    room: registeredRoom ?? null,
+  };
+}
+
 export async function getUserOnliveLog(
   userId: string,
   logId: string
