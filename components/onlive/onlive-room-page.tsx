@@ -54,8 +54,6 @@ import { cn } from "@/lib/utils";
 
 const POLLING_INTERVAL_MS = 60_000;
 const ONLIVE_SOCKET_PING_INTERVAL_MS = 60_000;
-const MAX_COMMENT_ROWS = 300;
-const MAX_GIFT_ROWS = 200;
 const GIFT_LOG_MERGE_WINDOW_SECONDS = 30;
 const ONLIVE_LOG_VERSION = 1;
 const ONLIVE_STORAGE_VERSION = 1;
@@ -677,7 +675,7 @@ function mergeCommentRows(
     }
   }
 
-  return rows.slice(0, MAX_COMMENT_ROWS);
+  return rows;
 }
 
 function mergeGiftLogs(
@@ -754,7 +752,7 @@ function mergeGiftLogs(
     }
   }
 
-  return rows.slice(0, MAX_GIFT_ROWS);
+  return rows;
 }
 
 function isFreeGiftLog(item: Pick<RoomGiftLog, "isFree">): boolean {
