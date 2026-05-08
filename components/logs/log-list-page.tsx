@@ -138,7 +138,7 @@ export function LogListPage({ initialLogs }: LogListPageProps) {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="rounded-lg border border-slate-200 bg-white">
           {logs.map((log) => (
             <div
               key={log.id}
