@@ -11,7 +11,8 @@ import {
   type OnliveLogViewerData,
 } from "@/components/onlive/onlive-room-page";
 import { toJstWallTimeIsoString } from "@/lib/jst";
-import { getUserOnliveLog } from "@/lib/onlive-log";
+import { getAnyOnliveLog, getUserOnliveLog } from "@/lib/onlive-log";
+import { hasTopAdminRole } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,10 @@ export default async function Page({
   }
 
   const { logId } = await params;
-  const log = await getUserOnliveLog(userId, logId);
+  const isAdmin = await hasTopAdminRole(userId);
+  const log = isAdmin
+    ? await getAnyOnliveLog(logId)
+    : await getUserOnliveLog(userId, logId);
 
   if (!log) {
     notFound();

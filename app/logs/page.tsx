@@ -9,8 +9,9 @@ export const metadata: Metadata = {
 import { LogListPage, type LogListItem } from "@/components/logs/log-list-page";
 import { AppShell } from "@/components/navigation/app-sidebar";
 import { toJstWallTimeIsoString } from "@/lib/jst";
-import { listUserOnliveLogs, type OnliveLogListItem } from "@/lib/onlive-log";
+import { listAllOnliveLogs, listUserOnliveLogs, type OnliveLogListItem } from "@/lib/onlive-log";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
+import { hasTopAdminRole } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,17 @@ export default async function Page() {
 
   if (!userId) {
     redirect("/");
+  }
+
+  const isAdmin = await hasTopAdminRole(userId);
+
+  if (isAdmin) {
+    const logs = await listAllOnliveLogs();
+    return (
+      <AppShell activeKey="logs">
+        <LogListPage initialLogs={logs.map(toListItem)} />
+      </AppShell>
+    );
   }
 
   const [registeredRoom, logs] = await Promise.all([
