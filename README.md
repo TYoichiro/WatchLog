@@ -92,6 +92,20 @@ npm run dev
 | `AUTH_GOOGLE_ID` | Yes | Google OAuth Client ID |
 | `AUTH_GOOGLE_SECRET` | Yes | Google OAuth Client Secret |
 | `NEXTAUTH_URL` | Yes | アプリケーションのベース URL |
+| `LOG_LEVEL` | No | ログ出力レベル（`debug` / `info` / `warn` / `error`）。未設定時は開発環境で `debug`、本番環境で `info` |
+
+### ログレベルについて
+
+`LOG_LEVEL` 環境変数でアプリケーションのログ出力レベルを制御できます。
+
+| 値 | 内容 |
+| --- | --- |
+| `debug` | デバッグ情報を含むすべてのログを出力 |
+| `info` | 通常の動作ログを出力（デフォルト: 本番） |
+| `warn` | 警告以上のみ出力 |
+| `error` | エラーのみ出力 |
+
+未設定の場合、`NODE_ENV` が `production` 以外なら `debug`、本番環境なら `info` が使われます。開発時に詳細ログが不要な場合は `.env.local` に `LOG_LEVEL="info"` を追加してください。
 
 ## npm scripts
 
