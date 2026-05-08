@@ -326,7 +326,7 @@ export function AppShell({
 
           <main
             className={cn(
-              "flex w-full flex-1 flex-col gap-4 p-4 xl:min-h-0 xl:overflow-y-auto",
+              "flex w-full flex-1 flex-col gap-4 p-4 xl:h-full xl:overflow-auto",
               mainClassName
             )}
           >
