@@ -43,6 +43,7 @@ const adminPermissionActions: readonly PermissionAction[] = permissionDefinition
   (permission) => permission.action,
 );
 const userPermissionActions = ["profile.read"] satisfies readonly PermissionAction[];
+const premiumUserPermissionActions = ["profile.read"] satisfies readonly PermissionAction[];
 
 const dashboardNotices = [
   {
@@ -91,7 +92,7 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  const [adminRole, userRole] = await Promise.all([
+  const [adminRole, userRole, premiumUserRole] = await Promise.all([
     prisma.role.upsert({
       where: {
         name: "admin",
@@ -117,6 +118,21 @@ async function main() {
       create: {
         name: "user",
         description: "Default authenticated user",
+      },
+      select: {
+        id: true,
+      },
+    }),
+    prisma.role.upsert({
+      where: {
+        name: "premiumuser",
+      },
+      update: {
+        description: "Premium authenticated user",
+      },
+      create: {
+        name: "premiumuser",
+        description: "Premium authenticated user",
       },
       select: {
         id: true,
@@ -141,6 +157,7 @@ async function main() {
   await Promise.all([
     assignPermissions(adminRole.id, adminPermissionActions),
     assignPermissions(userRole.id, userPermissionActions),
+    assignPermissions(premiumUserRole.id, premiumUserPermissionActions),
   ]);
 
   await prisma.dashboardNotice.deleteMany({
