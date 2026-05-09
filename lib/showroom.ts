@@ -278,7 +278,7 @@ type ShowroomUserRoomProfileResponse = {
   share_url?: string | null;
   share_url_live?: string | null;
   sns_list?: ShowroomUserProfileSnsItem[] | null;
-  avatar?: string | null;
+  avatar?: string | { description?: string | null; list?: string[] | null } | null;
   view_num?: number | string | null;
 };
 
@@ -717,7 +717,7 @@ function normalizeUserRoomProfile(
     : [];
 
   return {
-    avatarUrl: rawData.avatar?.trim() || null,
+    avatarUrl: typeof rawData.avatar === "string" ? rawData.avatar.trim() || null : null,
     banners,
     currentLiveStartedAt: toUnixSeconds(rawData.current_live_started_at),
     description: rawData.description?.trim() || "",
