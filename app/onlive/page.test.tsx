@@ -212,44 +212,41 @@ const mockFetch = (scenario: FetchScenario = {}) => {
     blocks = [],
   } = scenario;
 
+  const parsedRoomId = registeredRoom ? Number(registeredRoom.roomId) : NaN;
+  const isValidRoom =
+    registeredRoom !== null &&
+    Number.isInteger(parsedRoomId) &&
+    parsedRoomId > 0;
+
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = getFetchUrl(input);
     const method = init?.method ?? "GET";
 
-    if (url === "/api/registered-room") {
-      return jsonResponse({ room: registeredRoom });
+    if (url === "/api/onlive/init") {
+      if (!isValidRoom) {
+        return jsonResponse({ status: "no_room" });
+      }
+
+      return jsonResponse({
+        status: "ok",
+        roomId: parsedRoomId,
+        liveInfo,
+        giftDefinitions,
+        comments,
+        gifts,
+        telop,
+      });
     }
 
-    if (url.startsWith("/api/live/liveinfo")) {
-      return jsonResponse(liveInfo);
-    }
-
-    if (url.startsWith("/api/room/gift-definitions")) {
-      return jsonResponse({ gifts: giftDefinitions });
-    }
-
-    if (url.startsWith("/api/room/profile")) {
-      return jsonResponse(profile);
-    }
-
-    if (url.startsWith("/api/room/live-ranking")) {
-      return jsonResponse({ ranking: liveRanking });
-    }
-
-    if (url.startsWith("/api/room/total-ranking")) {
-      return jsonResponse({ ranking: totalRanking });
-    }
-
-    if (url.startsWith("/api/room/gifts")) {
-      return jsonResponse({ gifts });
-    }
-
-    if (url.startsWith("/api/room/comments")) {
-      return jsonResponse({ comments });
-    }
-
-    if (url.startsWith("/api/room/telop")) {
-      return jsonResponse({ telop });
+    if (url === "/api/onlive/poll") {
+      return jsonResponse({
+        profile,
+        profileHasError: false,
+        liveRanking,
+        liveRankingHasError: false,
+        totalRanking,
+        totalRankingHasError: false,
+      });
     }
 
     if (url.startsWith("/api/room/user-profile")) {
@@ -389,15 +386,11 @@ describe("Onlive page", () => {
     expect(screen.getByText("Total Ranker")).not.toBeNull();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/live/liveinfo?room_id=123&initial=1",
+      "/api/onlive/init",
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/room/profile?room_id=123",
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/room/gifts?room_id=123",
+      "/api/onlive/poll",
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });

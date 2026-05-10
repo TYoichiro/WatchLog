@@ -47,7 +47,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AppShell } from "@/components/navigation/app-sidebar";
-import { fetchRegisteredRoom } from "@/lib/registered-room";
 import { toJstIsoString } from "@/lib/jst";
 import { useUserBlocks } from "@/hooks/use-user-blocks";
 import { cn } from "@/lib/utils";
@@ -78,34 +77,27 @@ type NoticeTone =
   | "firstVisit"
   | "ranking";
 
-type CommentResponse = {
-  comments: RoomComment[];
+type UserProfileResponse = {
+  profile: RoomUserProfile;
 };
 
-type TelopResponse = {
+type OnliveInitOkResponse = {
+  status: "ok";
+  roomId: number;
+  liveInfo: RoomLiveInfo | null;
+  giftDefinitions: RoomGiftDefinition[];
+  comments: RoomComment[];
+  gifts: RoomGiftLog[];
   telop: string | null;
 };
 
-type GiftResponse = {
-  gifts: RoomGiftLog[];
-};
-
-type GiftDefinitionsResponse = {
-  gifts: RoomGiftDefinition[];
-};
-
-type LiveInfoResponse = RoomLiveInfo;
-
-type LiveRankingResponse = {
-  ranking: RoomLiveRankingUser[];
-};
-
-type TotalRankingResponse = {
-  ranking: RoomTotalRankingUser[];
-};
-
-type UserProfileResponse = {
-  profile: RoomUserProfile;
+type OnlivePollResponse = {
+  profile: RoomProfile | null;
+  profileHasError: boolean;
+  liveRanking: RoomLiveRankingUser[];
+  liveRankingHasError: boolean;
+  totalRanking: RoomTotalRankingUser[];
+  totalRankingHasError: boolean;
 };
 
 type GiftTotals = {
@@ -1190,22 +1182,6 @@ function formatMetricDelta({
   };
 }
 
-function identityResponse<T>(value: T): T {
-  return value;
-}
-
-function selectLiveRankingResponse(
-  response: LiveRankingResponse
-): RoomLiveRankingUser[] {
-  return response.ranking;
-}
-
-function selectTotalRankingResponse(
-  response: TotalRankingResponse
-): RoomTotalRankingUser[] {
-  return response.ranking;
-}
-
 function formatLiveStartedClock(unixSeconds: number | null): string {
   const parts = getJstDateParts(unixSeconds);
 
@@ -1328,180 +1304,16 @@ function UserVisitStatusBadge({
   );
 }
 
-function usePollingResource<TResponse, TData>(
-  url: string,
-  selectData: (response: TResponse) => TData,
-  isEnabled = true
+function useRoomGiftLogs(initialGifts: RoomGiftLog[]) {
+  const [gifts] = useState(() => initialGifts);
+  return { gifts, isLoading: false, hasError: false };
+}
+
+function useShowroomRealtimeFeed(
+  roomId: number,
+  liveInfo: RoomLiveInfo | null,
+  giftDefinitions: RoomGiftDefinition[]
 ) {
-  const [data, setData] = useState<TData | null>(null);
-  const [initialData, setInitialData] = useState<TData | null>(null);
-  const [previousData, setPreviousData] = useState<TData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  const latestDataRef = useRef<TData | null>(null);
-
-  useEffect(() => {
-    if (!isEnabled) {
-      return;
-    }
-
-    let isActive = true;
-    let currentController: AbortController | null = null;
-
-    async function loadResource() {
-      currentController?.abort();
-
-      const controller = new AbortController();
-      currentController = controller;
-
-      try {
-        const response = await fetch(url, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ${url}`);
-        }
-
-        const payload = (await response.json()) as TResponse;
-        const nextData = selectData(payload);
-
-        if (!isActive || controller.signal.aborted) {
-          return;
-        }
-
-        const previousData = latestDataRef.current;
-
-        setPreviousData(previousData);
-        if (previousData === null) {
-          setInitialData(nextData);
-        }
-        latestDataRef.current = nextData;
-        setData(nextData);
-        setHasError(false);
-      } catch (error) {
-        if ((error as Error).name === "AbortError" || !isActive) {
-          return;
-        }
-
-        if (latestDataRef.current === null) {
-          setHasError(true);
-        }
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void loadResource();
-
-    const intervalId = window.setInterval(() => {
-      void loadResource();
-    }, POLLING_INTERVAL_MS);
-
-    return () => {
-      isActive = false;
-      currentController?.abort();
-      window.clearInterval(intervalId);
-    };
-  }, [isEnabled, selectData, url]);
-
-  return { data, initialData, previousData, isLoading: isEnabled ? isLoading : false, hasError };
-}
-
-function useRoomGiftLogs(roomId: number) {
-  const [gifts, setGifts] = useState<RoomGiftLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadGifts() {
-      try {
-        const response = await fetch(`/api/room/gifts?room_id=${roomId}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch gifts");
-        }
-
-        const data = (await response.json()) as GiftResponse;
-        setGifts(data.gifts);
-        setHasError(false);
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          return;
-        }
-
-        setHasError(true);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadGifts();
-
-    return () => controller.abort();
-  }, [roomId]);
-
-  return { gifts, isLoading, hasError };
-}
-
-function useRoomTelop(roomId: number, isEnabled = true) {
-  const [telop, setTelop] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    if (!isEnabled) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    async function loadTelop() {
-      try {
-        const response = await fetch(`/api/room/telop?room_id=${roomId}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch telop");
-        }
-
-        const data = (await response.json()) as TelopResponse;
-        setTelop(data.telop);
-        setHasError(false);
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          return;
-        }
-
-        setHasError(true);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadTelop();
-
-    return () => controller.abort();
-  }, [isEnabled, roomId]);
-
-  return {
-    telop,
-    isLoading: isEnabled ? isLoading : false,
-    hasError: isEnabled ? hasError : false,
-  };
-}
-
-function useShowroomRealtimeFeed(roomId: number) {
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [gifts, setGifts] = useState<RoomGiftLog[]>([]);
   const [hasFatalError, setHasFatalError] = useState(false);
@@ -1550,18 +1362,12 @@ function useShowroomRealtimeFeed(roomId: number) {
       }
     };
 
-    async function connect() {
+    function connect() {
       try {
-        const liveInfoResponse = await fetch(`/api/live/liveinfo?room_id=${roomId}&initial=1`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-
-        if (!liveInfoResponse.ok) {
-          throw new Error("Failed to fetch live info");
+        if (!liveInfo) {
+          reportFatalError();
+          return;
         }
-
-        const liveInfo = (await liveInfoResponse.json()) as LiveInfoResponse;
 
         if (!isActive) {
           return;
@@ -1596,21 +1402,7 @@ function useShowroomRealtimeFeed(roomId: number) {
           restoredSessionRef.current = liveSessionKey;
         }
 
-        const giftDefinitionsResponse = await fetch(
-          `/api/room/gift-definitions?room_id=${roomId}`,
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          }
-        );
-
-        if (!giftDefinitionsResponse.ok) {
-          throw new Error("Failed to fetch gift definitions");
-        }
-
-        const giftDefinitionsData =
-          (await giftDefinitionsResponse.json()) as GiftDefinitionsResponse;
-        const giftDefinitions = toGiftDefinitionMap(giftDefinitionsData.gifts);
+        const giftDefinitionMap = toGiftDefinitionMap(giftDefinitions);
         const bcsvrKey = liveInfo.bcsvrKey?.trim();
 
         if (!bcsvrKey) {
@@ -1693,7 +1485,7 @@ function useShowroomRealtimeFeed(roomId: number) {
             const gift = normalizeRealtimeGift(
               payload,
               nextSequence,
-              giftDefinitions
+              giftDefinitionMap
             );
             if (gift) {
               setGifts((current) => mergeGiftLogs([gift], current));
@@ -1779,47 +1571,99 @@ function useShowroomRealtimeFeed(roomId: number) {
   };
 }
 
-function useRoomLiveRanking(roomId: number, isEnabled = true) {
-  const { data, isLoading, hasError } = usePollingResource(
-    `/api/room/live-ranking?room_id=${roomId}`,
-    selectLiveRankingResponse,
-    isEnabled
-  );
+function useOnlivePoll(isEnabled = true) {
+  const [profile, setProfile] = useState<RoomProfile | null>(null);
+  const [initialProfile, setInitialProfile] = useState<RoomProfile | null>(null);
+  const [previousProfile, setPreviousProfile] = useState<RoomProfile | null>(null);
+  const [liveRanking, setLiveRanking] = useState<RoomLiveRankingUser[]>([]);
+  const [totalRanking, setTotalRanking] = useState<RoomTotalRankingUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [profileHasError, setProfileHasError] = useState(false);
+  const [liveRankingHasError, setLiveRankingHasError] = useState(false);
+  const [totalRankingHasError, setTotalRankingHasError] = useState(false);
+  const latestProfileRef = useRef<RoomProfile | null>(null);
+
+  useEffect(() => {
+    if (!isEnabled) {
+      return;
+    }
+
+    let isActive = true;
+    let currentController: AbortController | null = null;
+
+    async function loadPollData() {
+      currentController?.abort();
+      const controller = new AbortController();
+      currentController = controller;
+
+      try {
+        const response = await fetch("/api/onlive/poll", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch poll data");
+        }
+
+        const data = (await response.json()) as OnlivePollResponse;
+
+        if (!isActive || controller.signal.aborted) {
+          return;
+        }
+
+        const prevProfile = latestProfileRef.current;
+        setPreviousProfile(prevProfile);
+        if (prevProfile === null) {
+          setInitialProfile(data.profile);
+        }
+        latestProfileRef.current = data.profile;
+        setProfile(data.profile);
+        setLiveRanking(data.liveRanking);
+        setTotalRanking(data.totalRanking);
+        setProfileHasError(data.profileHasError);
+        setLiveRankingHasError(data.liveRankingHasError);
+        setTotalRankingHasError(data.totalRankingHasError);
+      } catch (error) {
+        if ((error as Error).name === "AbortError" || !isActive) {
+          return;
+        }
+
+        if (latestProfileRef.current === null) {
+          setProfileHasError(true);
+          setLiveRankingHasError(true);
+          setTotalRankingHasError(true);
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadPollData();
+
+    const intervalId = window.setInterval(() => {
+      void loadPollData();
+    }, POLLING_INTERVAL_MS);
+
+    return () => {
+      isActive = false;
+      currentController?.abort();
+      window.clearInterval(intervalId);
+    };
+  }, [isEnabled]);
 
   return {
-    ranking: data ?? [],
-    isLoading,
-    hasError,
-  };
-}
-
-function useRoomTotalRanking(roomId: number, isEnabled = true) {
-  const { data, isLoading, hasError } = usePollingResource(
-    `/api/room/total-ranking?room_id=${roomId}`,
-    selectTotalRankingResponse,
-    isEnabled
-  );
-
-  return {
-    ranking: data ?? [],
-    isLoading,
-    hasError,
-  };
-}
-
-function useRoomProfile(roomId: number, isEnabled = true) {
-  const { data, initialData, previousData, isLoading, hasError } = usePollingResource(
-    `/api/room/profile?room_id=${roomId}`,
-    identityResponse<RoomProfile>,
-    isEnabled
-  );
-
-  return {
-    profile: data,
-    initialProfile: initialData,
-    previousProfile: previousData,
-    isLoading,
-    hasError,
+    profile,
+    initialProfile,
+    previousProfile,
+    liveRanking,
+    totalRanking,
+    isLoading: isEnabled ? isLoading : false,
+    profileHasError: isEnabled ? profileHasError : false,
+    liveRankingHasError: isEnabled ? liveRankingHasError : false,
+    totalRankingHasError: isEnabled ? totalRankingHasError : false,
   };
 }
 
@@ -2731,6 +2575,8 @@ export function UserProfileModal({
 function CommentPane({
   blockedUserIds,
   hasLiveInfo,
+  initialComments = [],
+  initialTelop = null,
   isSnapshot = false,
   isLiveEnded,
   liveComments,
@@ -2742,6 +2588,8 @@ function CommentPane({
 }: {
   blockedUserIds: ReadonlySet<string>;
   hasLiveInfo: boolean;
+  initialComments?: RoomComment[];
+  initialTelop?: string | null;
   isSnapshot?: boolean;
   isLiveEnded: boolean;
   liveComments: readonly CommentRow[];
@@ -2751,52 +2599,12 @@ function CommentPane({
   onOpenProfile: OpenProfileHandler;
   roomId: number;
 }) {
-  const [comments, setComments] = useState<CommentRow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const [comments] = useState<CommentRow[]>(() =>
+    isSnapshot ? [] : normalizeComments(initialComments)
+  );
+  const [isLoading] = useState(false);
+  const [hasError] = useState(false);
   const showNotice = true;
-  const {
-    telop,
-    isLoading: isTelopLoading,
-    hasError: hasTelopError,
-  } = useRoomTelop(roomId, !isSnapshot);
-
-  useEffect(() => {
-    if (isSnapshot) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    async function loadComments() {
-      try {
-        const response = await fetch(`/api/room/comments?room_id=${roomId}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error("コメントの取得に失敗しました");
-        }
-
-        const data = (await response.json()) as CommentResponse;
-        setComments(normalizeComments(data.comments));
-        setHasError(false);
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          return;
-        }
-
-        setHasError(true);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadComments();
-
-    return () => controller.abort();
-  }, [isSnapshot, roomId]);
 
   useEffect(() => {
     if (
@@ -2827,11 +2635,7 @@ function CommentPane({
   const hasTableError = !isSnapshot && hasError && mergedComments.length === 0;
   const telopText = isSnapshot
     ? liveTelop ?? "テロップは保存されていません"
-    : hasTelopError
-      ? "テロップの取得に失敗しました"
-      : isTelopLoading
-        ? "テロップを取得中です"
-        : liveTelop ?? telop ?? "テロップは設定されていません";
+    : liveTelop ?? initialTelop ?? "テロップは設定されていません";
 
   return (
     <SectionCard
@@ -3352,6 +3156,8 @@ function LiveBody({
   hasLiveRankingError,
   hasTotalRankingError,
   hasGiftError,
+  initialComments = [],
+  initialTelop = null,
   isLiveEnded,
   isLiveRankingLoading,
   isTotalRankingLoading,
@@ -3372,6 +3178,8 @@ function LiveBody({
   hasLiveRankingError: boolean;
   hasTotalRankingError: boolean;
   hasGiftError: boolean;
+  initialComments?: RoomComment[];
+  initialTelop?: string | null;
   isLiveEnded: boolean;
   isLiveRankingLoading: boolean;
   isTotalRankingLoading: boolean;
@@ -3404,6 +3212,8 @@ function LiveBody({
         <CommentPane
           blockedUserIds={blockedUserIds}
           hasLiveInfo={hasLiveInfo}
+          initialComments={initialComments}
+          initialTelop={initialTelop}
           isSnapshot={isSnapshot}
           isLiveEnded={isLiveEnded}
           liveComments={liveComments}
@@ -3992,10 +3802,11 @@ export function OnliveLogViewerPage({
   );
 }
 
-function OnliveRoomPage({ roomId }: { roomId: number }) {
+function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
   const router = useRouter();
+  const { roomId } = initData;
   const { gifts, isLoading: isGiftLoading, hasError: hasGiftError } =
-    useRoomGiftLogs(roomId);
+    useRoomGiftLogs(initData.gifts);
   const {
     comments: liveComments,
     gifts: liveGifts,
@@ -4006,24 +3817,20 @@ function OnliveRoomPage({ roomId }: { roomId: number }) {
     liveId,
     liveStatus,
     telop: liveTelop,
-  } = useShowroomRealtimeFeed(roomId);
+  } = useShowroomRealtimeFeed(roomId, initData.liveInfo, initData.giftDefinitions);
   const {
     initialProfile: initialRoomProfile,
     profile: roomProfile,
     previousProfile: previousRoomProfile,
     isLoading: isRoomProfileLoading,
-    hasError: hasRoomProfileError,
-  } = useRoomProfile(roomId, !isLiveEnded);
-  const {
-    ranking: liveRanking,
-    isLoading: isLiveRankingLoading,
-    hasError: hasLiveRankingError,
-  } = useRoomLiveRanking(roomId, !isLiveEnded);
-  const {
-    ranking: totalRanking,
-    isLoading: isTotalRankingLoading,
-    hasError: hasTotalRankingError,
-  } = useRoomTotalRanking(roomId, !isLiveEnded);
+    profileHasError: hasRoomProfileError,
+    liveRanking,
+    totalRanking,
+    liveRankingHasError: hasLiveRankingError,
+    totalRankingHasError: hasTotalRankingError,
+  } = useOnlivePoll(!isLiveEnded);
+  const isLiveRankingLoading = isRoomProfileLoading;
+  const isTotalRankingLoading = isRoomProfileLoading;
   const [selectedProfileTarget, setSelectedProfileTarget] =
     useState<ProfileTarget | null>(null);
   const [profileCache, setProfileCache] = useState<Record<string, RoomUserProfile>>(
@@ -4614,6 +4421,8 @@ function OnliveRoomPage({ roomId }: { roomId: number }) {
         blockedUserIds={blockedUserIds}
         gifts={visibleMergedGifts}
         hasLiveInfo={hasLiveInfo}
+        initialComments={initData.comments}
+        initialTelop={initData.telop}
         liveRanking={visibleLiveRanking}
         liveComments={visibleLiveComments}
         liveId={liveId}
@@ -4698,17 +4507,26 @@ function OnliveRoomPage({ roomId }: { roomId: number }) {
 
 export function OnlivePage() {
   const router = useRouter();
-  const [roomId, setRoomId] = useState<number | null>(null);
+  const [initData, setInitData] = useState<OnliveInitOkResponse | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     let isActive = true;
 
-    async function loadRegisteredRoom() {
-      let registeredRoom: Awaited<ReturnType<typeof fetchRegisteredRoom>>;
+    async function loadInitData() {
+      let data: OnliveInitOkResponse | { status: "no_room" };
 
       try {
-        registeredRoom = await fetchRegisteredRoom(controller.signal);
+        const response = await fetch("/api/onlive/init", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch init data");
+        }
+
+        data = (await response.json()) as OnliveInitOkResponse | { status: "no_room" };
       } catch (error) {
         if ((error as Error).name === "AbortError" || !isActive) {
           return;
@@ -4722,22 +4540,16 @@ export function OnlivePage() {
         return;
       }
 
-      const parsedRoomId = registeredRoom ? Number(registeredRoom.roomId) : NaN;
-
-      if (
-        !registeredRoom ||
-        !Number.isInteger(parsedRoomId) ||
-        parsedRoomId <= 0
-      ) {
+      if (data.status === "no_room") {
         router.replace("/search");
         return;
       }
 
-      setRoomId(parsedRoomId);
+      setInitData(data);
     }
 
     const timeoutId = window.setTimeout(() => {
-      void loadRegisteredRoom();
+      void loadInitData();
     }, 0);
 
     return () => {
@@ -4747,9 +4559,9 @@ export function OnlivePage() {
     };
   }, [router]);
 
-  if (roomId === null) {
+  if (initData === null) {
     return null;
   }
 
-  return <OnliveRoomPage roomId={roomId} />;
+  return <OnliveRoomPage initData={initData} />;
 }

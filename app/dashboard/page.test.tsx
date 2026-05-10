@@ -138,53 +138,37 @@ function setupFetchScenario({
   fetchMock.mockImplementation(async (input) => {
     const url = getFetchUrl(input);
 
-    if (url === "/api/registered-room") {
-      return jsonResponse({ room: registeredRoomData });
-    }
-
-    if (url.startsWith("/api/room/profile?")) {
-      if (!profileOk) {
-        return jsonResponse({ error: "Failed" }, { status: 500 });
+    if (url === "/api/dashboard") {
+      if (!registeredRoomData) {
+        return jsonResponse({ status: "no_room" });
       }
 
-      return jsonResponse(profileData);
-    }
-
-    if (url.startsWith("/api/room/activefan?")) {
-      if (!activeFanData) {
-        return jsonResponse({ error: "Failed" }, { status: 500 });
-      }
-
-      return jsonResponse(activeFanData);
-    }
-
-    if (url.startsWith("/api/room/eventandsupport?")) {
-      if (!eventAndSupportData) {
-        return jsonResponse({ error: "Failed" }, { status: 500 });
-      }
-
-      return jsonResponse(eventAndSupportData);
-    }
-
-    if (url.startsWith("/api/room/status?")) {
-      return jsonResponse(roomStatusData);
-    }
-
-    if (url === "/api/dashboard/notices") {
-      if (!noticesOk) {
-        return jsonResponse({ error: "Failed" }, { status: 500 });
-      }
+      const resolvedProfile = profileOk ? profileData : null;
+      const isLive =
+        resolvedProfile?.isOnlive === true || roomStatusData.isLive === true;
 
       return jsonResponse({
-        notices: [
-          {
-            body: "Dashboard maintenance is scheduled.",
-            date: "2026/05/09 21:00",
-            id: 1,
-            linkUrl: null,
-            title: "Dashboard notice",
-          },
-        ],
+        status: isLive ? "is_live" : "ok",
+        registeredRoom: {
+          roomId: registeredRoomData.roomId,
+          roomUrl: registeredRoomData.roomUrl,
+        },
+        profile: resolvedProfile,
+        activeFan: activeFanData,
+        eventAndSupport: eventAndSupportData,
+        notices: noticesOk
+          ? [
+              {
+                body: "Dashboard maintenance is scheduled.",
+                date: "2026/05/09 21:00",
+                id: 1,
+                linkUrl: null,
+                title: "Dashboard notice",
+              },
+            ]
+          : [],
+        noticesHasError: !noticesOk,
+        roomStatus: roomStatusData,
       });
     }
 
@@ -278,16 +262,16 @@ describe("DashboardPage", () => {
     expect(screen.queryByText("開催中のイベント")).toBeNull();
   });
 
-  it("starts the live watcher after loading dashboard data", async () => {
+  it("fetches dashboard data with no-store cache", async () => {
     setupFetchScenario();
 
     render(<DashboardPage />);
 
     await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
 
-    const statusCall = fetchCallsFor("/api/room/status")[0];
-    expect(getFetchUrl(statusCall[0])).toBe("/api/room/status?room_url_key=alpha-room");
-    expect(statusCall[1]).toEqual(expect.objectContaining({ cache: "no-store" }));
+    const bffCalls = fetchCallsFor("/api/dashboard");
+    expect(bffCalls.length).toBeGreaterThan(0);
+    expect(bffCalls[0][1]).toEqual(expect.objectContaining({ cache: "no-store" }));
   });
 
   it("renders the dashboard shell when the profile endpoint fails", async () => {
@@ -300,15 +284,14 @@ describe("DashboardPage", () => {
     expect(screen.getAllByText("取得できませんでした").length).toBeGreaterThan(0);
   });
 
-  it("redirects to /onlive when the live watcher detects that the room went live", async () => {
+  it("redirects to /onlive when the BFF reports the room is live", async () => {
     setupFetchScenario({ roomStatus: { ...roomStatus, isLive: true } });
 
     render(<DashboardPage />);
 
-    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
-
     await waitFor(() => {
       expect(routerReplace).toHaveBeenCalledWith("/onlive");
     });
+    expect(screen.queryByRole("heading", { level: 1, name: "Alpha Room" })).toBeNull();
   });
 });
