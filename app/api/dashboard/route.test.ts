@@ -10,10 +10,15 @@ const mocks = vi.hoisted(() => ({
   getRoomProfile: vi.fn(),
   getRoomStatus: vi.fn(),
   getUserRegisteredRoom: vi.fn(),
+  hasTopAdminRole: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({
   auth: mocks.auth,
+}));
+
+vi.mock("@/lib/authz", () => ({
+  hasTopAdminRole: mocks.hasTopAdminRole,
 }));
 
 vi.mock("@/lib/dashboard-notices", () => ({
@@ -91,6 +96,7 @@ async function expectJson(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.hasTopAdminRole.mockResolvedValue(false);
 });
 
 describe("GET /api/dashboard", () => {
@@ -141,6 +147,7 @@ describe("GET /api/dashboard", () => {
     expect(response.status).toBe(200);
     expect(data).toMatchObject({
       status: "is_live",
+      isAdmin: false,
       registeredRoom: {
         roomId: "123",
         roomUrl: "alpha-room",
@@ -156,6 +163,28 @@ describe("GET /api/dashboard", () => {
     expect(mocks.getRoomActiveFan).toHaveBeenCalledWith("123");
     expect(mocks.getRoomEventAndSupport).toHaveBeenCalledWith("123");
     expect(mocks.getRoomStatus).toHaveBeenCalledWith("alpha-room");
+    expect(mocks.hasTopAdminRole).toHaveBeenCalledWith("user-1");
+  });
+
+  it("marks top admins in the dashboard payload", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "admin-1" } });
+    mocks.hasTopAdminRole.mockResolvedValue(true);
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.getRoomProfile.mockResolvedValue(profile);
+    mocks.getRoomActiveFan.mockResolvedValue(null);
+    mocks.getRoomEventAndSupport.mockResolvedValue(null);
+    mocks.getDashboardNotices.mockResolvedValue([]);
+    mocks.getRoomStatus.mockResolvedValue(roomStatus);
+
+    const response = await GET();
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      status: "ok",
+      isAdmin: true,
+    });
+    expect(mocks.hasTopAdminRole).toHaveBeenCalledWith("admin-1");
   });
 
   it("keeps the response usable when supplemental sources fail", async () => {
@@ -173,6 +202,7 @@ describe("GET /api/dashboard", () => {
     expect(response.status).toBe(200);
     expect(data).toMatchObject({
       status: "ok",
+      isAdmin: false,
       activeFan: null,
       eventAndSupport: null,
       notices: [],

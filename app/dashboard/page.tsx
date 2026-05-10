@@ -541,7 +541,7 @@ export default function Page() {
       setCanShowDashboard(true);
 
       const broadcastKey = roomStatus?.broadcastKey?.trim();
-      if (broadcastKey) {
+      if (!bffData.isAdmin && broadcastKey) {
         startLiveStartWatcher(broadcastKey);
       }
     }
