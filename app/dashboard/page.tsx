@@ -19,9 +19,7 @@ import {
   type ActiveFanSummary,
   type EventAndSupportSummary,
   type RoomProfile,
-  type RoomStatus,
 } from "@/lib/showroom";
-import { fetchRegisteredRoom } from "@/lib/registered-room";
 import {
   createShowroomSubscribeMessage,
   getShowroomSocketPayloadText,
@@ -30,6 +28,7 @@ import {
   SHOWROOM_SOCKET_URL,
 } from "@/lib/showroom-realtime";
 import type {
+  DashboardBffResponse,
   DashboardData,
   DashboardRealtimeMessage,
   DashboardStat,
@@ -67,43 +66,17 @@ function formatTime(unixSeconds: number | null | undefined): string {
   )}） ${get("hour")}時${get("minute")}分`;
 }
 
-async function fetchDashboardEndpoint<T>(
-  endpoint: string,
-  roomId: string,
-  signal: AbortSignal
-): Promise<T> {
-  const response = await fetch(
-    `${endpoint}?room_id=${encodeURIComponent(roomId)}`,
-    {
-      cache: "no-store",
-      signal,
-    }
-  );
+async function fetchDashboard(signal: AbortSignal): Promise<DashboardBffResponse> {
+  const response = await fetch("/api/dashboard", {
+    cache: "no-store",
+    signal,
+  });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch ${endpoint}`);
+    throw new Error("Failed to fetch dashboard");
   }
 
-  return (await response.json()) as T;
-}
-
-async function fetchRoomStatus(
-  roomUrlKey: string,
-  signal: AbortSignal
-): Promise<RoomStatus> {
-  const response = await fetch(
-    `/api/room/status?room_url_key=${encodeURIComponent(roomUrlKey)}`,
-    {
-      cache: "no-store",
-      signal,
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch room status");
-  }
-
-  return (await response.json()) as RoomStatus;
+  return (await response.json()) as DashboardBffResponse;
 }
 
 function toRealtimeMessageType(
@@ -145,34 +118,6 @@ function isLiveStartedSocketMessage(
   } catch {
     return false;
   }
-}
-
-async function getDashboardSupplementalData(
-  roomId: string,
-  signal: AbortSignal
-): Promise<Pick<DashboardData, "activeFan" | "eventAndSupport">> {
-  const [activeFanResult, eventAndSupportResult] =
-    await Promise.allSettled([
-      fetchDashboardEndpoint<ActiveFanSummary>(
-        "/api/room/activefan",
-        roomId,
-        signal
-      ),
-      fetchDashboardEndpoint<EventAndSupportSummary>(
-        "/api/room/eventandsupport",
-        roomId,
-        signal
-      ),
-    ]);
-
-  return {
-    activeFan:
-      activeFanResult.status === "fulfilled" ? activeFanResult.value : null,
-    eventAndSupport:
-      eventAndSupportResult.status === "fulfilled"
-        ? eventAndSupportResult.value
-        : null,
-  };
 }
 
 function createRoomStats(
@@ -250,7 +195,7 @@ function HeroCard({ profile }: { profile: RoomProfile | null }) {
           width={1600}
           height={900}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-r from-black/65 via-black/30 to-transparent" />
         <div className="absolute left-4 top-1/2 -translate-y-1/2 sm:left-8">
           <Badge className="mb-3 rounded-full bg-white/20 px-3 py-1 text-white backdrop-blur">
             {profile?.isOfficial ? "公式枠ルーム" : "フリー枠ルーム"}
@@ -392,6 +337,8 @@ export default function Page() {
     profile: null,
     activeFan: null,
     eventAndSupport: null,
+    notices: [],
+    noticesHasError: false,
   });
 
   useEffect(() => {
@@ -444,86 +391,63 @@ export default function Page() {
       window.location.reload();
     };
 
-    async function startLiveStartWatcher(roomUrlKey: string) {
-      try {
-        const status = await fetchRoomStatus(roomUrlKey, controller.signal);
+    function startLiveStartWatcher(broadcastKey: string) {
+      const currentSocket = new WebSocket(SHOWROOM_SOCKET_URL);
+      socket = currentSocket;
+      shouldReloadOnSocketClose = true;
 
-        if (!isActive) {
-          return;
-        }
-
-        if (status.isLive) {
-          navigateFromDashboard("/onlive");
-          return;
-        }
-
-        const broadcastKey = status.broadcastKey?.trim();
-
-        if (!broadcastKey) {
-          return;
-        }
-
-        const currentSocket = new WebSocket(SHOWROOM_SOCKET_URL);
-        socket = currentSocket;
-        shouldReloadOnSocketClose = true;
-
-        currentSocket.addEventListener("open", () => {
-          try {
-            if (!isActive || currentSocket.readyState !== WebSocket.OPEN) {
-              return;
-            }
-
-            currentSocket.send(createShowroomSubscribeMessage(broadcastKey));
-            pingIntervalId = window.setInterval(() => {
-              try {
-                if (currentSocket.readyState !== WebSocket.OPEN) {
-                  reloadOnUnexpectedSocketClose();
-                  return;
-                }
-
-                currentSocket.send(SHOWROOM_SOCKET_PING_MESSAGE);
-              } catch {
-                reloadOnUnexpectedSocketClose();
-              }
-            }, DASHBOARD_SOCKET_PING_INTERVAL_MS);
-          } catch {
-            reloadOnUnexpectedSocketClose();
-          }
-        });
-
-        currentSocket.addEventListener("message", (event) => {
-          if (!isActive || typeof event.data !== "string") {
+      currentSocket.addEventListener("open", () => {
+        try {
+          if (!isActive || currentSocket.readyState !== WebSocket.OPEN) {
             return;
           }
 
-          if (isLiveStartedSocketMessage(event.data, broadcastKey)) {
-            navigateFromDashboard("/onlive");
-          }
-        });
+          currentSocket.send(createShowroomSubscribeMessage(broadcastKey));
+          pingIntervalId = window.setInterval(() => {
+            try {
+              if (currentSocket.readyState !== WebSocket.OPEN) {
+                reloadOnUnexpectedSocketClose();
+                return;
+              }
 
-        currentSocket.addEventListener("error", () => {
+              currentSocket.send(SHOWROOM_SOCKET_PING_MESSAGE);
+            } catch {
+              reloadOnUnexpectedSocketClose();
+            }
+          }, DASHBOARD_SOCKET_PING_INTERVAL_MS);
+        } catch {
           reloadOnUnexpectedSocketClose();
-        });
+        }
+      });
 
-        currentSocket.addEventListener("close", () => {
-          if (socket === currentSocket) {
-            socket = null;
-          }
-
-          reloadOnUnexpectedSocketClose();
-        });
-      } catch (error) {
-        if ((error as Error).name === "AbortError" || !isActive) {
+      currentSocket.addEventListener("message", (event) => {
+        if (!isActive || typeof event.data !== "string") {
           return;
         }
-      }
+
+        if (isLiveStartedSocketMessage(event.data, broadcastKey)) {
+          navigateFromDashboard("/onlive");
+        }
+      });
+
+      currentSocket.addEventListener("error", () => {
+        reloadOnUnexpectedSocketClose();
+      });
+
+      currentSocket.addEventListener("close", () => {
+        if (socket === currentSocket) {
+          socket = null;
+        }
+
+        reloadOnUnexpectedSocketClose();
+      });
     }
 
     async function initializeDashboard() {
-      let registeredRoom: Awaited<ReturnType<typeof fetchRegisteredRoom>>;
+      let bffData: DashboardBffResponse;
 
       try {
-        registeredRoom = await fetchRegisteredRoom(controller.signal);
+        bffData = await fetchDashboard(controller.signal);
       } catch (error) {
         if ((error as Error).name === "AbortError" || !isActive) {
           return;
@@ -533,56 +457,29 @@ export default function Page() {
         return;
       }
 
-      if (!registeredRoom) {
+      if (!isActive) {
+        return;
+      }
+
+      if (bffData.status === "no_room") {
         navigateFromDashboard("/search");
         return;
       }
 
-      const registeredRoomId = registeredRoom.roomId;
-      const registeredRoomUrlKey = registeredRoom.roomUrl;
-
-      async function loadRoomProfile() {
-        try {
-          const profile = await fetchDashboardEndpoint<RoomProfile>(
-            "/api/room/profile",
-            registeredRoomId,
-            controller.signal
-          );
-
-          if (!isActive) {
-            return;
-          }
-
-          if (profile.isOnlive) {
-            navigateFromDashboard("/onlive");
-            return;
-          }
-
-          setDashboardData((current) => ({ ...current, profile }));
-          setCanShowDashboard(true);
-          void startLiveStartWatcher(registeredRoomUrlKey);
-        } catch (error) {
-          if ((error as Error).name === "AbortError" || !isActive) {
-            return;
-          }
-
-          setCanShowDashboard(true);
-        }
+      if (bffData.status === "is_live") {
+        navigateFromDashboard("/onlive");
+        return;
       }
 
-      async function loadSupplementalData() {
-        const data = await getDashboardSupplementalData(
-          registeredRoomId,
-          controller.signal
-        );
+      const { profile, activeFan, eventAndSupport, notices, noticesHasError, roomStatus } = bffData;
 
-        if (isActive) {
-          setDashboardData((current) => ({ ...current, ...data }));
-        }
+      setDashboardData({ profile, activeFan, eventAndSupport, notices, noticesHasError });
+      setCanShowDashboard(true);
+
+      const broadcastKey = roomStatus?.broadcastKey?.trim();
+      if (broadcastKey) {
+        startLiveStartWatcher(broadcastKey);
       }
-
-      void loadRoomProfile();
-      void loadSupplementalData();
     }
 
     const timeoutId = window.setTimeout(() => {
@@ -601,7 +498,7 @@ export default function Page() {
     return null;
   }
 
-  const { profile, activeFan, eventAndSupport } = dashboardData;
+  const { profile, activeFan, eventAndSupport, notices, noticesHasError } = dashboardData;
 
   return (
     <AppShell activeKey="dashboard">
@@ -609,7 +506,7 @@ export default function Page() {
         <HeroCard profile={profile} />
         <RoomStatsSection profile={profile} activeFan={activeFan} />
         <EventOverviewCard eventAndSupport={eventAndSupport} />
-        <NoticesCard />
+        <NoticesCard notices={notices} hasError={noticesHasError} />
       </div>
     </AppShell>
   );
