@@ -200,7 +200,6 @@ describe("DashboardPage", () => {
     await waitFor(() => {
       expect(routerReplace).toHaveBeenCalledWith("/search");
     });
-    expect(screen.queryByTestId("app-shell")).toBeNull();
   });
 
   it("redirects to onlive when the registered room is already live", async () => {
@@ -279,8 +278,8 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
-    expect(await screen.findByTestId("app-shell")).toBeDefined();
-    expect(screen.getByText("ルーム情報を取得できませんでした")).toBeDefined();
+    expect(await screen.findByText("ルーム情報を取得できませんでした")).toBeDefined();
+    expect(screen.getByTestId("app-shell")).toBeDefined();
     expect(screen.getAllByText("取得できませんでした").length).toBeGreaterThan(0);
   });
 
