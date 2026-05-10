@@ -38,6 +38,7 @@ type RegisteredRoom = {
 type DashboardFetchScenario = {
   activeFan?: ActiveFanSummary | null;
   eventAndSupport?: EventAndSupportSummary | null;
+  isAdmin?: boolean;
   noticesOk?: boolean;
   profile?: RoomProfile;
   profileOk?: boolean;
@@ -129,6 +130,7 @@ function getFetchUrl(input: Parameters<typeof fetch>[0]) {
 function setupFetchScenario({
   activeFan: activeFanData = activeFan,
   eventAndSupport: eventAndSupportData = eventAndSupport,
+  isAdmin = false,
   noticesOk = true,
   profile: profileData = profile,
   profileOk = true,
@@ -149,6 +151,7 @@ function setupFetchScenario({
 
       return jsonResponse({
         status: isLive ? "is_live" : "ok",
+        isAdmin,
         registeredRoom: {
           roomId: registeredRoomData.roomId,
           roomUrl: registeredRoomData.roomUrl,
@@ -180,6 +183,30 @@ function fetchCallsFor(path: string) {
   return fetchMock.mock.calls.filter(([input]) => getFetchUrl(input).startsWith(path));
 }
 
+class MockWebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+  static instances: MockWebSocket[] = [];
+
+  readonly url: string;
+  readyState = MockWebSocket.CONNECTING;
+
+  constructor(url: string) {
+    this.url = url;
+    MockWebSocket.instances.push(this);
+  }
+
+  addEventListener() {}
+
+  send() {}
+
+  close() {
+    this.readyState = MockWebSocket.CLOSED;
+  }
+}
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -188,7 +215,9 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  MockWebSocket.instances = [];
   vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal("WebSocket", MockWebSocket);
 });
 
 describe("DashboardPage", () => {
@@ -200,7 +229,6 @@ describe("DashboardPage", () => {
     await waitFor(() => {
       expect(routerReplace).toHaveBeenCalledWith("/search");
     });
-    expect(screen.queryByTestId("app-shell")).toBeNull();
   });
 
   it("redirects to onlive when the registered room is already live", async () => {
@@ -274,13 +302,47 @@ describe("DashboardPage", () => {
     expect(bffCalls[0][1]).toEqual(expect.objectContaining({ cache: "no-store" }));
   });
 
+  it("starts a WebSocket watcher for non-admin users when a broadcast key is available", async () => {
+    setupFetchScenario({
+      roomStatus: {
+        ...roomStatus,
+        broadcastKey: "bcsvr-key",
+      },
+    });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+    expect(MockWebSocket.instances[0].url).toBe("wss://online.showroom-live.com/");
+  });
+
+  it("does not start a WebSocket watcher for admin users", async () => {
+    setupFetchScenario({
+      isAdmin: true,
+      roomStatus: {
+        ...roomStatus,
+        broadcastKey: "bcsvr-key",
+      },
+    });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+
+    expect(MockWebSocket.instances).toHaveLength(0);
+  });
+
   it("renders the dashboard shell when the profile endpoint fails", async () => {
     setupFetchScenario({ profileOk: false });
 
     render(<DashboardPage />);
 
-    expect(await screen.findByTestId("app-shell")).toBeDefined();
-    expect(screen.getByText("ルーム情報を取得できませんでした")).toBeDefined();
+    expect(await screen.findByText("ルーム情報を取得できませんでした")).toBeDefined();
+    expect(screen.getByTestId("app-shell")).toBeDefined();
     expect(screen.getAllByText("取得できませんでした").length).toBeGreaterThan(0);
   });
 

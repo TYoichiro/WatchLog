@@ -15,6 +15,8 @@ import { NoticesCard } from "@/components/dashboard/notices-card";
 import { AppShell } from "@/components/navigation/app-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { NoticeListLoadingCard } from "@/components/notices/notice-list-card";
 import {
   type ActiveFanSummary,
   type EventAndSupportSummary,
@@ -163,6 +165,68 @@ function createRoomStats(
       icon: Tag,
     },
   ];
+}
+
+function HeroCardSkeleton() {
+  return (
+    <Card className="overflow-hidden rounded-3xl border-0 py-0 shadow-sm">
+      <Skeleton className="h-56 w-full rounded-none sm:h-72 lg:h-80" />
+    </Card>
+  );
+}
+
+function StatsCardSkeleton() {
+  return (
+    <Card className="rounded-3xl border-0 shadow-sm">
+      <CardContent className="flex items-center gap-4 p-5">
+        <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-5 w-32" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RoomStatsSectionSkeleton() {
+  return (
+    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <StatsCardSkeleton key={i} />
+      ))}
+    </section>
+  );
+}
+
+function EventOverviewCardSkeleton() {
+  return (
+    <Card className="rounded-3xl border-0 shadow-sm">
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between gap-3">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-6 w-16 rounded-full" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <Skeleton className="h-56 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-8 w-48" />
+            </div>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2 rounded-2xl bg-slate-50 p-4">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-5 w-28" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function StatsCard({ title, value, icon: Icon }: DashboardStat) {
@@ -477,7 +541,7 @@ export default function Page() {
       setCanShowDashboard(true);
 
       const broadcastKey = roomStatus?.broadcastKey?.trim();
-      if (broadcastKey) {
+      if (!bffData.isAdmin && broadcastKey) {
         startLiveStartWatcher(broadcastKey);
       }
     }
@@ -495,7 +559,16 @@ export default function Page() {
   }, [router]);
 
   if (!canShowDashboard) {
-    return null;
+    return (
+      <AppShell activeKey="dashboard">
+        <div className="flex shrink-0 flex-col gap-4">
+          <HeroCardSkeleton />
+          <RoomStatsSectionSkeleton />
+          <EventOverviewCardSkeleton />
+          <NoticeListLoadingCard />
+        </div>
+      </AppShell>
+    );
   }
 
   const { profile, activeFan, eventAndSupport, notices, noticesHasError } = dashboardData;
