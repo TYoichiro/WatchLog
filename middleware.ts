@@ -1,8 +1,7 @@
-// proxy.ts
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-export const proxy = auth((request) => {
+export default auth((request) => {
   const { pathname } = request.nextUrl;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-watchlog-pathname", pathname);
