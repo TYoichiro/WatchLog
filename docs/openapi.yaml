@@ -958,6 +958,41 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /admin/sessions/cleanup:
+    post:
+      tags: [Admin]
+      summary: 期限切れセッション削除
+      description: |
+        `sessions.expires` が実行時点より過去のセッションレコードを削除します。
+        操作は監査ログに記録されます。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: 期限切れセッション削除結果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deletedCount, expiredBefore]
+                properties:
+                  deletedCount:
+                    type: integer
+                    minimum: 0
+                    description: 削除されたセッションレコード数
+                  expiredBefore:
+                    type: string
+                    format: date-time
+                    description: この日時より前に期限切れだったセッションを削除
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 # ─────────────────────────── Components ───────────────────────────
 components:
   securitySchemes:

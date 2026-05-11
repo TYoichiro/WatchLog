@@ -89,6 +89,17 @@ export async function hasTopAdminRole(userId: string): Promise<boolean> {
   return hasRole(userId, TOP_ADMIN_ROLE_NAME);
 }
 
+export async function requireTopAdminRole(): Promise<AuthenticatedUser> {
+  const user = await requireUser();
+  const allowed = await hasTopAdminRole(user.id);
+
+  if (!allowed) {
+    throw new ForbiddenError();
+  }
+
+  return user;
+}
+
 export async function requirePermission(action: string): Promise<AuthenticatedUser> {
   const user = await requireUser();
   const allowed = await hasPermission(user.id, action);
