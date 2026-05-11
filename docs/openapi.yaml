@@ -55,7 +55,7 @@ paths:
           required: true
           schema:
             type: string
-          description: "NextAuth ルートパラメータ（例: callback/google, session）"
+          description: "NextAuth ルートパラメータ（例： callback/google, session）"
       responses:
         "200":
           description: 認証フロー応答
@@ -303,7 +303,7 @@ paths:
           required: true
           schema:
             type: string
-          description: SHOWROOM ルーム URL キー（例: `example_room`）
+          description: SHOWROOM ルーム URL キー（例： `example_room`）
       responses:
         "200":
           description: ルームステータス
@@ -958,6 +958,41 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /admin/sessions/cleanup:
+    post:
+      tags: [Admin]
+      summary: 期限切れセッション削除
+      description: |
+        `sessions.expires` が実行時点より過去のセッションレコードを削除します。
+        操作は監査ログに記録されます。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: 期限切れセッション削除結果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deletedCount, expiredBefore]
+                properties:
+                  deletedCount:
+                    type: integer
+                    minimum: 0
+                    description: 削除されたセッションレコード数
+                  expiredBefore:
+                    type: string
+                    format: date-time
+                    description: この日時より前に期限切れだったセッションを削除
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 # ─────────────────────────── Components ───────────────────────────
 components:
   securitySchemes:
@@ -1042,7 +1077,7 @@ components:
           description: タイトル
         date:
           type: string
-          description: "掲載日時（JST、例: 2025/05/11 12:00）"
+          description: "掲載日時（JST、例： 2025/05/11 12:00）"
         body:
           type: string
           description: 本文
@@ -1160,7 +1195,7 @@ components:
           type: integer
         followerNum:
           type: string
-          description: "ロケール整形済みの数値文字列（例: 10,000）"
+          description: "ロケール整形済みの数値文字列（例： 10,000）"
         viewNum:
           type: integer
           nullable: true
@@ -1175,11 +1210,11 @@ components:
           type: string
         showRankSubdivided:
           type: string
-          description: "現在のランク表示（例: A-3）"
+          description: "現在のランク表示（例： A-3）"
         showRankTimeCharge:
           type: string
           nullable: true
-          description: "ランクに対応する時間課金額（例: ¥730）"
+          description: "ランクに対応する時間課金額（例： ¥730）"
         nextShowRankSubdivided:
           type: string
         currentLiveStartedAt:
@@ -1273,10 +1308,10 @@ components:
               type: integer
             point:
               type: string
-              description: "ロケール整形済みポイント数（例: 12,345）"
+              description: "ロケール整形済みポイント数（例： 12,345）"
             gap:
               type: string
-              description: "前回ランクとの差（例: 500）"
+              description: "前回ランクとの差（例： 500）"
 
     ActiveFanSummary:
       type: object
@@ -1287,7 +1322,7 @@ components:
           description: アクティブファン称号名
         totalUserCount:
           type: string
-          description: "ロケール整形済みのファン総数（例: 1,234）"
+          description: "ロケール整形済みのファン総数（例： 1,234）"
 
     RoomSearchResult:
       type: object
@@ -1302,7 +1337,7 @@ components:
           type: string
         roomUrl:
           type: string
-          description: ルーム URL キー（例: `example_room`）
+          description: ルーム URL キー（例： `example_room`）
 
     RoomGiftDefinition:
       type: object
@@ -1850,10 +1885,10 @@ components:
           nullable: true
         action:
           type: string
-          description: "操作種別（例: room.register, role.assign）"
+          description: "操作種別（例： room.register, role.assign）"
         resource:
           type: string
-          description: "操作対象リソース種別（例: UserRegisteredRoom, UserRole）"
+          description: "操作対象リソース種別（例： UserRegisteredRoom, UserRole）"
         resourceId:
           type: string
           nullable: true
