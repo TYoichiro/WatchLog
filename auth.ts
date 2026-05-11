@@ -21,6 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   session: {
     strategy: "database",
+    maxAge: 180 * 24 * 60 * 60,
   },
   providers: [
     Google({
