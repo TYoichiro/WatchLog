@@ -1,0 +1,1885 @@
+openapi: 3.0.3
+info:
+  title: WatchLog API
+  version: 1.0.0
+  description: |
+    WatchLog の内部 REST API 仕様書です。
+
+    ## 認証
+    認証には NextAuth のセッション Cookie（`next-auth.session-token`）を使用します。
+    認証が必要なエンドポイントにはセッション Cookie を含むリクエストが必要です。
+
+    ## タイムスタンプ形式
+    すべてのタイムスタンプは JST（アジア/東京）タイムゾーンの ISO 8601 文字列で返却されます。
+
+    ## アクセス制御レベル
+    - **Public**: 認証不要
+    - **Auth (Optional)**: 認証済みの場合はブロック済みユーザーのフィルタリングが適用される
+    - **Auth (Required)**: 有効なセッションが必要
+    - **Permission**: 特定のパーミッションを持つロールが必要
+
+servers:
+  - url: /api
+    description: Next.js App Router API
+
+tags:
+  - name: Dashboard
+    description: ダッシュボード情報
+  - name: Room
+    description: SHOWROOM ルーム情報（プロキシ）
+  - name: Registered Room
+    description: ユーザーの登録ルーム管理
+  - name: Blocks
+    description: ブロック機能
+  - name: Onlive
+    description: オンライブ（配信視聴）機能
+  - name: Live
+    description: ライブ情報
+  - name: Invitations
+    description: 招待コード
+  - name: Admin
+    description: 管理機能（特権パーミッション必須）
+  - name: Auth
+    description: NextAuth 認証
+
+paths:
+  # ───────────────────────────── Auth ─────────────────────────────
+  /auth/{nextauth}:
+    get:
+      tags: [Auth]
+      summary: NextAuth ハンドラー（GET）
+      description: NextAuth.js が提供する認証エンドポイント。Google OAuth コールバックなどを処理します。
+      parameters:
+        - name: nextauth
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "NextAuth ルートパラメータ（例: callback/google, session）"
+      responses:
+        "200":
+          description: 認証フロー応答
+        "302":
+          description: リダイレクト
+    post:
+      tags: [Auth]
+      summary: NextAuth ハンドラー（POST）
+      description: サインイン・サインアウトなどの認証フォーム送信を処理します。
+      parameters:
+        - name: nextauth
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: 認証フロー応答
+        "302":
+          description: リダイレクト
+
+  # ───────────────────────────── Dashboard ─────────────────────────────
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      summary: ダッシュボード統合情報取得
+      description: |
+        ユーザーの登録ルームに関連する統合情報を並列取得して返します。
+
+        **認証**: 必須（セッション Cookie）
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: ダッシュボード情報
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/DashboardOkResponse"
+                  - $ref: "#/components/schemas/DashboardIsLiveResponse"
+                  - $ref: "#/components/schemas/DashboardNoRoomResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /dashboard/notices:
+    get:
+      tags: [Dashboard]
+      summary: ダッシュボード通知一覧取得
+      description: |
+        認証済みユーザー向けの掲示通知を取得します。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: 通知一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notices]
+                properties:
+                  notices:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AppNotice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ───────────────────────────── Room ─────────────────────────────
+  /room/profile:
+    get:
+      tags: [Room]
+      summary: ルームプロフィール取得
+      description: SHOWROOM ルームのプロフィール情報を取得します。
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+      responses:
+        "200":
+          description: ルームプロフィール
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/user-profile:
+    get:
+      tags: [Room]
+      summary: ルームユーザープロフィール取得
+      description: SHOWROOM ルームの特定ユーザーのプロフィール情報を取得します。
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: SHOWROOM ユーザー ID
+      responses:
+        "200":
+          description: ユーザープロフィール
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [profile]
+                properties:
+                  profile:
+                    $ref: "#/components/schemas/RoomUserProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/telop:
+    get:
+      tags: [Room]
+      summary: テロップ取得
+      description: ルームのテロップ（テキスト告知）を取得します。
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+      responses:
+        "200":
+          description: テロップ情報
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [telop]
+                properties:
+                  telop:
+                    type: string
+                    nullable: true
+                    description: テロップテキスト。設定されていない場合は null。
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/paid-gifts:
+    get:
+      tags: [Room]
+      summary: 有料ギフトログ取得
+      description: ルームの有料ギフトログ（`isFree === false` のみ）を取得します。
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+      responses:
+        "200":
+          description: 有料ギフトログ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [gifts]
+                properties:
+                  gifts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RoomGiftLog"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/gift-definitions:
+    get:
+      tags: [Room]
+      summary: ギフト定義一覧取得
+      description: ルームで使用可能なギフトの定義（名称・画像・ポイント）を取得します。
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+      responses:
+        "200":
+          description: ギフト定義一覧
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoomGiftDefinition"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/eventandsupport:
+    get:
+      tags: [Room]
+      summary: イベント＆サポート情報取得
+      description: ルームの現在参加イベントおよびサポート情報を取得します。
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+      responses:
+        "200":
+          description: イベント＆サポート情報
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventAndSupportSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/activefan:
+    get:
+      tags: [Room]
+      summary: アクティブファン情報取得
+      description: 当月のアクティブファン称号・総人数を取得します。
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+      responses:
+        "200":
+          description: アクティブファン情報
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveFanSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/status:
+    get:
+      tags: [Room]
+      summary: ルーム配信ステータス取得
+      description: ルームの配信中/停止ステータスを取得します。
+      parameters:
+        - name: room_url_key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: SHOWROOM ルーム URL キー（例: `example_room`）
+      responses:
+        "200":
+          description: ルームステータス
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/search:
+    get:
+      tags: [Room]
+      summary: ルーム検索
+      description: キーワードで SHOWROOM ルームを検索します。
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: 検索キーワード（前後の空白は自動トリム）
+      responses:
+        "200":
+          description: 検索結果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rooms]
+                properties:
+                  rooms:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RoomSearchResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/total-ranking:
+    get:
+      tags: [Room]
+      summary: 総合ランキング取得
+      description: |
+        ルームの総合（月間）ランキングを取得します。
+        認証済みの場合、ブロック済みユーザーはリストから除外されます。
+
+        **認証**: 任意
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+      responses:
+        "200":
+          description: 総合ランキング
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ranking]
+                properties:
+                  ranking:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RoomTotalRankingUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/live-ranking:
+    get:
+      tags: [Room]
+      summary: ライブランキング取得
+      description: |
+        現在配信中のライブランキング（ステージユーザーリスト）を取得します。
+        認証済みの場合、ブロック済みユーザーはリストから除外されます。
+
+        **認証**: 任意
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+      responses:
+        "200":
+          description: ライブランキング
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ranking]
+                properties:
+                  ranking:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RoomLiveRankingUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/gifts:
+    get:
+      tags: [Room]
+      summary: ギフトログ取得
+      description: |
+        ルームのギフトログを取得します。30 秒以内の同一ユーザー・同一ギフトは集約されます。
+        認証済みの場合、ブロック済みユーザーのギフトは除外されます。
+
+        **認証**: 任意
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+      responses:
+        "200":
+          description: ギフトログ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [gifts]
+                properties:
+                  gifts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RoomGiftLog"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /room/comments:
+    get:
+      tags: [Room]
+      summary: コメントログ取得
+      description: |
+        ルームのコメントログを取得します。
+        認証済みの場合、ブロック済みユーザーのコメントは除外されます。
+
+        **認証**: 任意
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+      responses:
+        "200":
+          description: コメントログ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [comments]
+                properties:
+                  comments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RoomComment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  # ───────────────────────────── Registered Room ─────────────────────────────
+  /registered-room:
+    get:
+      tags: [Registered Room]
+      summary: 登録ルーム取得
+      description: |
+        ログインユーザーの登録ルームを取得します。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: 登録ルーム情報
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [room]
+                properties:
+                  room:
+                    nullable: true
+                    oneOf:
+                      - $ref: "#/components/schemas/UserRegisteredRoom"
+                    description: 登録ルーム。未登録の場合は null。
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    put:
+      tags: [Registered Room]
+      summary: 登録ルーム保存
+      description: |
+        ユーザーのルームを登録します。招待コードが必要です。
+        招待コードは消費され、ユーザーに新しい招待コードが払い出されます。
+        操作は監査ログに記録されます。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisteredRoomRequest"
+      responses:
+        "200":
+          description: 登録成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [room]
+                properties:
+                  room:
+                    $ref: "#/components/schemas/UserRegisteredRoom"
+        "400":
+          description: バリデーションエラーまたは招待コード不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: ルームまたは招待コードが既に使用済み
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ───────────────────────────── Blocks ─────────────────────────────
+  /blocks:
+    get:
+      tags: [Blocks]
+      summary: ブロックリスト取得
+      description: |
+        ログインユーザーがブロックしている SHOWROOM ユーザーの一覧を取得します。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: ブロックリスト
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [blocks]
+                properties:
+                  blocks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BlockEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags: [Blocks]
+      summary: ユーザーをブロック
+      description: |
+        指定した SHOWROOM ユーザーをブロックします。
+        開発者ユーザーはブロックできません。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBlockRequest"
+      responses:
+        "200":
+          description: ブロック成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [block]
+                properties:
+                  block:
+                    $ref: "#/components/schemas/BlockEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 開発者ユーザーのブロック禁止
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /blocks/{blockId}:
+    delete:
+      tags: [Blocks]
+      summary: ブロック解除
+      description: |
+        指定した ID のブロックを解除します。
+        自分が作成したブロックのみ削除できます。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: blockId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ブロック ID
+      responses:
+        "200":
+          description: 解除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ───────────────────────────── Live ─────────────────────────────
+  /live/liveinfo:
+    get:
+      tags: [Live]
+      summary: ライブ情報取得
+      description: |
+        指定ルームのライブ情報（配信キー・ライブ ID・ステータス）を取得します。
+        認証済みかつ `initial=1` パラメータが指定された場合、配信中の場合はアクセスログを記録します。
+
+        **認証**: 任意
+      parameters:
+        - $ref: "#/components/parameters/room_id"
+        - name: initial
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["1"]
+          description: 初回アクセスフラグ。`1` を指定するとアクセスログが記録されます。
+      responses:
+        "200":
+          description: ライブ情報
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomLiveInfo"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  # ───────────────────────────── Onlive ─────────────────────────────
+  /onlive/init:
+    get:
+      tags: [Onlive]
+      summary: オンライブ初期化データ取得
+      description: |
+        オンライブ画面の初期表示に必要なデータ（ライブ情報・ギフト定義・コメント・ギフト・テロップ）を
+        一括取得します。認証済みの場合はブロック済みユーザーのコメント・ギフトが除外されます。
+
+        **認証**: 任意
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: 初期化データ
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/OnliveInitOkResponse"
+                  - $ref: "#/components/schemas/OnliveNoRoomResponse"
+
+  /onlive/poll:
+    get:
+      tags: [Onlive]
+      summary: オンライブポーリング
+      description: |
+        オンライブ画面のポーリング更新用エンドポイント。
+        プロフィール・ライブランキング・総合ランキングを返します。
+        認証済みの場合はブロック済みユーザーのランキングが除外されます。
+
+        **認証**: 任意
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: ポーリング応答
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnlivePollResponse"
+        "404":
+          description: 登録ルームなし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /onlive/logs:
+    post:
+      tags: [Onlive]
+      summary: オンライブログ保存
+      description: |
+        クライアントが収集したオンライブログを保存します。
+        保存時にサーバー側でも総合ランキングを取得してログにマージします。
+        ユーザーの登録ルームと一致しない `roomId` は拒否されます。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnliveLogRequest"
+      responses:
+        "200":
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [log]
+                properties:
+                  log:
+                    $ref: "#/components/schemas/OnliveLog"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: ユーザーの登録ルームと roomId が不一致
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /onlive/logs/{logId}:
+    delete:
+      tags: [Onlive]
+      summary: オンライブログ削除
+      description: |
+        指定 ID のオンライブログを削除します。自分が保存したログのみ削除できます。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: logId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: オンライブログ ID
+      responses:
+        "200":
+          description: 削除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ───────────────────────────── Invitations ─────────────────────────────
+  /invitations/verify:
+    post:
+      tags: [Invitations]
+      summary: 招待コード検証
+      description: |
+        招待コードが有効かどうかを検証します。コードは消費されません。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inviteCode]
+              properties:
+                inviteCode:
+                  type: string
+                  description: 検証する招待コード
+      responses:
+        "200":
+          description: 検証結果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [valid]
+                properties:
+                  valid:
+                    type: boolean
+                    description: 有効な招待コードの場合 true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ───────────────────────────── Admin ─────────────────────────────
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: ユーザー一覧取得
+      description: |
+        全ユーザーとそのロールを取得します。
+
+        **パーミッション**: `user.read`
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: ユーザー一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [users]
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminUser"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/users/{userId}/roles:
+    post:
+      tags: [Admin]
+      summary: ユーザーへのロール割り当て
+      description: |
+        指定ユーザーにロールを割り当てます（upsert）。
+        `admin` ロールは API 経由では割り当て不可です。
+        操作は監査ログに記録されます。
+
+        **パーミッション**: `role.assign`
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ロール割り当て対象のユーザー ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roleId]
+              properties:
+                roleId:
+                  type: string
+                  description: 割り当てるロール ID
+      responses:
+        "200":
+          description: ロール割り当て成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userRole]
+                properties:
+                  userRole:
+                    $ref: "#/components/schemas/UserRoleResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: パーミッション不足、または admin ロールの割り当て試行
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ErrorResponse"
+                  - type: object
+                    required: [error]
+                    properties:
+                      error:
+                        type: string
+                        enum: [admin_role_not_assignable]
+        "404":
+          description: 対象ユーザーまたはロールが存在しない
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    enum: [target_user_not_found, role_not_found]
+
+  /admin/audit-logs:
+    get:
+      tags: [Admin]
+      summary: 監査ログ取得
+      description: |
+        システム監査ログ（ルーム登録・ロール割り当て等）を取得します。
+
+        **パーミッション**: `audit.read`
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+          description: 取得件数上限（最大 100）
+      responses:
+        "200":
+          description: 監査ログ一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [auditLogs]
+                properties:
+                  auditLogs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+# ─────────────────────────── Components ───────────────────────────
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+      description: NextAuth セッション Cookie
+
+  parameters:
+    room_id:
+      name: room_id
+      in: query
+      required: true
+      schema:
+        type: string
+      description: SHOWROOM ルーム ID
+
+  responses:
+    BadRequest:
+      description: リクエストパラメータが不正
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: 未認証（セッションなし）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: Unauthorized
+    Forbidden:
+      description: パーミッション不足
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: リソースが存在しない、または権限なし
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: サーバー内部エラー
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: Internal Server Error
+    BadGateway:
+      description: 上流 SHOWROOM API の取得失敗
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: Failed to fetch upstream API
+
+  schemas:
+    # ── 共通 ──
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    # ── Dashboard ──
+    AppNotice:
+      type: object
+      required: [id, title, date, body]
+      properties:
+        id:
+          type: integer
+          description: 通知 ID
+        title:
+          type: string
+          description: タイトル
+        date:
+          type: string
+          description: "掲載日時（JST、例: 2025/05/11 12:00）"
+        body:
+          type: string
+          description: 本文
+        linkUrl:
+          type: string
+          nullable: true
+          description: 外部リンク URL（http/https のみ）
+
+    DashboardNoRoomResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [no_room]
+
+    DashboardIsLiveResponse:
+      type: object
+      required: [status, isAdmin, registeredRoom, profile, activeFan, eventAndSupport, notices, noticesHasError, roomStatus]
+      properties:
+        status:
+          type: string
+          enum: [is_live]
+        isAdmin:
+          type: boolean
+        registeredRoom:
+          $ref: "#/components/schemas/UserRegisteredRoom"
+        profile:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/RoomProfile"
+        activeFan:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ActiveFanSummary"
+        eventAndSupport:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/EventAndSupportSummary"
+        notices:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppNotice"
+        noticesHasError:
+          type: boolean
+        roomStatus:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/RoomStatus"
+
+    DashboardOkResponse:
+      type: object
+      required: [status, isAdmin, registeredRoom, profile, activeFan, eventAndSupport, notices, noticesHasError, roomStatus]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        isAdmin:
+          type: boolean
+        registeredRoom:
+          $ref: "#/components/schemas/UserRegisteredRoom"
+        profile:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/RoomProfile"
+        activeFan:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ActiveFanSummary"
+        eventAndSupport:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/EventAndSupportSummary"
+        notices:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppNotice"
+        noticesHasError:
+          type: boolean
+        roomStatus:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/RoomStatus"
+
+    # ── Room ──
+    RoomProfile:
+      type: object
+      required:
+        - roomId
+        - roomUrlKey
+        - roomName
+        - roomImageUrl
+        - isOnlive
+        - premiumRoomType
+        - followerNum
+        - genreName
+        - isOfficial
+        - roomLevel
+        - leagueLabel
+        - showRankSubdivided
+        - nextShowRankSubdivided
+      properties:
+        roomId:
+          type: integer
+        roomUrlKey:
+          type: string
+        roomName:
+          type: string
+        roomImageUrl:
+          type: string
+          format: uri
+        isOnlive:
+          type: boolean
+        premiumRoomType:
+          type: integer
+        followerNum:
+          type: string
+          description: "ロケール整形済みの数値文字列（例: 10,000）"
+        viewNum:
+          type: integer
+          nullable: true
+        genreName:
+          type: string
+        isOfficial:
+          type: boolean
+        roomLevel:
+          type: string
+          description: "ロケール整形済みのルームレベル"
+        leagueLabel:
+          type: string
+        showRankSubdivided:
+          type: string
+          description: "現在のランク表示（例: A-3）"
+        showRankTimeCharge:
+          type: string
+          nullable: true
+          description: "ランクに対応する時間課金額（例: ¥730）"
+        nextShowRankSubdivided:
+          type: string
+        currentLiveStartedAt:
+          type: integer
+          nullable: true
+          description: 配信開始 Unix タイムスタンプ（秒）
+
+    RoomStatus:
+      type: object
+      required: [isLive, roomUrlKey]
+      properties:
+        broadcastHost:
+          type: string
+          nullable: true
+        broadcastKey:
+          type: string
+          nullable: true
+        broadcastPort:
+          type: integer
+          nullable: true
+        isLive:
+          type: boolean
+        liveStatus:
+          type: integer
+          nullable: true
+        roomId:
+          type: integer
+          nullable: true
+        roomUrlKey:
+          type: string
+
+    RoomLiveInfo:
+      type: object
+      required: [bcsvrKey, liveId, liveStatus]
+      properties:
+        bcsvrKey:
+          type: string
+          nullable: true
+          description: 配信サーバーキー
+        liveId:
+          type: string
+          nullable: true
+          description: 現在のライブ ID
+        liveStatus:
+          type: integer
+          nullable: true
+          description: "配信ステータス（1 = 停止中、それ以外 = 配信中）"
+
+    EventAndSupportSummary:
+      type: object
+      required: [event, support, ranking]
+      properties:
+        event:
+          nullable: true
+          type: object
+          required: [id, name, imageUrl, startAt, endAt, eventUrl]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            imageUrl:
+              type: string
+              format: uri
+            startAt:
+              type: integer
+              description: Unix タイムスタンプ（秒）
+            endAt:
+              type: integer
+              description: Unix タイムスタンプ（秒）
+            eventUrl:
+              type: string
+              format: uri
+        support:
+          nullable: true
+          type: object
+          required: [id, name]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        ranking:
+          nullable: true
+          type: object
+          required: [rank, beforeRank, point, gap]
+          properties:
+            rank:
+              type: integer
+            beforeRank:
+              type: integer
+            point:
+              type: string
+              description: "ロケール整形済みポイント数（例: 12,345）"
+            gap:
+              type: string
+              description: "前回ランクとの差（例: 500）"
+
+    ActiveFanSummary:
+      type: object
+      required: [fanName, totalUserCount]
+      properties:
+        fanName:
+          type: string
+          description: アクティブファン称号名
+        totalUserCount:
+          type: string
+          description: "ロケール整形済みのファン総数（例: 1,234）"
+
+    RoomSearchResult:
+      type: object
+      required: [imageUrl, roomId, roomName, roomUrl]
+      properties:
+        imageUrl:
+          type: string
+          format: uri
+        roomId:
+          type: string
+        roomName:
+          type: string
+        roomUrl:
+          type: string
+          description: ルーム URL キー（例: `example_room`）
+
+    RoomGiftDefinition:
+      type: object
+      required: [giftId, giftName, isFree]
+      properties:
+        giftId:
+          type: integer
+        giftImageUrl:
+          type: string
+          nullable: true
+          format: uri
+        giftName:
+          type: string
+        isFree:
+          type: boolean
+        point:
+          type: integer
+          nullable: true
+          description: "ギフトポイント。無料ギフトは 0。有料ギフトで不明な場合は null。"
+
+    RoomGiftLog:
+      type: object
+      required: [id, count, giftName, isFree, userName]
+      properties:
+        id:
+          type: string
+        avatarId:
+          type: integer
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+          format: uri
+        count:
+          type: integer
+          description: ギフト個数（同一ユーザー・同一ギフトが30秒以内に集約済み）
+        createdAt:
+          type: integer
+          nullable: true
+          description: Unix タイムスタンプ（秒）
+        giftId:
+          type: integer
+          nullable: true
+        giftImageUrl:
+          type: string
+          nullable: true
+          format: uri
+        giftName:
+          type: string
+        isFree:
+          type: boolean
+          nullable: true
+          description: "true = 無料ギフト、false = 有料ギフト、null = 不明"
+        point:
+          type: integer
+          nullable: true
+          description: 1個あたりのポイント
+        totalPoint:
+          type: integer
+          nullable: true
+          description: count × point の合計
+        userId:
+          type: string
+          nullable: true
+        userImageUrl:
+          type: string
+          nullable: true
+          format: uri
+        userName:
+          type: string
+        userVisitStatus:
+          type: integer
+          nullable: true
+
+    RoomComment:
+      type: object
+      required: [id, name, text]
+      properties:
+        id:
+          type: string
+        avatarId:
+          type: integer
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+          format: uri
+        classLevel:
+          type: integer
+          nullable: true
+        createdAt:
+          type: integer
+          nullable: true
+          description: Unix タイムスタンプ（秒）
+        name:
+          type: string
+        text:
+          type: string
+        userId:
+          type: string
+          nullable: true
+
+    RoomLiveRankingUser:
+      type: object
+      required: [id, rank, userName]
+      properties:
+        id:
+          type: string
+        avatarId:
+          type: integer
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+          format: uri
+        badge:
+          type: integer
+          nullable: true
+        badgeType:
+          type: integer
+          nullable: true
+        orderNo:
+          type: integer
+          nullable: true
+        rank:
+          type: integer
+        userId:
+          type: string
+          nullable: true
+        userImageUrl:
+          type: string
+          nullable: true
+          format: uri
+        userName:
+          type: string
+        userVisitStatus:
+          type: integer
+          nullable: true
+
+    RoomTotalRankingUser:
+      type: object
+      required: [id, rank, point, userName]
+      properties:
+        id:
+          type: string
+        avatarId:
+          type: integer
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+          format: uri
+        order:
+          type: integer
+          nullable: true
+        point:
+          type: integer
+        rank:
+          type: integer
+        userId:
+          type: string
+          nullable: true
+        userName:
+          type: string
+        userVisitStatus:
+          type: integer
+          nullable: true
+        visitCount:
+          type: integer
+          nullable: true
+
+    RoomUserProfile:
+      type: object
+      required: [name, description, isSmsAuthenticated, snsList]
+      properties:
+        activeFanLevel:
+          type: integer
+          nullable: true
+        avatarId:
+          type: integer
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+          format: uri
+        classLevel:
+          type: integer
+          nullable: true
+        description:
+          type: string
+        fanLevel:
+          type: integer
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+          format: uri
+        isSmsAuthenticated:
+          type: boolean
+        name:
+          type: string
+        snsList:
+          type: array
+          items:
+            $ref: "#/components/schemas/SnsItem"
+        roomProfile:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/RoomUserRoomProfile"
+
+    RoomUserRoomProfile:
+      type: object
+      required: [description, genreName, isOfficial, isOnlive, leagueLabel, mainName, roomName, roomUrlKey, shareTextLive, snsList, banners]
+      properties:
+        avatarUrl:
+          type: string
+          nullable: true
+          format: uri
+        banners:
+          type: array
+          items:
+            type: object
+            required: [imageUrl]
+            properties:
+              imageUrl:
+                type: string
+                format: uri
+              url:
+                type: string
+                nullable: true
+                format: uri
+        currentLiveStartedAt:
+          type: integer
+          nullable: true
+        description:
+          type: string
+        followerNum:
+          type: integer
+          nullable: true
+        genreName:
+          type: string
+        imageSquareUrl:
+          type: string
+          nullable: true
+          format: uri
+        imageUrl:
+          type: string
+          nullable: true
+          format: uri
+        isOfficial:
+          type: boolean
+        isOnlive:
+          type: boolean
+        leagueLabel:
+          type: string
+        mainName:
+          type: string
+        roomId:
+          type: integer
+          nullable: true
+        roomLevel:
+          type: integer
+          nullable: true
+        roomName:
+          type: string
+        roomUrlKey:
+          type: string
+        shareTextLive:
+          type: string
+        shareUrl:
+          type: string
+          nullable: true
+          format: uri
+        shareUrlLive:
+          type: string
+          nullable: true
+          format: uri
+        snsList:
+          type: array
+          items:
+            $ref: "#/components/schemas/SnsItem"
+        viewNum:
+          type: integer
+          nullable: true
+
+    SnsItem:
+      type: object
+      required: [icon, url]
+      properties:
+        icon:
+          type: string
+          description: SNS アイコン識別子
+        url:
+          type: string
+          format: uri
+        name:
+          type: string
+          nullable: true
+
+    # ── Registered Room ──
+    UserRegisteredRoom:
+      type: object
+      required: [roomId, roomUrl]
+      properties:
+        roomId:
+          type: string
+        roomUrl:
+          type: string
+          description: ルーム URL キー
+        roomName:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+          format: uri
+
+    RegisteredRoomRequest:
+      type: object
+      required: [roomId, roomUrl, inviteCode]
+      properties:
+        roomId:
+          type: string
+        roomUrl:
+          type: string
+        roomName:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+        inviteCode:
+          type: string
+          description: 10文字の招待コード
+
+    # ── Blocks ──
+    BlockEntry:
+      type: object
+      required: [id, blockedUserId, blockedUserName, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        blockedUserId:
+          type: string
+          description: ブロックされた SHOWROOM ユーザー ID
+        blockedUserName:
+          type: string
+          description: ブロックされた SHOWROOM ユーザー名
+        createdAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+        updatedAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+
+    CreateBlockRequest:
+      type: object
+      required: [blockedUserId, blockedUserName]
+      properties:
+        blockedUserId:
+          type: string
+        blockedUserName:
+          type: string
+
+    # ── Onlive ──
+    OnliveInitOkResponse:
+      type: object
+      required: [status, roomId, liveInfo, giftDefinitions, comments, gifts, telop]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        roomId:
+          type: integer
+        liveInfo:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/RoomLiveInfo"
+        giftDefinitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoomGiftDefinition"
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoomComment"
+        gifts:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoomGiftLog"
+        telop:
+          type: string
+          nullable: true
+
+    OnliveNoRoomResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [no_room]
+
+    OnlivePollResponse:
+      type: object
+      required: [profile, profileHasError, liveRanking, liveRankingHasError, totalRanking, totalRankingHasError]
+      properties:
+        profile:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/RoomProfile"
+        profileHasError:
+          type: boolean
+        liveRanking:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoomLiveRankingUser"
+        liveRankingHasError:
+          type: boolean
+        totalRanking:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoomTotalRankingUser"
+        totalRankingHasError:
+          type: boolean
+
+    OnliveLogRequest:
+      type: object
+      required: [roomId, liveId, capturedAt, log]
+      properties:
+        roomId:
+          type: string
+          description: ルーム ID（ユーザーの登録ルームと一致する必要あり）
+        liveId:
+          type: string
+          description: ライブ ID
+        capturedAt:
+          type: string
+          format: date-time
+          description: キャプチャ日時（JST ISO 8601）
+        log:
+          type: object
+          description: クライアントが収集したランキング等のログデータ（任意の JSON オブジェクト）
+          additionalProperties: true
+
+    OnliveLog:
+      type: object
+      required: [id, roomId, liveId, capturedAt, log, isDeleted, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        roomId:
+          type: string
+        liveId:
+          type: string
+        capturedAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+        log:
+          type: object
+          description: マージ済みログ（クライアントログ + サーバー側総合ランキングスナップショット）
+          additionalProperties: true
+        isDeleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+        updatedAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+
+    # ── Admin ──
+    AdminUser:
+      type: object
+      required: [id, createdAt, updatedAt, roles]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+          format: email
+        image:
+          type: string
+          nullable: true
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+        updatedAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUserRole"
+
+    AdminUserRole:
+      type: object
+      required: [id, name, assignedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        assignedAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+
+    UserRoleResult:
+      type: object
+      required: [id, role]
+      properties:
+        id:
+          type: string
+        role:
+          type: object
+          required: [id, name]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+
+    AuditLog:
+      type: object
+      required: [id, action, resource, detail, createdAt]
+      properties:
+        id:
+          type: string
+        actorUserId:
+          type: string
+          nullable: true
+        action:
+          type: string
+          description: "操作種別（例: room.register, role.assign）"
+        resource:
+          type: string
+          description: "操作対象リソース種別（例: UserRegisteredRoom, UserRole）"
+        resourceId:
+          type: string
+          nullable: true
+        detail:
+          type: object
+          description: 操作の詳細情報（任意の JSON）
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+        actor:
+          nullable: true
+          type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+              nullable: true
+            email:
+              type: string
+              nullable: true
+              format: email
+            image:
+              type: string
+              nullable: true
+              format: uri
