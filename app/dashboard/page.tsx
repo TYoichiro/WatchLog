@@ -36,10 +36,6 @@ import type {
   DashboardStat,
 } from "@/types/pages/dashboard";
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1600&q=80";
-const EVENT_IMAGE =
-  "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1200&q=80";
 const DASHBOARD_SOCKET_PING_INTERVAL_MS = 60_000;
 
 function formatTime(unixSeconds: number | null | undefined): string {
@@ -253,7 +249,7 @@ function HeroCard({ profile }: { profile: RoomProfile | null }) {
       <div className="relative h-56 w-full sm:h-72 lg:h-80">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={profile?.roomImageUrl || HERO_IMAGE}
+          src={profile?.roomImageUrl ?? ""}
           alt={profile?.roomName || "ルーム画像"}
           className="h-full w-full object-cover"
           width={1600}
@@ -309,7 +305,7 @@ function EventOverviewCard({
   const image = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={eventAndSupport.event?.imageUrl ?? EVENT_IMAGE}
+      src={eventAndSupport.event?.imageUrl ?? ""}
       alt={campaignName}
       className="h-56 w-full object-cover lg:h-full"
       width={1280}
