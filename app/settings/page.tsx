@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { KeyRound } from "lucide-react";
+import { KeyRound, ShieldCheck } from "lucide-react";
 
 import { auth } from "@/auth";
 import { AppShell } from "@/components/navigation/app-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
 import { listUserInvitationCodes } from "@/lib/invitations";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
 
@@ -15,6 +16,12 @@ export const metadata: Metadata = {
   title: "設定 | WatchLog",
 };
 
+function getRoleLabel(isAdmin: boolean, isPremium: boolean): string {
+  if (isAdmin) return "管理者";
+  if (isPremium) return "プレミアム";
+  return "一般";
+}
+
 export default async function Page() {
   const session = await auth();
   const userId = session?.user?.id;
@@ -23,20 +30,38 @@ export default async function Page() {
     redirect("/");
   }
 
-  const [registeredRoom, invitationCodes] = await Promise.all([
+  const [registeredRoom, invitationCodes, isAdmin, isPremium] = await Promise.all([
     getUserRegisteredRoom(userId),
     listUserInvitationCodes(userId),
+    hasTopAdminRole(userId),
+    hasPremiumRole(userId),
   ]);
 
   if (!registeredRoom) {
     redirect("/search");
   }
 
+  const roleLabel = getRoleLabel(isAdmin, isPremium);
+
   return (
     <AppShell activeKey="settings">
       <section className="shrink-0">
         <h1 className="text-xl font-semibold text-slate-950">設定</h1>
       </section>
+
+      <Card className="rounded-lg border-slate-200 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <ShieldCheck className="size-5" aria-hidden="true" />
+            </div>
+            <h2 className="text-base font-semibold text-slate-950">権限</h2>
+          </div>
+          <p className="mt-4 text-sm text-slate-700">
+            あなたは<span className="font-semibold">{roleLabel}</span>ユーザーです
+          </p>
+        </CardContent>
+      </Card>
 
       <Card className="rounded-lg border-slate-200 shadow-sm">
         <CardContent className="p-6">
