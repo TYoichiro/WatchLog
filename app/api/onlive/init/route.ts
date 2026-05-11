@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { hasPremiumRole } from "@/lib/authz";
 import { logger } from "@/lib/logger";
 import {
   getRoomCommentLog,
@@ -17,7 +18,10 @@ export async function GET() {
   const session = await auth();
   const userId = session?.user?.id ?? null;
 
-  const registeredRoom = userId ? await getUserRegisteredRoom(userId) : null;
+  const [registeredRoom, isPremium] = await Promise.all([
+    userId ? getUserRegisteredRoom(userId) : Promise.resolve(null),
+    userId ? hasPremiumRole(userId) : Promise.resolve(false),
+  ]);
   const parsedRoomId = registeredRoom ? Number(registeredRoom.roomId) : NaN;
 
   if (!registeredRoom || !Number.isInteger(parsedRoomId) || parsedRoomId <= 0) {
@@ -53,6 +57,7 @@ export async function GET() {
   return Response.json({
     status: "ok",
     roomId: parsedRoomId,
+    isPremium,
     liveInfo,
     giftDefinitions,
     comments: filterBlockedShowroomItems(rawComments, blockedUserIds),

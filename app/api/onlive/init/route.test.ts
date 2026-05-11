@@ -10,12 +10,17 @@ const mocks = vi.hoisted(() => ({
   getRoomLiveInfo: vi.fn(),
   getRoomTelop: vi.fn(),
   getUserRegisteredRoom: vi.fn(),
+  hasPremiumRole: vi.fn(),
   listBlockedShowroomUserIds: vi.fn(),
   loggerInfo: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({
   auth: mocks.auth,
+}));
+
+vi.mock("@/lib/authz", () => ({
+  hasPremiumRole: mocks.hasPremiumRole,
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -53,6 +58,7 @@ async function expectJson(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.hasPremiumRole.mockResolvedValue(false);
 });
 
 describe("GET /api/onlive/init", () => {
@@ -74,6 +80,7 @@ describe("GET /api/onlive/init", () => {
   it("returns initial live data and filters blocked users", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.hasPremiumRole.mockResolvedValue(true);
     mocks.listBlockedShowroomUserIds.mockResolvedValue(["blocked-user"]);
     mocks.getRoomLiveInfo.mockResolvedValue({
       bcsvrKey: "bcsvr-key",
@@ -156,6 +163,7 @@ describe("GET /api/onlive/init", () => {
     expect(data).toMatchObject({
       status: "ok",
       roomId: 123,
+      isPremium: true,
       liveInfo: {
         bcsvrKey: "bcsvr-key",
         liveId: "live-123",
@@ -201,6 +209,7 @@ describe("GET /api/onlive/init", () => {
     expect(await expectJson(response)).toEqual({
       status: "ok",
       roomId: 123,
+      isPremium: false,
       liveInfo: null,
       giftDefinitions: [],
       comments: [],

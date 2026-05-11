@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/dialog";
 import { AppShell } from "@/components/navigation/app-sidebar";
 import { toJstIsoString } from "@/lib/jst";
+import { writeOnliveLocalLog, type OnliveLocalLog } from "@/lib/onlive-local-log";
 import { useUserBlocks } from "@/hooks/use-user-blocks";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +85,7 @@ type UserProfileResponse = {
 type OnliveInitOkResponse = {
   status: "ok";
   roomId: number;
+  isPremium: boolean;
   liveInfo: RoomLiveInfo | null;
   giftDefinitions: RoomGiftDefinition[];
   comments: RoomComment[];
@@ -3804,7 +3806,7 @@ export function OnliveLogViewerPage({
 
 function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
   const router = useRouter();
-  const { roomId } = initData;
+  const { roomId, isPremium } = initData;
   const { gifts, isLoading: isGiftLoading, hasError: hasGiftError } =
     useRoomGiftLogs(initData.gifts);
   const {
@@ -4174,6 +4176,30 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
         version: ONLIVE_LOG_VERSION,
       };
 
+      if (!isPremium) {
+        const localLog: OnliveLocalLog = {
+          capturedAt,
+          commentCount: comments.length,
+          giftCount: logGifts.length,
+          liveId: liveId!,
+          liveRankingCount: visibleLiveRanking.length,
+          log: log as Record<string, unknown>,
+          roomId: String(roomId),
+          roomName: (roomProfile ?? initialRoomProfile)?.roomName ?? null,
+          savedAt: toJstIsoString(),
+        };
+        writeOnliveLocalLog(roomId, localLog);
+        savedOnliveLogKeysRef.current.add(logKey);
+        removeOnliveStorageSnapshot(roomId);
+        savingOnliveLogKeysRef.current.delete(logKey);
+
+        if (isActive) {
+          setStoredMetrics(null);
+          setIsLiveEndedDialogOpen(true);
+        }
+        return;
+      }
+
       try {
         const response = await fetch("/api/onlive/logs", {
           method: "POST",
@@ -4219,6 +4245,7 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
     blockedUserIds,
     hasLiveInfo,
     initialFollowerNumText,
+    isPremium,
     isLiveEnded,
     latestAudienceNum,
     latestFollowerNumText,

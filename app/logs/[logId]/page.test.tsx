@@ -10,6 +10,7 @@ const {
   blockUserMock,
   getAnyOnliveLogMock,
   getUserOnliveLogMock,
+  getUserRegisteredRoomMock,
   hasTopAdminRoleMock,
   notFoundMock,
   redirectMock,
@@ -18,6 +19,7 @@ const {
   blockUserMock: vi.fn(),
   getAnyOnliveLogMock: vi.fn(),
   getUserOnliveLogMock: vi.fn(),
+  getUserRegisteredRoomMock: vi.fn(),
   hasTopAdminRoleMock: vi.fn(),
   notFoundMock: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
@@ -46,6 +48,10 @@ vi.mock("@/lib/authz", () => ({
 vi.mock("@/lib/onlive-log", () => ({
   getAnyOnliveLog: getAnyOnliveLogMock,
   getUserOnliveLog: getUserOnliveLogMock,
+}));
+
+vi.mock("@/lib/user-registered-room", () => ({
+  getUserRegisteredRoom: getUserRegisteredRoomMock,
 }));
 
 vi.mock("@/hooks/use-user-blocks", () => ({
@@ -240,13 +246,22 @@ function setupAuthenticatedUser({ isAdmin = false }: { isAdmin?: boolean } = {})
   hasTopAdminRoleMock.mockResolvedValue(isAdmin);
 }
 
+const registeredRoom = {
+  imageUrl: "https://static.showroom-live.com/room.jpg",
+  roomId: "12345",
+  roomName: "Alpha Room",
+  roomUrl: "alpha-room",
+};
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.localStorage.clear();
   authMock.mockReset();
   blockUserMock.mockReset();
   getAnyOnliveLogMock.mockReset();
   getUserOnliveLogMock.mockReset();
+  getUserRegisteredRoomMock.mockReset();
   hasTopAdminRoleMock.mockReset();
   notFoundMock.mockClear();
   redirectMock.mockClear();
@@ -306,6 +321,30 @@ describe("LogDetailPage", () => {
 
     expect(getUserOnliveLogMock).toHaveBeenCalledWith("user-1", "missing-log");
     expect(notFoundMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("local: プレフィックスのlogIdはローカルログビューワーを表示する", async () => {
+    setupAuthenticatedUser();
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+
+    await renderResolvedLogDetailPage("local:live-123");
+
+    expect(screen.getByText("ローカルのログが見つかりませんでした。")).toBeDefined();
+    expect(getUserOnliveLogMock).not.toHaveBeenCalled();
+    expect(getAnyOnliveLogMock).not.toHaveBeenCalled();
+  });
+
+  it("local: プレフィックスのlogIdで登録ルームがない場合はnotFoundを呼ぶ", async () => {
+    setupAuthenticatedUser();
+    getUserRegisteredRoomMock.mockResolvedValue(null);
+
+    await expect(
+      LogDetailPage({ params: Promise.resolve({ logId: "local:live-123" }) }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
+
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
+    expect(getUserOnliveLogMock).not.toHaveBeenCalled();
+    expect(getAnyOnliveLogMock).not.toHaveBeenCalled();
   });
 
   it("ユーザーアバターをクリックしてブロック操作を実行できる", async () => {

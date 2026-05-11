@@ -10,6 +10,7 @@ const {
   authMock,
   getUserRegisteredRoomMock,
   hasTopAdminRoleMock,
+  hasPremiumRoleMock,
   listAllOnliveLogsMock,
   listUserOnliveLogsMock,
   redirectMock,
@@ -18,6 +19,7 @@ const {
   authMock: vi.fn(),
   getUserRegisteredRoomMock: vi.fn(),
   hasTopAdminRoleMock: vi.fn(),
+  hasPremiumRoleMock: vi.fn(),
   listAllOnliveLogsMock: vi.fn(),
   listUserOnliveLogsMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
@@ -39,6 +41,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/authz", () => ({
   hasTopAdminRole: hasTopAdminRoleMock,
+  hasPremiumRole: hasPremiumRoleMock,
 }));
 
 vi.mock("@/lib/onlive-log", () => ({
@@ -107,13 +110,13 @@ vi.mock("@/components/ui/alert-dialog", () => ({
   ),
 }));
 
-const pageTitle = "\u30ed\u30b0\u4e00\u89a7";
+const pageTitle = "ログ一覧";
 const emptyMessage =
-  "\u4fdd\u5b58\u6e08\u307f\u30ed\u30b0\u306f\u307e\u3060\u3042\u308a\u307e\u305b\u3093\u3002\u914d\u4fe1\u7d42\u4e86\u6642\u306b\u30ed\u30b0\u304c\u4fdd\u5b58\u3055\u308c\u307e\u3059\u3002";
+  "保存済みログはまだありません。配信終了時にログが保存されます。";
 const deleteDialogTitle =
-  "\u30ed\u30b0\u3092\u524a\u9664\u3057\u307e\u3059\u304b\uff1f";
-const confirmDeleteLabel = "\u306f\u3044";
-const formattedCapturedAt = "2026/05/09(\u571f) 12:00:00";
+  "ログを削除しますか？";
+const confirmDeleteLabel = "はい";
+const formattedCapturedAt = "2026/05/09(土) 12:00:00";
 
 const session = {
   user: {
@@ -168,27 +171,74 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
   });
 }
 
-function setupAuthenticatedUser({ isAdmin = false }: { isAdmin?: boolean } = {}) {
+function setupAuthenticatedUser({
+  isAdmin = false,
+  isPremium = true,
+}: { isAdmin?: boolean; isPremium?: boolean } = {}) {
   authMock.mockResolvedValue(session);
   hasTopAdminRoleMock.mockResolvedValue(isAdmin);
+  hasPremiumRoleMock.mockResolvedValue(isPremium);
 }
 
 async function renderLogsPage() {
   render(await LogsPage());
 }
 
+// Saved originals for URL download methods (may not exist in jsdom)
+type UrlWithDownloadMethods = typeof URL & {
+  createObjectURL?: (typeof URL)["createObjectURL"];
+  revokeObjectURL?: (typeof URL)["revokeObjectURL"];
+};
+const savedUrlMethods: {
+  createObjectURL?: (typeof URL)["createObjectURL"];
+  revokeObjectURL?: (typeof URL)["revokeObjectURL"];
+} = {};
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.localStorage.clear();
   authMock.mockReset();
   getUserRegisteredRoomMock.mockReset();
   hasTopAdminRoleMock.mockReset();
+  hasPremiumRoleMock.mockReset();
   listAllOnliveLogsMock.mockReset();
   listUserOnliveLogsMock.mockReset();
   redirectMock.mockClear();
   routerRefresh.mockReset();
   fetchMock.mockReset();
+  // Restore URL download methods to their saved originals
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    writable: true,
+    value: savedUrlMethods.createObjectURL,
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    writable: true,
+    value: savedUrlMethods.revokeObjectURL,
+  });
 });
+
+function setupDownloadMocks() {
+  const revokeObjectURL = vi.fn();
+  // Save originals before overriding (may be undefined in jsdom)
+  savedUrlMethods.createObjectURL = (URL as UrlWithDownloadMethods).createObjectURL;
+  savedUrlMethods.revokeObjectURL = (URL as UrlWithDownloadMethods).revokeObjectURL;
+  // Use Object.defineProperty to work regardless of whether the property
+  // previously existed, is writable, or is configurable
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => "blob:mock-url"),
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    writable: true,
+    value: revokeObjectURL,
+  });
+  return revokeObjectURL;
+}
 
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
@@ -213,13 +263,13 @@ describe("LogsPage", () => {
     expect(screen.getByTestId("app-shell").getAttribute("data-active-key")).toBe(
       "logs",
     );
-    expect(screen.getByRole("heading", { name: `${pageTitle} 1\u4ef6` })).toBeDefined();
+    expect(screen.getByRole("heading", { name: `${pageTitle} 1件` })).toBeDefined();
     expect(screen.getByText(formattedCapturedAt)).toBeDefined();
     expect(screen.getByText("Live ID: live-1")).toBeDefined();
-    expect(screen.getByText("\u30b3\u30e1\u30f3\u30c8 12")).toBeDefined();
-    expect(screen.getByText("\u30ae\u30d5\u30c8 3")).toBeDefined();
+    expect(screen.getByText("コメント 12")).toBeDefined();
+    expect(screen.getByText("ギフト 3")).toBeDefined();
 
-    const viewLink = screen.getByRole("link", { name: /\u95b2\u89a7/ });
+    const viewLink = screen.getByRole("link", { name: /閲覧/ });
     expect(viewLink.getAttribute("href")).toBe("/logs/log-1");
     expect(listAllOnliveLogsMock).toHaveBeenCalledTimes(1);
     expect(getUserRegisteredRoomMock).not.toHaveBeenCalled();
@@ -229,25 +279,36 @@ describe("LogsPage", () => {
   it("redirects non-admin users without a registered room to search", async () => {
     setupAuthenticatedUser();
     getUserRegisteredRoomMock.mockResolvedValue(null);
-    listUserOnliveLogsMock.mockResolvedValue([]);
 
     await expect(LogsPage()).rejects.toThrow("NEXT_REDIRECT:/search");
 
     expect(getUserRegisteredRoomMock).toHaveBeenCalledWith("user-1");
-    expect(listUserOnliveLogsMock).toHaveBeenCalledWith("user-1");
+    expect(listUserOnliveLogsMock).not.toHaveBeenCalled();
     expect(redirectMock).toHaveBeenCalledWith("/search");
   });
 
-  it("renders the current user's logs for non-admin users", async () => {
-    setupAuthenticatedUser();
+  it("renders the current user's logs for premium non-admin users", async () => {
+    setupAuthenticatedUser({ isPremium: true });
     getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
     listUserOnliveLogsMock.mockResolvedValue([onliveLog]);
 
     await renderLogsPage();
 
-    expect(screen.getByRole("heading", { name: `${pageTitle} 1\u4ef6` })).toBeDefined();
+    expect(screen.getByRole("heading", { name: `${pageTitle} 1件` })).toBeDefined();
     expect(screen.getByText(formattedCapturedAt)).toBeDefined();
     expect(listAllOnliveLogsMock).not.toHaveBeenCalled();
+    expect(listUserOnliveLogsMock).toHaveBeenCalledWith("user-1");
+  });
+
+  it("renders an empty log list for non-premium users", async () => {
+    setupAuthenticatedUser({ isPremium: false });
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+
+    await renderLogsPage();
+
+    expect(screen.getByRole("heading", { name: `${pageTitle} 0件` })).toBeDefined();
+    expect(screen.getByText(emptyMessage)).toBeDefined();
+    expect(listUserOnliveLogsMock).not.toHaveBeenCalled();
   });
 });
 
@@ -255,7 +316,7 @@ describe("LogListPage", () => {
   it("renders an empty state when there are no saved logs", () => {
     render(<LogListPage initialLogs={[]} />);
 
-    expect(screen.getByRole("heading", { name: `${pageTitle} 0\u4ef6` })).toBeDefined();
+    expect(screen.getByRole("heading", { name: `${pageTitle} 0件` })).toBeDefined();
     expect(screen.getByText(emptyMessage)).toBeDefined();
   });
 
@@ -264,11 +325,11 @@ describe("LogListPage", () => {
 
     render(<LogListPage initialLogs={[logListItem]} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /\u524a\u9664/ }));
+    fireEvent.click(screen.getByRole("button", { name: /削除/ }));
 
     expect(screen.getByRole("heading", { name: deleteDialogTitle })).toBeDefined();
     expect(
-      screen.getByText(`${formattedCapturedAt} \u306e\u30ed\u30b0\u3092\u524a\u9664\u3057\u307e\u3059\u3002`),
+      screen.getByText(`${formattedCapturedAt} のログを削除します。`),
     ).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: confirmDeleteLabel }));
@@ -291,18 +352,101 @@ describe("LogListPage", () => {
   it("shows the delete error and keeps the log when deletion fails", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(
-        { error: "\u30ed\u30b0\u3092\u524a\u9664\u3067\u304d\u307e\u305b\u3093" },
+        { error: "ログを削除できません" },
         { status: 500 },
       ),
     );
 
     render(<LogListPage initialLogs={[logListItem]} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /\u524a\u9664/ }));
+    fireEvent.click(screen.getByRole("button", { name: /削除/ }));
     fireEvent.click(screen.getByRole("button", { name: confirmDeleteLabel }));
 
-    expect(await screen.findByText("\u30ed\u30b0\u3092\u524a\u9664\u3067\u304d\u307e\u305b\u3093")).toBeDefined();
+    expect(await screen.findByText("ログを削除できません")).toBeDefined();
     expect(screen.getByText(formattedCapturedAt)).toBeDefined();
     expect(routerRefresh).not.toHaveBeenCalled();
+  });
+
+  it("non-premium users can delete a local log", async () => {
+    const localLog = {
+      capturedAt: "2026-05-09T12:00:00.000+09:00",
+      commentCount: 5,
+      giftCount: 2,
+      liveId: "live-local-1",
+      liveRankingCount: 3,
+      log: {},
+      roomId: "12345",
+      roomName: "Alpha Room",
+      savedAt: "2026-05-09T12:01:00.000+09:00",
+    };
+    window.localStorage.setItem(
+      "watchlog:saved-log:12345",
+      JSON.stringify(localLog),
+    );
+
+    render(<LogListPage initialLogs={[]} isPremium={false} roomId="12345" />);
+
+    expect(screen.getByRole("heading", { name: `${pageTitle} 1件` })).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: /削除/ }));
+    fireEvent.click(screen.getByRole("button", { name: confirmDeleteLabel }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: `${pageTitle} 0件` })).toBeDefined();
+    });
+    expect(window.localStorage.getItem("watchlog:saved-log:12345")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("downloads a DB log as JSON", async () => {
+    const revokeObjectURL = setupDownloadMocks();
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        capturedAt: "2026-05-09T12:00:00.000Z",
+        liveId: "live-1",
+        log: { comments: [] },
+        roomId: "12345",
+      }),
+    );
+
+    render(<LogListPage initialLogs={[logListItem]} />);
+    fireEvent.click(screen.getByRole("button", { name: /ダウンロード/ }));
+
+    await waitFor(() => {
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/onlive/logs/log-1",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("non-premium users can download a local log", async () => {
+    const revokeObjectURL = setupDownloadMocks();
+
+    const localLog = {
+      capturedAt: "2026-05-09T12:00:00.000+09:00",
+      commentCount: 5,
+      giftCount: 2,
+      liveId: "live-local-1",
+      liveRankingCount: 3,
+      log: { comments: [] },
+      roomId: "12345",
+      roomName: "Alpha Room",
+      savedAt: "2026-05-09T12:01:00.000+09:00",
+    };
+    window.localStorage.setItem(
+      "watchlog:saved-log:12345",
+      JSON.stringify(localLog),
+    );
+
+    render(<LogListPage initialLogs={[]} isPremium={false} roomId="12345" />);
+    fireEvent.click(screen.getByRole("button", { name: /ダウンロード/ }));
+
+    await waitFor(() => {
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
