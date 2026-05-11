@@ -1,5 +1,6 @@
 // proxy.ts
 import { auth } from "@/auth";
+import { toJstIsoString } from "@/lib/jst";
 import { NextResponse } from "next/server";
 
 export const proxy = auth((request) => {
@@ -16,7 +17,7 @@ export const proxy = auth((request) => {
     const ua = request.headers.get("user-agent") ?? undefined;
     console.log(
       JSON.stringify({
-        time: new Date().toISOString(),
+        time: toJstIsoString(),
         level: "info",
         msg: "API request",
         method: request.method,

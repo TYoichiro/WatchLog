@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { toJstIsoString } from "@/lib/jst";
+
 type Level = "debug" | "info" | "warn" | "error";
 
 type LogContext = Record<string, unknown>;
@@ -30,11 +32,8 @@ try {
   // ignore — directory may already exist or be read-only
 }
 
-// JST offset for daily log filename
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-
 function getJstDateString(): string {
-  return new Date(Date.now() + JST_OFFSET_MS).toISOString().slice(0, 10);
+  return toJstIsoString().slice(0, 10);
 }
 
 function appendToFile(line: string): void {
@@ -49,7 +48,7 @@ function emit(level: Level, message: string, context?: LogContext): void {
     return;
   }
 
-  const timestamp = new Date().toISOString();
+  const timestamp = toJstIsoString();
   const entry = { time: timestamp, level, msg: message, ...context };
   const jsonLine = JSON.stringify(entry);
 
