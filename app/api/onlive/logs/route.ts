@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import type { Prisma } from "@/app/generated/prisma/client";
 
 import { auth } from "@/auth";
+import { hasPremiumRole } from "@/lib/authz";
 import { logger } from "@/lib/logger";
 import { saveOnliveLog } from "@/lib/onlive-log";
 import { filterBlockedShowroomItems } from "@/lib/showroom-block-filter";
@@ -142,10 +143,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const registeredRoom = await getUserRegisteredRoom(userId);
+  const [registeredRoom, isPremium] = await Promise.all([
+    getUserRegisteredRoom(userId),
+    hasPremiumRole(userId),
+  ]);
 
   if (!registeredRoom || registeredRoom.roomId !== roomId) {
     logger.warn("Onlive log rejected: room not registered for user", { userId, roomId });
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!isPremium) {
+    logger.warn("Onlive log rejected: user is not premium", { userId, roomId });
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 

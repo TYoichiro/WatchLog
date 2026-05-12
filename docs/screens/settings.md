@@ -9,7 +9,7 @@
 | 認証要否 | 必要 |
 | ページタイトル | 設定 \| WatchLog |
 
-ユーザーが自分の招待コードを確認できる画面です。現時点では招待コードの参照のみ提供しています。
+ユーザーが自分のアカウント情報を確認できる画面です。現在の権限ロールと招待コードを参照できます。
 
 ---
 
@@ -30,8 +30,12 @@
 │  [サイドバー]   設定                                        │
 │  ・ホーム      ─────────────────────────────────────────  │
 │  ・ログ閲覧    ┌──────────────────────────────────────┐   │
-│  ・ブロック    │ 🔑 招待コード（最大3名まで招待可）     │   │
-│  ・設定 ◀━━   │ ──────────────────────────────────── │   │
+│  ・ブロック    │ 🛡 権限                                │   │
+│  ・設定 ◀━━   │ あなたは管理者ユーザーです            │   │
+│               └──────────────────────────────────────┘   │
+│               ┌──────────────────────────────────────┐   │
+│               │ 🔑 招待コード（最大3名まで招待可）     │   │
+│               │ ──────────────────────────────────── │   │
 │               │ XXXXXXXXXX              [有効]        │   │
 │               │ ──────────────────────────────────── │   │
 │               │ YYYYYYYYYY              [有効]        │   │
@@ -53,9 +57,20 @@
 
 **処理フロー**:
 1. `auth()` でセッション確認 → ユーザーIDがなければ `/` へリダイレクト
-2. `getUserRegisteredRoom(userId)` で登録ルームを確認 → なければ `/search` へリダイレクト
-3. `getUserRegisteredRoom()` と `listUserInvitationCodes()` を `Promise.all` で並列取得
-4. `<AppShell activeKey="settings">` 内に招待コードカードをレンダリング
+2. `getUserRegisteredRoom`, `listUserInvitationCodes`, `hasTopAdminRole`, `hasPremiumRole` を `Promise.all` で並列取得
+3. 登録ルームがなければ `/search` へリダイレクト
+4. `getRoleLabel(isAdmin, isPremium)` で表示ロールラベルを決定
+5. `<AppShell activeKey="settings">` 内に権限カード・招待コードカードをレンダリング
+
+**ロールラベル決定ロジック（`getRoleLabel`）**:
+
+| 条件 | 表示ラベル |
+|------|-----------|
+| `isAdmin = true` | 管理者 |
+| `isAdmin = false` かつ `isPremium = true` | プレミアム |
+| `isAdmin = false` かつ `isPremium = false` | 一般 |
+
+管理者とプレミアムの両方を持つユーザーは「管理者」と表示されます。
 
 ### AppShell
 
@@ -75,6 +90,23 @@
 | `settings` | 設定 | `/settings` |
 
 ログアウトは `signOut({ redirectTo: "/" })` を実行してトップページへリダイレクト。
+
+---
+
+## 権限カード
+
+| 要素 | 説明 |
+|------|------|
+| アイコン + 見出し | ShieldCheck アイコン + 「権限」の h2 見出し |
+| 説明文 | 「あなたは**{ロールラベル}**ユーザーです」（ロールラベル部分は太字） |
+
+### ロールラベル一覧
+
+| ラベル | 対象ユーザー |
+|--------|-------------|
+| 管理者 | `hasTopAdminRole(userId) = true` のユーザー |
+| プレミアム | `hasPremiumRole(userId) = true`（かつ管理者でない）のユーザー |
+| 一般 | 上記いずれにも該当しないユーザー |
 
 ---
 
@@ -147,6 +179,17 @@ ORDER BY createdAt ASC
 SELECT code, isDeleted, usedAt
 ```
 
+### 権限判定
+
+- **関数**: `hasTopAdminRole(userId)` / `hasPremiumRole(userId)` ([lib/authz.ts](../lib/authz.ts))
+- **用途**: 表示するロールラベルの決定
+- `getUserRegisteredRoom`・`listUserInvitationCodes` と同じ `Promise.all` で並列取得
+
+| 関数 | ロール名 | 説明 |
+|------|---------|------|
+| `hasTopAdminRole` | `admin` | 管理者ロール保持確認 |
+| `hasPremiumRole` | `premiumuser` | プレミアムロール保持確認 |
+
 ---
 
 ## 招待コードの仕組み
@@ -175,6 +218,7 @@ SELECT code, isDeleted, usedAt
 |----------|------|
 | [app/settings/page.tsx](../app/settings/page.tsx) | ページコンポーネント（データ取得・レンダリング） |
 | [components/navigation/app-sidebar.tsx](../components/navigation/app-sidebar.tsx) | AppShell・ナビゲーションサイドバー |
+| [lib/authz.ts](../lib/authz.ts) | 管理者・プレミアム権限判定（`hasTopAdminRole`, `hasPremiumRole`） |
 | [lib/user-registered-room.ts](../lib/user-registered-room.ts) | 登録ルームデータ取得 |
 | [lib/invitations.ts](../lib/invitations.ts) | 招待コード管理ロジック |
 | [components/ui/card.tsx](../components/ui/card.tsx) | Card UI コンポーネント |

@@ -1,17 +1,21 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import SettingsPage from "./page";
 
 const {
   authMock,
   getUserRegisteredRoomMock,
+  hasTopAdminRoleMock,
+  hasPremiumRoleMock,
   listUserInvitationCodesMock,
   redirectMock,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
   getUserRegisteredRoomMock: vi.fn(),
+  hasTopAdminRoleMock: vi.fn(),
+  hasPremiumRoleMock: vi.fn(),
   listUserInvitationCodesMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
@@ -24,6 +28,11 @@ vi.mock("@/auth", () => ({
 
 vi.mock("next/navigation", () => ({
   redirect: redirectMock,
+}));
+
+vi.mock("@/lib/authz", () => ({
+  hasTopAdminRole: hasTopAdminRoleMock,
+  hasPremiumRole: hasPremiumRoleMock,
 }));
 
 vi.mock("@/lib/user-registered-room", () => ({
@@ -48,13 +57,13 @@ vi.mock("@/components/navigation/app-sidebar", () => ({
   ),
 }));
 
-const settingsTitle = "\u8a2d\u5b9a";
+const settingsTitle = "設定";
+const roleHeading = "権限";
 const invitationHeading =
-  "\u62db\u5f85\u30b3\u30fc\u30c9\uff08\u6700\u59273\u540d\u307e\u3067\u62db\u5f85\u3059\u308b\u3053\u3068\u304c\u3067\u304d\u307e\u3059\uff09";
-const activeLabel = "\u6709\u52b9";
-const inactiveLabel = "\u7121\u52b9";
-const emptyInvitationMessage =
-  "\u62db\u5f85\u30b3\u30fc\u30c9\u306f\u3042\u308a\u307e\u305b\u3093";
+  "招待コード（最大3名まで招待することができます）";
+const activeLabel = "有効";
+const inactiveLabel = "無効";
+const emptyInvitationMessage = "招待コードはありません";
 
 const session = {
   user: {
@@ -73,10 +82,28 @@ async function renderSettingsPage() {
   render(await SettingsPage());
 }
 
+// RTL's getByText only matches direct text nodes, not text split across child elements.
+// Use this helper to find the role description paragraph by its full textContent.
+function getRoleDescriptionText(): string {
+  const el = screen.getByText(
+    (_, element) =>
+      element?.tagName === "P" &&
+      /あなたは.+ユーザーです/.test(element.textContent ?? ""),
+  );
+  return el.textContent ?? "";
+}
+
+beforeEach(() => {
+  hasTopAdminRoleMock.mockResolvedValue(false);
+  hasPremiumRoleMock.mockResolvedValue(false);
+});
+
 afterEach(() => {
   cleanup();
   authMock.mockReset();
   getUserRegisteredRoomMock.mockReset();
+  hasTopAdminRoleMock.mockReset();
+  hasPremiumRoleMock.mockReset();
   listUserInvitationCodesMock.mockReset();
   redirectMock.mockClear();
 });
@@ -124,6 +151,7 @@ describe("SettingsPage", () => {
       "settings",
     );
     expect(screen.getByRole("heading", { level: 1, name: settingsTitle })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 2, name: roleHeading })).toBeDefined();
     expect(screen.getByRole("heading", { level: 2, name: invitationHeading })).toBeDefined();
     expect(screen.getByText("ABCD123456")).toBeDefined();
     expect(screen.getByText("WXYZ987654")).toBeDefined();
@@ -142,5 +170,50 @@ describe("SettingsPage", () => {
     expect(screen.getByText(emptyInvitationMessage)).toBeDefined();
     expect(screen.queryByText(activeLabel)).toBeNull();
     expect(screen.queryByText(inactiveLabel)).toBeNull();
+  });
+
+  it("displays 一般 role label for general users", async () => {
+    authMock.mockResolvedValue(session);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(screen.getByRole("heading", { level: 2, name: roleHeading })).toBeDefined();
+    expect(getRoleDescriptionText()).toBe("あなたは一般ユーザーです");
+  });
+
+  it("displays プレミアム role label for premium users", async () => {
+    authMock.mockResolvedValue(session);
+    hasPremiumRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(getRoleDescriptionText()).toBe("あなたはプレミアムユーザーです");
+  });
+
+  it("displays 管理者 role label for admin users", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(getRoleDescriptionText()).toBe("あなたは管理者ユーザーです");
+  });
+
+  it("displays 管理者 role label when the user has both admin and premium roles", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    hasPremiumRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(getRoleDescriptionText()).toBe("あなたは管理者ユーザーです");
   });
 });

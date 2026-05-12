@@ -243,6 +243,7 @@ function setupAuthenticatedUser({ isAdmin = false }: { isAdmin?: boolean } = {})
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.localStorage.clear();
   authMock.mockReset();
   blockUserMock.mockReset();
   getAnyOnliveLogMock.mockReset();

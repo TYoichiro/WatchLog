@@ -28,6 +28,7 @@ export class ForbiddenError extends Error {
 }
 
 export const TOP_ADMIN_ROLE_NAME = "admin";
+export const PREMIUM_ROLE_NAME = "premiumuser";
 
 export async function requireUser(): Promise<AuthenticatedUser> {
   const session = await auth();
@@ -87,6 +88,10 @@ export async function hasRole(userId: string, roleName: string): Promise<boolean
 
 export async function hasTopAdminRole(userId: string): Promise<boolean> {
   return hasRole(userId, TOP_ADMIN_ROLE_NAME);
+}
+
+export async function hasPremiumRole(userId: string): Promise<boolean> {
+  return hasRole(userId, PREMIUM_ROLE_NAME);
 }
 
 export async function requireTopAdminRole(): Promise<AuthenticatedUser> {

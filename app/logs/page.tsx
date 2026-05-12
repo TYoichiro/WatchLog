@@ -11,7 +11,7 @@ import { AppShell } from "@/components/navigation/app-sidebar";
 import { toJstWallTimeIsoString } from "@/lib/jst";
 import { listAllOnliveLogs, listUserOnliveLogs, type OnliveLogListItem } from "@/lib/onlive-log";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
-import { hasTopAdminRole } from "@/lib/authz";
+import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
@@ -50,14 +50,24 @@ export default async function Page() {
     );
   }
 
-  const [registeredRoom, logs] = await Promise.all([
+  const [registeredRoom, isPremium] = await Promise.all([
     getUserRegisteredRoom(userId),
-    listUserOnliveLogs(userId),
+    hasPremiumRole(userId),
   ]);
 
   if (!registeredRoom) {
     redirect("/search");
   }
+
+  if (!isPremium) {
+    return (
+      <AppShell activeKey="logs">
+        <LogListPage initialLogs={[]} isPremium={false} roomId={registeredRoom.roomId} />
+      </AppShell>
+    );
+  }
+
+  const logs = await listUserOnliveLogs(userId);
 
   return (
     <AppShell activeKey="logs">

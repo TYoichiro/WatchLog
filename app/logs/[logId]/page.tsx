@@ -2,17 +2,17 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-
-export const metadata: Metadata = {
-  title: "配信ログ詳細 | WatchLog",
-};
 import {
   OnliveLogViewerPage,
   type OnliveLogViewerData,
 } from "@/components/onlive/onlive-room-page";
+import { hasTopAdminRole } from "@/lib/authz";
 import { toJstWallTimeIsoString } from "@/lib/jst";
 import { getAnyOnliveLog, getUserOnliveLog } from "@/lib/onlive-log";
-import { hasTopAdminRole } from "@/lib/authz";
+
+export const metadata: Metadata = {
+  title: "配信ログ詳細 | WatchLog",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +43,7 @@ export default async function Page({
   }
 
   const { logId } = await params;
+
   const isAdmin = await hasTopAdminRole(userId);
   const log = isAdmin
     ? await getAnyOnliveLog(logId)

@@ -159,7 +159,9 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 
 ---
 
-## ローカルストレージ（セッション保持）
+## ローカルストレージ
+
+### セッション保持（配信中データ）
 
 ページをリロードしても配信中データが失われないよう、セッション情報をローカルストレージに保存します。
 
@@ -191,6 +193,18 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 ```
 
 **復元条件：** 保存された `liveId` が現在の `liveId` と一致する場合のみ復元します。`liveId` が変わった場合（別配信）は破棄します。
+
+### 配信終了ログ（非プレミアム）
+
+非プレミアムユーザーの配信終了後ログを保存します。
+
+| 項目 | 値 |
+|---|---|
+| キー | `watchlog:saved-log:{roomId}` |
+| 保存タイミング | 配信終了時（`isLiveEnded=true` 後の `useEffect`） |
+| 保存件数 | 1件のみ（新しいログで上書き） |
+| 削除タイミング | ログ一覧画面で削除操作を実行した時 |
+| 閲覧 | ログ一覧画面・ログ詳細画面（`/logs/local:{liveId}`）から |
 
 ---
 
@@ -464,23 +478,43 @@ Next.js の Error Boundary が捕捉した例外が対象です。
 
 ## 配信終了ログ保存フロー
 
-配信終了（`isLiveEnded=true`）後、以下の手順でログを自動保存します。
+配信終了（`isLiveEnded=true`）後、ユーザーのプレミアム状態に応じて保存先を分岐します。
+
+### プレミアムユーザー（DB 保存）
 
 ```
 配信終了（WebSocket t=101 受信）
   └─ isLiveEnded = true, liveEndedAt = 設定
        └─ (useEffect) ログキーの重複チェック（savedOnliveLogKeysRef / savingOnliveLogKeysRef）
-            └─ POST /api/onlive/logs
-                 ├─ リクエスト: { roomId, liveId, capturedAt, log: OnliveLogPayload }
-                 │   log 内容: source, version, capturedAt, savedAt, roomId,
-                 │             comments, gifts, liveInfo, metrics, rankings.live,
-                 │             roomProfile, localStorageSnapshot
-                 ├─ サーバー側: 総合ランキングを追加取得して rankings.total に追加保存
-                 ├─ 成功: ローカルストレージ削除 → isLiveEndedDialogOpen = true → ダイアログ表示
-                 └─ 失敗: コンソールエラーログのみ（ダイアログなし）
+            └─ isPremium = true の場合:
+                 POST /api/onlive/logs
+                      ├─ リクエスト: { roomId, liveId, capturedAt, log: OnliveLogPayload }
+                      │   log 内容: source, version, capturedAt, savedAt, roomId,
+                      │             comments, gifts, liveInfo, metrics, rankings.live,
+                      │             roomProfile, localStorageSnapshot
+                      ├─ サーバー側: 総合ランキングを追加取得して rankings.total に追加保存
+                      ├─ 成功: セッションストレージ削除 → isLiveEndedDialogOpen = true → ダイアログ表示
+                      └─ 失敗: コンソールエラーログのみ（ダイアログなし）
 ```
 
-ログキー（`{roomId}:{liveId}:{capturedAt}`）で重複保存を防止します。
+### 非プレミアムユーザー（ローカルストレージ保存）
+
+```
+配信終了（WebSocket t=101 受信）
+  └─ isLiveEnded = true, liveEndedAt = 設定
+       └─ (useEffect) ログキーの重複チェック（savedOnliveLogKeysRef / savingOnliveLogKeysRef）
+            └─ isPremium = false の場合:
+                 writeOnliveLocalLog(roomId, OnliveLocalLog)
+                      ├─ キー: watchlog:saved-log:{roomId}（同一ルームの直近1件を上書き）
+                      ├─ 保存内容: capturedAt, commentCount, giftCount, liveId,
+                      │            liveRankingCount, log（完全ペイロード）, roomId, roomName, savedAt
+                      ├─ 成功: セッションストレージ削除 → isLiveEndedDialogOpen = true → ダイアログ表示
+                      └─ API 呼び出しなし（ネットワーク不要）
+```
+
+ログキー（`{roomId}:{liveId}:{capturedAt}`）で重複保存を防止します（プレミアム・非プレミアム共通）。
+
+`isPremium` は `GET /api/onlive/init` のレスポンスから取得します。
 
 ---
 
@@ -539,6 +573,7 @@ Next.js の Error Boundary が捕捉した例外が対象です。
 {
   "status": "ok",
   "roomId": 123456,
+  "isPremium": true,
   "liveInfo": {
     "bcsvrKey": "...",
     "liveId": "...",
@@ -550,6 +585,8 @@ Next.js の Error Boundary が捕捉した例外が対象です。
   "telop": "テロップテキスト"
 }
 ```
+
+`isPremium` は `hasPremiumRole(userId)` の結果です。`OnliveRoomPage` がこの値を元にログ保存先（DB / ローカルストレージ）を分岐します。
 
 **レスポンス（登録ルームなし）：**
 
@@ -573,6 +610,8 @@ Next.js の Error Boundary が捕捉した例外が対象です。
 ```
 
 ### `POST /api/onlive/logs`
+
+**プレミアムユーザー専用。** 非プレミアムユーザーが呼び出した場合は `403 Forbidden` を返します。
 
 **リクエスト：**
 
@@ -655,7 +694,8 @@ updatedAt             DateTime
 | `GIFT_LOG_MERGE_WINDOW_SECONDS` | `30` | ギフトマージウィンドウ（秒） |
 | `ONLIVE_LOG_VERSION` | `1` | ログペイロードのバージョン |
 | `ONLIVE_STORAGE_VERSION` | `1` | ローカルストレージスキーマのバージョン |
-| `ONLIVE_STORAGE_KEY_PREFIX` | `"watchlog:onlive"` | ローカルストレージキーのプレフィックス |
+| `ONLIVE_STORAGE_KEY_PREFIX` | `"watchlog:onlive"` | セッション保持用ローカルストレージキーのプレフィックス |
+| `ONLIVE_LOCAL_LOG_KEY_PREFIX` | `"watchlog:saved-log"` | 非プレミアム配信終了ログ用ローカルストレージキーのプレフィックス |
 | `DEVELOPER_USER_ID` | `"3699368"` | 開発者の Showroom ユーザー ID |
 | `SHOWROOM_SOCKET_URL` | `"wss://online.showroom-live.com/"` | WebSocket エンドポイント |
 
@@ -678,6 +718,7 @@ updatedAt             DateTime
 | [lib/showroom/ranking.ts](../../lib/showroom/ranking.ts) | ライブ・総合ランキング取得 |
 | [lib/showroom/room.ts](../../lib/showroom/room.ts) | ルームプロフィール取得 |
 | [lib/onlive-log.ts](../../lib/onlive-log.ts) | ログ保存・取得・削除 |
+| [lib/onlive-local-log.ts](../../lib/onlive-local-log.ts) | 非プレミアム用ローカルストレージログ読み書き |
 | [lib/showroom-block-filter.ts](../../lib/showroom-block-filter.ts) | ブロックユーザーフィルタリング |
 | [hooks/use-user-blocks.ts](../../hooks/use-user-blocks.ts) | ブロック一覧管理フック |
 | [prisma/schema.prisma](../../prisma/schema.prisma) | `OnliveLog` / `UserBlock` モデル |
