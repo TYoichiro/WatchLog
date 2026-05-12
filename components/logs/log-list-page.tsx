@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CalendarClock,
   ChevronRight,
   Download,
+  FileJson,
   Gift,
   Loader2,
   MessageSquareText,
@@ -25,7 +26,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { deleteOnliveLocalLog, readOnliveLocalLog, type OnliveLocalLog } from "@/lib/onlive-local-log";
+import {
+  deleteOnliveLocalLog,
+  isValidJsonViewerLog,
+  readOnliveLocalLog,
+  writeJsonViewerLog,
+  type OnliveLocalLog,
+} from "@/lib/onlive-local-log";
 
 export type LogListItem = {
   capturedAt: string;
@@ -64,7 +71,7 @@ function localLogToListItem(log: OnliveLocalLog): LogListItem {
     commentCount: log.commentCount,
     createdAt: log.savedAt,
     giftCount: log.giftCount,
-    id: `local:${log.liveId}`,
+    id: `local:${log.roomId}`,
     liveId: log.liveId,
     liveRankingCount: log.liveRankingCount,
     roomId: log.roomId,
@@ -140,6 +147,35 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
     null
   );
   const [downloadingLogId, setDownloadingLogId] = useState<string | null>(null);
+  const [jsonImportError, setJsonImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleJsonFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!event.target) return;
+    event.target.value = "";
+    if (!file) return;
+
+    setJsonImportError(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed: unknown = JSON.parse(e.target?.result as string);
+        if (!isValidJsonViewerLog(parsed)) {
+          setJsonImportError("正しい形式のWatchLog JSONファイルではありません。");
+          return;
+        }
+        writeJsonViewerLog(parsed);
+        router.push("/logs/json-import");
+      } catch {
+        setJsonImportError("JSONファイルの読み込みに失敗しました。");
+      }
+    };
+    reader.onerror = () => {
+      setJsonImportError("ファイルの読み込みに失敗しました。");
+    };
+    reader.readAsText(file);
+  };
 
   const handleDownload = async (log: LogListItem) => {
     setDownloadingLogId(log.id);
@@ -222,6 +258,44 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
         </h1>
       </section>
 
+      <Card className="rounded-lg border-slate-200 shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <FileJson className="h-5 w-5 shrink-0 text-slate-400" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-slate-800">JSONログ閲覧</p>
+              <p className="text-xs text-slate-500">
+                ダウンロードしたJSONファイルを選択してログを閲覧できます
+              </p>
+              <p className="text-xs text-slate-500">
+                （旧バージョン（v2.X.X系）の互換性はありません）
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setJsonImportError(null);
+                fileInputRef.current?.click();
+              }}
+            >
+              JSONを選択
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={handleJsonFileChange}
+            />
+          </div>
+          {jsonImportError ? (
+            <p className="mt-3 text-xs text-rose-600">{jsonImportError}</p>
+          ) : null}
+        </CardContent>
+      </Card>
+
       {logs.length === 0 ? (
         <Card className="rounded-lg border-slate-200 shadow-sm">
           <CardContent className="p-8 text-sm text-slate-600">
@@ -256,7 +330,7 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/logs/${log.id}`}>
+                  <Link href={log.id.startsWith("local:") ? `/logs/local/${log.roomId}` : `/logs/${encodeURIComponent(log.id)}`}>
                     閲覧
                     <ChevronRight className="h-4 w-4" aria-hidden />
                   </Link>

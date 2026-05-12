@@ -10,11 +10,9 @@ import {
   OnliveLogViewerPage,
   type OnliveLogViewerData,
 } from "@/components/onlive/onlive-room-page";
-import { LocalLogViewerPage } from "@/components/logs/local-log-viewer-page";
 import { toJstWallTimeIsoString } from "@/lib/jst";
 import { getAnyOnliveLog, getUserOnliveLog } from "@/lib/onlive-log";
 import { hasTopAdminRole } from "@/lib/authz";
-import { getUserRegisteredRoom } from "@/lib/user-registered-room";
 
 export const dynamic = "force-dynamic";
 
@@ -45,12 +43,6 @@ export default async function Page({
   }
 
   const { logId } = await params;
-
-  if (logId.startsWith("local:")) {
-    const registeredRoom = await getUserRegisteredRoom(userId);
-    if (!registeredRoom) notFound();
-    return <LocalLogViewerPage roomId={registeredRoom.roomId} />;
-  }
 
   const isAdmin = await hasTopAdminRole(userId);
   const log = isAdmin

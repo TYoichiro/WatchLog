@@ -9,7 +9,7 @@
 | 認証要否 | 必要 |
 | ページタイトル | 配信ログ \| WatchLog |
 
-配信終了時に自動保存された配信ログを一覧表示する画面です。管理者は全ユーザーのログを閲覧でき、プレミアムユーザーは自分の登録ルームの DB ログを閲覧できます。非プレミアムユーザーはローカルストレージに保存された直近 1 件のログのみを閲覧できます。各ログに対して「閲覧」（詳細ページへ遷移）・「ダウンロード」（JSON ファイル出力）・「削除」が行えます。
+配信終了時に自動保存された配信ログを一覧表示する画面です。管理者は全ユーザーのログを閲覧でき、プレミアムユーザーは自分の登録ルームの DB ログを閲覧できます。非プレミアムユーザーはローカルストレージに保存された直近 1 件のログのみを閲覧できます。各ログに対して「閲覧」（詳細ページへ遷移）・「ダウンロード」（JSON ファイル出力）・「削除」が行えます。また、ダウンロードした JSON ファイルをインポートしてログを閲覧する機能（全ユーザー共通）も備えています。
 
 ---
 
@@ -35,6 +35,12 @@
 ┌────────────────────────────────────────────────────────┐
 │ [サイドバー]  ログ一覧 0件                              │
 │              ┌──────────────────────────────────────┐  │
+│              │ 📄 JSONログ閲覧                        │  │
+│              │   ダウンロードしたJSONファイルを      │  │
+│              │   選択してログを閲覧できます           │  │
+│              │                    [JSONを選択]        │  │
+│              └──────────────────────────────────────┘  │
+│              ┌──────────────────────────────────────┐  │
 │              │ 保存済みログはまだありません。         │  │
 │              │ 配信終了時にログが保存されます。      │  │
 │              └──────────────────────────────────────┘  │
@@ -46,6 +52,12 @@
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │ [サイドバー]  ログ一覧 N件                                      │
+│              ┌──────────────────────────────────────────────┐  │
+│              │ 📄 JSONログ閲覧                                │  │
+│              │   ダウンロードしたJSONファイルを選択して       │  │
+│              │   ログを閲覧できます                           │  │
+│              │                           [JSONを選択]        │  │
+│              └──────────────────────────────────────────────┘  │
 │              ┌──────────────────────────────────────────────┐  │
 │              │ 🕐 2026/05/09(土) 12:00:00                   │  │
 │              │   [Live ID: 1234567]                          │  │
@@ -87,10 +99,30 @@
 | `isDeleting` | `boolean` | `false` | 削除処理中フラグ |
 | `deleteErrorMessage` | `string \| null` | `null` | 削除エラーメッセージ |
 | `downloadingLogId` | `string \| null` | `null` | ダウンロード処理中のログ ID |
+| `jsonImportError` | `string \| null` | `null` | JSONインポートエラーメッセージ |
+| `fileInputRef` | `RefObject<HTMLInputElement \| null>` | — | JSONファイル選択用 `<input type="file">` の ref |
 
 **初期化ロジック（`useState` 遅延初期化）：**
-- `isPremium = false` かつ `roomId` が指定されている場合：`readOnliveLocalLog(roomId)` を呼び出し、ローカルストレージに保存されたログを1件読み込む
+- `isPremium = false` かつ `roomId` が指定されている場合：`readOnliveLocalLog(roomId)` を呼び出し、ローカルストレージに保存されたログを1件読み込む。存在する場合は `localLogToListItem()` でマッピングして `[localLogToListItem(localLog)]` を初期値とする。データがなければ空配列
 - それ以外：`initialLogs` をそのまま使用
+
+**ローカルログのマッピング（`localLogToListItem`）：**
+
+`OnliveLocalLog` → `LogListItem` への変換関数。`id` フィールドには `local:{roomId}` 形式のプレフィックス付き文字列を設定する（DB ログとローカルログを区別するため）。
+
+| `LogListItem` フィールド | マッピング元 |
+|---|---|
+| `id` | `"local:" + log.roomId` |
+| `capturedAt` | `log.capturedAt` |
+| `commentCount` | `log.commentCount` |
+| `createdAt` | `log.savedAt` |
+| `giftCount` | `log.giftCount` |
+| `liveId` | `log.liveId` |
+| `liveRankingCount` | `log.liveRankingCount` |
+| `roomId` | `log.roomId` |
+| `roomName` | `log.roomName` |
+| `totalRankingCount` | `0`（ローカルログは累計ランキング未保持） |
+| `updatedAt` | `log.savedAt` |
 
 ---
 
@@ -129,6 +161,39 @@
 - **ファイル**: [components/logs/log-list-page.tsx](../components/logs/log-list-page.tsx)
 - **種別**: Client Component (`"use client"`)
 
+#### JSONログ閲覧カード
+
+ログ一覧の最上部（`h1` の直下）に常時表示されるカード。
+
+| 要素 | 内容 |
+|------|------|
+| アイコン | `FileJson`（slate） |
+| タイトル | 「JSONログ閲覧」 |
+| 説明 | 「ダウンロードしたJSONファイルを選択してログを閲覧できます」「（旧バージョン（v2.X.X系）の互換性はありません）」 |
+| ボタン | 「JSONを選択」（outline, sm） → 非表示の `<input type="file" accept=".json">` をトリガー |
+| エラー表示 | `jsonImportError` があれば rose 色で表示 |
+
+**JSONファイル選択フロー（`handleJsonFileChange`）：**
+
+```
+ファイル選択
+  │
+  ▼ FileReader で JSON を読み込み
+  │
+  ├─ isValidJsonViewerLog(parsed) = false
+  │   └─ jsonImportError = "正しい形式のWatchLog JSONファイルではありません。"
+  │
+  ├─ 正常
+  │   ├─ writeJsonViewerLog(parsed) でローカルストレージに保存（キー: watchlog:json-viewer）
+  │   └─ router.push("/logs/json-import") → JSONインポートビューアへ遷移
+  │
+  ├─ JSON.parse 例外
+  │   └─ jsonImportError = "JSONファイルの読み込みに失敗しました。"
+  │
+  └─ FileReader onerror
+      └─ jsonImportError = "ファイルの読み込みに失敗しました。"
+```
+
 ### 各ログ行
 
 | 要素 | 内容 |
@@ -137,7 +202,7 @@
 | Live ID バッジ | `Live ID: {log.liveId}`（outline バッジ） |
 | コメント数（MessageSquareText アイコン） | `コメント {log.commentCount}` |
 | ギフト数（Gift アイコン） | `ギフト {log.giftCount}` |
-| 「閲覧」ボタン | `/logs/{log.id}` へ遷移（ChevronRight アイコン付き） |
+| 「閲覧」ボタン | `log.id.startsWith("local:")` の場合 `/logs/local/{log.roomId}` へ遷移、それ以外は `/logs/{encodeURIComponent(log.id)}` へ遷移（ChevronRight アイコン付き） |
 | 「ダウンロード」ボタン | ログを JSON ファイルとしてダウンロード（Download アイコン付き、ダウンロード中はスピナー表示・`disabled`） |
 | 「削除」ボタン | 削除確認ダイアログを開く（Trash2 アイコン付き、Destructive バリアント） |
 
@@ -158,6 +223,99 @@
 | 「はい」ボタン | 削除実行（削除中はスピナー表示・`disabled`） |
 
 削除中にダイアログを閉じようとした場合（`isDeleting = true`）、`onOpenChange` で閉じ操作を無視します。
+
+### ログ詳細ページ（DB ログ）
+
+- **ファイル**: [app/logs/[logId]/page.tsx](../app/logs/%5BlogId%5D/page.tsx)
+- **種別**: Server Component (async)
+- **URL**: `/logs/{logId}`
+- **ページタイトル**: `配信ログ詳細 | WatchLog`
+- **キャッシュ制御**: `force-dynamic`
+
+**処理フロー：**
+1. `auth()` でユーザーID 確認、なければ `/` へリダイレクト
+2. `hasTopAdminRole(userId)` で管理者判定
+3. 管理者なら `getAnyOnliveLog(logId)`、一般ユーザーなら `getUserOnliveLog(userId, logId)` でログ取得
+4. ログが存在しない場合は `notFound()`
+5. `toViewerData()` で `OnliveLogViewerData` に変換して `OnliveLogViewerPage` をレンダリング
+
+**`toViewerData` 変換：**
+
+| `OnliveLogViewerData` フィールド | マッピング元 |
+|---|---|
+| `capturedAt` | `toJstWallTimeIsoString(log.capturedAt)` |
+| `createdAt` | `toJstWallTimeIsoString(log.createdAt)` |
+| `id` | `log.id` |
+| `liveId` | `log.liveId` |
+| `liveStartedAt` | `log.liveStartedAt` |
+| `log` | `log.log` |
+| `room` | `log.room` |
+| `roomId` | `log.roomId` |
+| `updatedAt` | `toJstWallTimeIsoString(log.updatedAt)` |
+
+### ローカルログ詳細ページ
+
+- **ファイル**: [app/logs/local/[roomId]/page.tsx](../app/logs/local/%5BroomId%5D/page.tsx)
+- **種別**: Server Component (async) + `LocalLogViewerPage`（Client Component）
+- **URL**: `/logs/local/{roomId}`
+- **ページタイトル**: `配信ログ詳細 | WatchLog`
+- **キャッシュ制御**: `force-dynamic`
+- **用途**: 非プレミアムユーザーがローカルストレージに保存した配信ログを閲覧する
+
+**処理フロー：**
+1. `auth()` でユーザーID 確認、なければ `/` へリダイレクト
+2. `params.roomId` を取得して `LocalLogViewerPage` をレンダリング
+
+**`LocalLogViewerPage`（Client Component）：**
+- `useSyncExternalStore` でローカルストレージの `watchlog:saved-log:{roomId}` を購読
+- ログが存在しない場合：「ローカルのログが見つかりませんでした。」を表示
+- ログが存在する場合：`toViewerData()` で変換して `OnliveLogViewerPage` をレンダリング
+
+**`toViewerData` 変換（ローカルログ）：**
+
+| `OnliveLogViewerData` フィールド | マッピング元 |
+|---|---|
+| `capturedAt` | `localLog.capturedAt` |
+| `createdAt` | `localLog.savedAt` |
+| `id` | `"local:" + localLog.liveId` |
+| `liveId` | `localLog.liveId` |
+| `liveStartedAt` | `null` |
+| `log` | `localLog.log` |
+| `room` | `null` |
+| `roomId` | `localLog.roomId` |
+| `updatedAt` | `localLog.savedAt` |
+
+### JSONインポートビューアページ
+
+- **ファイル**: [app/logs/json-import/page.tsx](../app/logs/json-import/page.tsx)
+- **種別**: Server Component (async) + `JsonImportViewerPage`（Client Component）
+- **URL**: `/logs/json-import`
+- **ページタイトル**: `JSONログ閲覧 | WatchLog`
+- **キャッシュ制御**: `force-dynamic`
+- **用途**: `LogListPage` でインポートした JSON ファイルのログを閲覧する（全ユーザー共通）
+
+**処理フロー：**
+1. `auth()` でユーザーID 確認、なければ `/` へリダイレクト
+2. `JsonImportViewerPage` をレンダリング
+
+**`JsonImportViewerPage`（Client Component）：**
+- `useState` 遅延初期化で `readJsonViewerLog()` を呼び出しローカルストレージの `watchlog:json-viewer` を取得
+- ログが存在しない場合：「JSONログが見つかりませんでした。ログ一覧からJSONファイルを選択してください。」を表示
+- ログが存在する場合：`toViewerData()` で変換して `OnliveLogViewerPage` をレンダリング
+
+**`toViewerData` 変換（JSON インポート）：**
+
+| `OnliveLogViewerData` フィールド | マッピング元 |
+|---|---|
+| `capturedAt` | `stored.capturedAt` |
+| `createdAt` | `stored.capturedAt` |
+| `id` | `"json-import:" + stored.liveId` |
+| `liveId` | `stored.liveId` |
+| `liveStartedAt` | `null` |
+| `log` | `stored.log` |
+| `room` | `null` |
+| `roomId` | `stored.roomId` |
+| `updatedAt` | `stored.capturedAt` |
 
 ---
 
@@ -398,7 +556,27 @@ DELETE /api/onlive/logs/{logId}
 - サーバーサイドでのデータ取得は行わない
 - `LogListPage` 側の `useState` 遅延初期化で `readOnliveLocalLog(roomId)` を呼び出す
 - 最大 1 件のみ表示（同一ルームの最新ログで上書き）
-- キー: `watchlog:saved-log:{roomId}`
+- キー: `watchlog:saved-log:{roomId}`（`getOnliveLocalLogKey(roomId)` で生成）
+
+### JSONビューアログ（JSONインポート、全ユーザー共通）
+
+- **ファイル**: [lib/onlive-local-log.ts](../lib/onlive-local-log.ts)
+- `LogListPage` でインポートした JSON ファイルの内容を一時保存する
+- キー: `watchlog:json-viewer`（固定）
+- 保存タイミング: `LogListPage` でファイル選択・バリデーション成功後
+- 取得タイミング: `JsonImportViewerPage` のマウント時
+
+**提供関数：**
+
+| 関数 | 説明 |
+|------|------|
+| `getOnliveLocalLogKey(roomId)` | `watchlog:saved-log:{roomId}` を返す（エクスポート済み） |
+| `readOnliveLocalLog(roomId)` | ローカルストレージから `OnliveLocalLog` を読み込む |
+| `writeOnliveLocalLog(roomId, log)` | ローカルストレージに `OnliveLocalLog` を書き込む |
+| `deleteOnliveLocalLog(roomId)` | ローカルストレージから `OnliveLocalLog` を削除する |
+| `readJsonViewerLog()` | ローカルストレージから `JsonViewerLog` を読み込む |
+| `writeJsonViewerLog(log)` | ローカルストレージに `JsonViewerLog` を書き込む |
+| `isValidJsonViewerLog(value)` | 値が `JsonViewerLog` 型かを検証する型ガード |
 
 ### ログサマリー集計（`getLogSummaryCounts`）
 
@@ -518,6 +696,22 @@ type OnliveLocalLog = {
 
 ローカルストレージキー: `watchlog:saved-log:{roomId}`
 
+### JsonViewerLog（JSONインポートビューア、全ユーザー共通）
+
+```typescript
+// lib/onlive-local-log.ts
+type JsonViewerLog = {
+  capturedAt: string;           // ISO 8601 文字列
+  liveId: string;
+  log: Record<string, unknown>; // 完全なログペイロード
+  roomId: string;
+};
+```
+
+ローカルストレージキー: `watchlog:json-viewer`（固定）
+
+`LogDownloadPayload`（ダウンロード JSON）と同じ構造。ダウンロードした JSON ファイルをインポートして閲覧する際に使用する。`isValidJsonViewerLog()` でバリデーションを行い、`capturedAt`・`liveId`・`roomId` が文字列、`log` がオブジェクトであることを確認する。
+
 ---
 
 ## ページネーション・フィルタリング
@@ -546,14 +740,17 @@ type OnliveLocalLog = {
 
 | ファイル | 役割 |
 |----------|------|
-| [app/logs/page.tsx](../app/logs/page.tsx) | ページコンポーネント（認証・データ取得） |
-| [app/logs/[logId]/page.tsx](../app/logs/%5BlogId%5D/page.tsx) | ログ詳細ページ（別画面） |
-| [components/logs/log-list-page.tsx](../components/logs/log-list-page.tsx) | ログ一覧 UI・ダウンロード・削除操作 |
-| [components/logs/local-log-viewer-page.tsx](../components/logs/local-log-viewer-page.tsx) | 非プレミアム用ローカルログ閲覧ページ |
+| [app/logs/page.tsx](../app/logs/page.tsx) | ログ一覧ページ（認証・データ取得） |
+| [app/logs/[logId]/page.tsx](../app/logs/%5BlogId%5D/page.tsx) | DB ログ詳細ページ（管理者・プレミアム） |
+| [app/logs/local/[roomId]/page.tsx](../app/logs/local/%5BroomId%5D/page.tsx) | ローカルログ詳細ページ（非プレミアム） |
+| [app/logs/json-import/page.tsx](../app/logs/json-import/page.tsx) | JSON インポートビューアページ（全ユーザー共通） |
+| [components/logs/log-list-page.tsx](../components/logs/log-list-page.tsx) | ログ一覧 UI・JSON インポート・ダウンロード・削除操作 |
+| [components/logs/local-log-viewer-page.tsx](../components/logs/local-log-viewer-page.tsx) | ローカルログ閲覧 UI（非プレミアム） |
+| [components/logs/json-import-viewer-page.tsx](../components/logs/json-import-viewer-page.tsx) | JSON インポートログ閲覧 UI（全ユーザー共通） |
 | [app/api/onlive/logs/route.ts](../app/api/onlive/logs/route.ts) | ログ保存 API（プレミアム専用） |
 | [app/api/onlive/logs/[logId]/route.ts](../app/api/onlive/logs/%5BlogId%5D/route.ts) | ログ取得（GET）・削除（DELETE）API |
 | [lib/onlive-log.ts](../lib/onlive-log.ts) | ログ DB 操作・集計 |
-| [lib/onlive-local-log.ts](../lib/onlive-local-log.ts) | ローカルストレージログ読み書き（非プレミアム） |
+| [lib/onlive-local-log.ts](../lib/onlive-local-log.ts) | ローカルストレージログ読み書き・JSON インポートログ読み書き |
 | [lib/authz.ts](../lib/authz.ts) | 管理者判定・プレミアム判定（`hasPremiumRole`） |
 | [lib/user-registered-room.ts](../lib/user-registered-room.ts) | 登録ルーム取得 |
 | [lib/jst.ts](../lib/jst.ts) | JST 日時変換ユーティリティ |

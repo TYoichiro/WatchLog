@@ -1,8 +1,8 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 
-import { readOnliveLocalLog, type OnliveLocalLog } from "@/lib/onlive-local-log";
+import { getOnliveLocalLogKey, type OnliveLocalLog } from "@/lib/onlive-local-log";
 import {
   OnliveLogViewerPage,
   type OnliveLogViewerData,
@@ -11,6 +11,8 @@ import {
 type Props = {
   roomId: string;
 };
+
+type SnapshotCache = { raw: string | null | undefined; log: OnliveLocalLog | null };
 
 function toViewerData(localLog: OnliveLocalLog): OnliveLogViewerData {
   return {
@@ -27,9 +29,18 @@ function toViewerData(localLog: OnliveLocalLog): OnliveLogViewerData {
 }
 
 export function LocalLogViewerPage({ roomId }: Props) {
+  const cacheRef = useRef<SnapshotCache>({ raw: undefined, log: null });
+
   const localLog = useSyncExternalStore(
     () => () => {},
-    () => readOnliveLocalLog(roomId),
+    () => {
+      if (typeof window === "undefined") return null;
+      const raw = window.localStorage.getItem(getOnliveLocalLogKey(roomId));
+      if (raw === cacheRef.current.raw) return cacheRef.current.log;
+      const log = raw ? (JSON.parse(raw) as OnliveLocalLog) : null;
+      cacheRef.current = { raw, log };
+      return log;
+    },
     () => null
   );
 

@@ -367,6 +367,29 @@ describe("LogListPage", () => {
     expect(routerRefresh).not.toHaveBeenCalled();
   });
 
+  it("non-premium users' 閲覧 link navigates to /logs/local/{roomId}", () => {
+    const localLog = {
+      capturedAt: "2026-05-09T12:00:00.000+09:00",
+      commentCount: 5,
+      giftCount: 2,
+      liveId: "live-local-1",
+      liveRankingCount: 3,
+      log: {},
+      roomId: "12345",
+      roomName: "Alpha Room",
+      savedAt: "2026-05-09T12:01:00.000+09:00",
+    };
+    window.localStorage.setItem(
+      "watchlog:saved-log:12345",
+      JSON.stringify(localLog),
+    );
+
+    render(<LogListPage initialLogs={[]} isPremium={false} roomId="12345" />);
+
+    const viewLink = screen.getByRole("link", { name: /閲覧/ });
+    expect(viewLink.getAttribute("href")).toBe("/logs/local/12345");
+  });
+
   it("non-premium users can delete a local log", async () => {
     const localLog = {
       capturedAt: "2026-05-09T12:00:00.000+09:00",
