@@ -1537,7 +1537,7 @@ function useShowroomRealtimeFeed(
 
       socket?.close();
     };
-  }, [roomId]);
+  }, [roomId, liveInfo, giftDefinitions]);
 
   useEffect(() => {
     if (!hasLiveInfo) {

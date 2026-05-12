@@ -2,7 +2,6 @@ import {
   SHOWROOM_API_URL,
   fetchShowroomJson,
   toFiniteNumber,
-  toUnixSeconds,
 } from "./core";
 
 type ShowroomCommentLogItem = {
@@ -66,7 +65,7 @@ export async function getRoomCommentLog(
     avatarId:
       typeof item.avatar_id === "number" ? item.avatar_id : null,
     avatarUrl: item.avatar_url ?? null,
-    classLevel: toUnixSeconds(item.class_level),
+    classLevel: toFiniteNumber(item.class_level),
     createdAt: toCommentCreatedAt(item.create_at ?? item.created_at),
     name: item.name?.trim() || "Unknown",
     text: item.comment?.trim() || "",

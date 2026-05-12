@@ -1,4 +1,5 @@
 import { authzErrorResponse, hasTopAdminRole, requireUser } from "@/lib/authz";
+import { toJstWallTimeIsoString } from "@/lib/jst";
 import { deleteUserOnliveLog, getAnyOnliveLog, getUserOnliveLog } from "@/lib/onlive-log";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export async function GET(
     }
 
     return Response.json({
-      capturedAt: log.capturedAt,
+      capturedAt: toJstWallTimeIsoString(log.capturedAt),
       liveId: log.liveId,
       log: log.log,
       roomId: log.roomId,
