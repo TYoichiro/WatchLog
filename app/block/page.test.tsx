@@ -7,10 +7,12 @@ import BlockPage from "./page";
 const {
   authMock,
   getUserRegisteredRoomMock,
+  hasTopAdminRoleMock,
   redirectMock,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
   getUserRegisteredRoomMock: vi.fn(),
+  hasTopAdminRoleMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   }),
@@ -24,6 +26,10 @@ vi.mock("next/navigation", () => ({
   redirect: redirectMock,
 }));
 
+vi.mock("@/lib/authz", () => ({
+  hasTopAdminRole: hasTopAdminRoleMock,
+}));
+
 vi.mock("@/lib/user-registered-room", () => ({
   getUserRegisteredRoom: getUserRegisteredRoomMock,
 }));
@@ -32,11 +38,17 @@ vi.mock("@/components/navigation/app-sidebar", () => ({
   AppShell: ({
     activeKey,
     children,
+    isAdmin,
   }: {
     activeKey?: string;
     children: ReactNode;
+    isAdmin?: boolean;
   }) => (
-    <div data-active-key={activeKey} data-testid="app-shell">
+    <div
+      data-active-key={activeKey}
+      data-is-admin={String(isAdmin ?? false)}
+      data-testid="app-shell"
+    >
       {children}
     </div>
   ),
@@ -223,8 +235,9 @@ function setupFetchScenario({
   });
 }
 
-function setupAuthenticatedPage() {
+function setupAuthenticatedPage({ isAdmin = false }: { isAdmin?: boolean } = {}) {
   authMock.mockResolvedValue(session);
+  hasTopAdminRoleMock.mockResolvedValue(isAdmin);
   getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
 }
 
@@ -237,11 +250,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
   authMock.mockReset();
   getUserRegisteredRoomMock.mockReset();
+  hasTopAdminRoleMock.mockReset();
   redirectMock.mockClear();
   fetchMock.mockReset();
 });
 
 beforeEach(() => {
+  hasTopAdminRoleMock.mockResolvedValue(false);
   vi.stubGlobal("fetch", fetchMock);
 });
 
@@ -263,6 +278,24 @@ describe("BlockPage", () => {
 
     expect(getUserRegisteredRoomMock).toHaveBeenCalledWith("user-1");
     expect(redirectMock).toHaveBeenCalledWith("/search");
+  });
+
+  it("passes isAdmin=false to AppShell for non-admin users", async () => {
+    setupAuthenticatedPage({ isAdmin: false });
+    setupFetchScenario();
+
+    await renderBlockPage();
+
+    expect(screen.getByTestId("app-shell").getAttribute("data-is-admin")).toBe("false");
+  });
+
+  it("passes isAdmin=true to AppShell for admin users", async () => {
+    setupAuthenticatedPage({ isAdmin: true });
+    setupFetchScenario();
+
+    await renderBlockPage();
+
+    expect(screen.getByTestId("app-shell").getAttribute("data-is-admin")).toBe("true");
   });
 
   it("renders the block list for the registered room", async () => {

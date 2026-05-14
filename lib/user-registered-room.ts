@@ -27,6 +27,39 @@ const registeredRoomSelect = {
   roomUrl: true,
 } as const;
 
+export type RegisteredRoomListItem = {
+  id: string;
+  roomId: string;
+  roomUrl: string;
+  roomName: string | null;
+  imageUrl: string | null;
+  createdAt: Date;
+  user: {
+    id: string;
+    name: string | null;
+  };
+};
+
+export async function listAllRegisteredRooms(): Promise<RegisteredRoomListItem[]> {
+  return prisma.userRegisteredRoom.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      roomId: true,
+      roomUrl: true,
+      roomName: true,
+      imageUrl: true,
+      createdAt: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+}
+
 export async function getUserRegisteredRoom(
   userId: string
 ): Promise<UserRegisteredRoomData | null> {

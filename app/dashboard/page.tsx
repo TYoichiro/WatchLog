@@ -394,6 +394,7 @@ export default function Page() {
   const router = useRouter();
   const [canShowDashboard, setCanShowDashboard] = useState(false);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
+    isAdmin: false,
     profile: null,
     activeFan: null,
     eventAndSupport: null,
@@ -531,9 +532,9 @@ export default function Page() {
         return;
       }
 
-      const { profile, activeFan, eventAndSupport, notices, noticesHasError, roomStatus } = bffData;
+      const { isAdmin: bffIsAdmin, profile, activeFan, eventAndSupport, notices, noticesHasError, roomStatus } = bffData;
 
-      setDashboardData({ profile, activeFan, eventAndSupport, notices, noticesHasError });
+      setDashboardData({ isAdmin: bffIsAdmin, profile, activeFan, eventAndSupport, notices, noticesHasError });
       setCanShowDashboard(true);
 
       const broadcastKey = roomStatus?.broadcastKey?.trim();
@@ -567,10 +568,10 @@ export default function Page() {
     );
   }
 
-  const { profile, activeFan, eventAndSupport, notices, noticesHasError } = dashboardData;
+  const { isAdmin, profile, activeFan, eventAndSupport, notices, noticesHasError } = dashboardData;
 
   return (
-    <AppShell activeKey="dashboard">
+    <AppShell activeKey="dashboard" isAdmin={isAdmin}>
       <div className="flex shrink-0 flex-col gap-4">
         <HeroCard profile={profile} />
         <RoomStatsSection profile={profile} activeFan={activeFan} />

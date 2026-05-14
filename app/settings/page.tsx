@@ -51,7 +51,7 @@ export default async function Page() {
     : "招待コード（最大3名まで招待することができます）";
 
   return (
-    <AppShell activeKey="settings">
+    <AppShell activeKey="settings" isAdmin={isAdmin}>
       <section className="shrink-0">
         <h1 className="text-xl font-semibold text-slate-950">設定</h1>
       </section>
