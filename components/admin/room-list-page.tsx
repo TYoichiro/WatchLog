@@ -16,6 +16,7 @@ export type RoomListItem = {
     id: string;
     name: string | null;
     isPremium: boolean;
+    isAdmin: boolean;
   };
 };
 
@@ -136,7 +137,9 @@ export function RoomListPage({ rooms }: { rooms: RoomListItem[] }) {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <RoleSelect userId={room.user.id} initialIsPremium={room.user.isPremium} />
+                {!room.user.isAdmin && (
+                  <RoleSelect userId={room.user.id} initialIsPremium={room.user.isPremium} />
+                )}
                 <a
                   href={`https://www.showroom-live.com/room/profile?room_id=${encodeURIComponent(room.roomId)}`}
                   target="_blank"

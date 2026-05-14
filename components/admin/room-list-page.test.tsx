@@ -14,6 +14,7 @@ const makeRoom = (overrides: Partial<RoomListItem> = {}): RoomListItem => ({
     id: "user-1",
     name: "User One",
     isPremium: false,
+    isAdmin: false,
   },
   ...overrides,
 });
@@ -69,7 +70,7 @@ describe("RoomListPage", () => {
   it("複数ルームを正しく表示する", () => {
     const rooms = [
       makeRoom({ id: "reg-1", roomName: "Alpha Room" }),
-      makeRoom({ id: "reg-2", roomId: "99999", roomUrl: "beta-room", roomName: "Beta Room", user: { id: "user-2", name: "User Two", isPremium: true } }),
+      makeRoom({ id: "reg-2", roomId: "99999", roomUrl: "beta-room", roomName: "Beta Room", user: { id: "user-2", name: "User Two", isPremium: true, isAdmin: false } }),
     ];
     render(<RoomListPage rooms={rooms} />);
     expect(screen.getByRole("heading", { name: "ルーム一覧 2件" })).toBeDefined();
@@ -80,13 +81,13 @@ describe("RoomListPage", () => {
 
 describe("RoleSelect", () => {
   it("一般ユーザーの場合 general が初期値", () => {
-    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false } })]} />);
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false, isAdmin: false } })]} />);
     const select = screen.getByRole("combobox", { name: "ロール変更" }) as HTMLSelectElement;
     expect(select.value).toBe("general");
   });
 
   it("プレミアムユーザーの場合 premiumuser が初期値", () => {
-    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: true } })]} />);
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: true, isAdmin: false } })]} />);
     const select = screen.getByRole("combobox", { name: "ロール変更" }) as HTMLSelectElement;
     expect(select.value).toBe("premiumuser");
   });
@@ -95,7 +96,7 @@ describe("RoleSelect", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<RoomListPage rooms={[makeRoom({ user: { id: "user-1", name: "User", isPremium: false } })]} />);
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "user-1", name: "User", isPremium: false, isAdmin: false } })]} />);
     const select = screen.getByRole("combobox", { name: "ロール変更" });
 
     fireEvent.change(select, { target: { value: "premiumuser" } });
@@ -115,7 +116,7 @@ describe("RoleSelect", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<RoomListPage rooms={[makeRoom({ user: { id: "user-1", name: "User", isPremium: true } })]} />);
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "user-1", name: "User", isPremium: true, isAdmin: false } })]} />);
     const select = screen.getByRole("combobox", { name: "ロール変更" });
 
     fireEvent.change(select, { target: { value: "general" } });
@@ -134,7 +135,7 @@ describe("RoleSelect", () => {
   it("API 成功後にセレクトの値が更新される", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
 
-    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false } })]} />);
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false, isAdmin: false } })]} />);
     const select = screen.getByRole("combobox", { name: "ロール変更" }) as HTMLSelectElement;
 
     fireEvent.change(select, { target: { value: "premiumuser" } });
@@ -147,7 +148,7 @@ describe("RoleSelect", () => {
   it("API 失敗時にエラーメッセージを表示する", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 
-    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false } })]} />);
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false, isAdmin: false } })]} />);
     const select = screen.getByRole("combobox", { name: "ロール変更" });
 
     fireEvent.change(select, { target: { value: "premiumuser" } });
@@ -160,7 +161,7 @@ describe("RoleSelect", () => {
   it("API 失敗時にセレクトの値はロールバックされない（元のままになる）", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 
-    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false } })]} />);
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false, isAdmin: false } })]} />);
     const select = screen.getByRole("combobox", { name: "ロール変更" }) as HTMLSelectElement;
 
     fireEvent.change(select, { target: { value: "premiumuser" } });
@@ -179,7 +180,7 @@ describe("RoleSelect", () => {
       vi.fn(() => new Promise<{ ok: boolean }>((r) => { resolveFetch = r; })),
     );
 
-    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false } })]} />);
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false, isAdmin: false } })]} />);
     const select = screen.getByRole("combobox", { name: "ロール変更" }) as HTMLSelectElement;
 
     fireEvent.change(select, { target: { value: "premiumuser" } });
@@ -199,7 +200,7 @@ describe("RoleSelect", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false } })]} />);
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false, isAdmin: false } })]} />);
     const select = screen.getByRole("combobox", { name: "ロール変更" });
 
     fireEvent.change(select, { target: { value: "general" } });
@@ -209,13 +210,28 @@ describe("RoleSelect", () => {
 
   it("複数ユーザーがいる場合それぞれのロールセレクトを表示する", () => {
     const rooms = [
-      makeRoom({ id: "reg-1", user: { id: "u1", name: "User1", isPremium: false } }),
-      makeRoom({ id: "reg-2", roomId: "99999", roomUrl: "beta-room", user: { id: "u2", name: "User2", isPremium: true } }),
+      makeRoom({ id: "reg-1", user: { id: "u1", name: "User1", isPremium: false, isAdmin: false } }),
+      makeRoom({ id: "reg-2", roomId: "99999", roomUrl: "beta-room", user: { id: "u2", name: "User2", isPremium: true, isAdmin: false } }),
     ];
     render(<RoomListPage rooms={rooms} />);
     const selects = screen.getAllByRole("combobox", { name: "ロール変更" }) as HTMLSelectElement[];
     expect(selects).toHaveLength(2);
     expect(selects[0].value).toBe("general");
     expect(selects[1].value).toBe("premiumuser");
+  });
+
+  it("管理者ユーザーのロールセレクトを表示しない", () => {
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "Admin", isPremium: false, isAdmin: true } })]} />);
+    expect(screen.queryByRole("combobox", { name: "ロール変更" })).toBeNull();
+  });
+
+  it("管理者と一般ユーザーが混在する場合、管理者のみ非表示", () => {
+    const rooms = [
+      makeRoom({ id: "reg-1", user: { id: "u1", name: "Admin", isPremium: false, isAdmin: true } }),
+      makeRoom({ id: "reg-2", roomId: "99999", roomUrl: "beta-room", user: { id: "u2", name: "User", isPremium: false, isAdmin: false } }),
+    ];
+    render(<RoomListPage rooms={rooms} />);
+    const selects = screen.getAllByRole("combobox", { name: "ロール変更" });
+    expect(selects).toHaveLength(1);
   });
 });

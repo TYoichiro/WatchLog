@@ -41,6 +41,7 @@ export default async function Page() {
       id: room.user.id,
       name: room.user.name,
       isPremium: room.user.isPremium,
+      isAdmin: room.user.isAdmin,
     },
   }));
 

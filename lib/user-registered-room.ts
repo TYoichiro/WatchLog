@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from "@/app/generated/prisma/client";
-import { PREMIUM_ROLE_NAME } from "@/lib/authz";
+import { PREMIUM_ROLE_NAME, TOP_ADMIN_ROLE_NAME } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 
 export type UserRegisteredRoomData = {
@@ -39,6 +39,7 @@ export type RegisteredRoomListItem = {
     id: string;
     name: string | null;
     isPremium: boolean;
+    isAdmin: boolean;
   };
 };
 
@@ -58,10 +59,9 @@ export async function listAllRegisteredRooms(): Promise<RegisteredRoomListItem[]
           name: true,
           userRoles: {
             where: {
-              role: { name: PREMIUM_ROLE_NAME },
+              role: { name: { in: [PREMIUM_ROLE_NAME, TOP_ADMIN_ROLE_NAME] } },
             },
-            select: { id: true },
-            take: 1,
+            select: { id: true, role: { select: { name: true } } },
           },
         },
       },
@@ -73,7 +73,8 @@ export async function listAllRegisteredRooms(): Promise<RegisteredRoomListItem[]
     user: {
       id: room.user.id,
       name: room.user.name,
-      isPremium: room.user.userRoles.length > 0,
+      isPremium: room.user.userRoles.some((r) => r.role.name === PREMIUM_ROLE_NAME),
+      isAdmin: room.user.userRoles.some((r) => r.role.name === TOP_ADMIN_ROLE_NAME),
     },
   }));
 }

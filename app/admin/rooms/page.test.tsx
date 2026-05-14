@@ -77,6 +77,7 @@ const room = {
     id: "user-1",
     name: "User One",
     isPremium: false,
+    isAdmin: false,
   },
 };
 
@@ -214,6 +215,17 @@ describe("AdminRoomsPage", () => {
     expect(select.value).toBe("premiumuser");
   });
 
+  it("does not render role select for admin users", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    listAllRegisteredRoomsMock.mockResolvedValue([{ ...room, user: { ...room.user, isAdmin: true } }]);
+    toJstWallTimeIsoStringMock.mockReturnValue("2026-05-01T00:00:00.000Z");
+
+    await renderPage();
+
+    expect(screen.queryByRole("combobox", { name: "ロール変更" })).toBeNull();
+  });
+
   it("renders multiple rooms with correct links", async () => {
     const room2 = {
       id: "reg-2",
@@ -222,7 +234,7 @@ describe("AdminRoomsPage", () => {
       roomName: "Beta Room",
       imageUrl: null,
       createdAt: new Date("2026-04-01T00:00:00.000Z"),
-      user: { id: "user-2", name: "User Two", isPremium: true },
+      user: { id: "user-2", name: "User Two", isPremium: true, isAdmin: false },
     };
     authMock.mockResolvedValue(session);
     hasTopAdminRoleMock.mockResolvedValue(true);
