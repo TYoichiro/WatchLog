@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
 import { listUserInvitationCodes } from "@/lib/invitations";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
+import { GenerateInvitationCodeButton } from "@/components/settings/generate-invitation-code-button";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,12 @@ export default async function Page() {
 
   const roleLabel = getRoleLabel(isAdmin, isPremium);
 
+  const activeCount = invitationCodes.filter((c) => c.isActive).length;
+  const usedCount = invitationCodes.filter((c) => !c.isActive).length;
+  const invitationHeading = isAdmin
+    ? `招待コード（現在${activeCount}名招待できるコードがあります　未利用：${activeCount}件　使用済み：${usedCount}件）`
+    : "招待コード（最大3名まで招待することができます）";
+
   return (
     <AppShell activeKey="settings">
       <section className="shrink-0">
@@ -65,13 +72,16 @@ export default async function Page() {
 
       <Card className="rounded-lg border-slate-200 shadow-sm">
         <CardContent className="p-6">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-              <KeyRound className="size-5" aria-hidden="true" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                <KeyRound className="size-5" aria-hidden="true" />
+              </div>
+              <h2 className="text-base font-semibold text-slate-950">
+                {invitationHeading}
+              </h2>
             </div>
-            <h2 className="text-base font-semibold text-slate-950">
-              招待コード（最大3名まで招待することができます）
-            </h2>
+            {isAdmin && <GenerateInvitationCodeButton />}
           </div>
 
           {invitationCodes.length > 0 ? (

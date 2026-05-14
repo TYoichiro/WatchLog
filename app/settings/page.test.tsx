@@ -57,10 +57,15 @@ vi.mock("@/components/navigation/app-sidebar", () => ({
   ),
 }));
 
+vi.mock("@/components/settings/generate-invitation-code-button", () => ({
+  GenerateInvitationCodeButton: () => (
+    <button data-testid="generate-invitation-code-button">招待コード生成</button>
+  ),
+}));
+
 const settingsTitle = "設定";
 const roleHeading = "権限";
-const invitationHeading =
-  "招待コード（最大3名まで招待することができます）";
+const generalInvitationHeading = "招待コード（最大3名まで招待することができます）";
 const activeLabel = "有効";
 const inactiveLabel = "無効";
 const emptyInvitationMessage = "招待コードはありません";
@@ -152,7 +157,7 @@ describe("SettingsPage", () => {
     );
     expect(screen.getByRole("heading", { level: 1, name: settingsTitle })).toBeDefined();
     expect(screen.getByRole("heading", { level: 2, name: roleHeading })).toBeDefined();
-    expect(screen.getByRole("heading", { level: 2, name: invitationHeading })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 2, name: generalInvitationHeading })).toBeDefined();
     expect(screen.getByText("ABCD123456")).toBeDefined();
     expect(screen.getByText("WXYZ987654")).toBeDefined();
     expect(screen.getByText(activeLabel)).toBeDefined();
@@ -215,5 +220,58 @@ describe("SettingsPage", () => {
     await renderSettingsPage();
 
     expect(getRoleDescriptionText()).toBe("あなたは管理者ユーザーです");
+  });
+
+  it("shows the generate invitation code button for admin users", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(screen.getByTestId("generate-invitation-code-button")).toBeDefined();
+  });
+
+  it("does not show the generate invitation code button for non-admin users", async () => {
+    authMock.mockResolvedValue(session);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(screen.queryByTestId("generate-invitation-code-button")).toBeNull();
+  });
+
+  it("shows admin invitation heading with correct counts", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([
+      { code: "AAAA111111", isActive: true },
+      { code: "BBBB222222", isActive: true },
+      { code: "CCCC333333", isActive: false },
+    ]);
+
+    await renderSettingsPage();
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "招待コード（現在2名招待できるコードがあります　未利用：2件　使用済み：1件）",
+      }),
+    ).toBeDefined();
+  });
+
+  it("shows general invitation heading for non-admin users", async () => {
+    authMock.mockResolvedValue(session);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: generalInvitationHeading }),
+    ).toBeDefined();
   });
 });

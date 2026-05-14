@@ -148,6 +148,17 @@ export async function ensureUserInvitationCodes(
   }
 }
 
+export async function addInvitationCode(
+  inviterUserId: string
+): Promise<UserInvitationCodeData> {
+  const created = await createUniqueInvitationCode(inviterUserId, prisma);
+  const invitation = await prisma.invitationCode.findUniqueOrThrow({
+    where: { id: created!.id },
+    select: { code: true },
+  });
+  return { code: invitation.code, isActive: true };
+}
+
 export async function listUserInvitationCodes(
   userId: string
 ): Promise<UserInvitationCodeData[]> {
