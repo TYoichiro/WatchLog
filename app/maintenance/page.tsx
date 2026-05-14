@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { Clock3, Wrench } from "lucide-react";
 import { redirect } from "next/navigation";
 
+import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
+import { StopMaintenanceButton } from "@/components/maintenance/stop-maintenance-button";
+import { hasTopAdminRole } from "@/lib/authz";
 import { getActiveMaintenanceWindow } from "@/lib/maintenance";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +20,10 @@ export default async function MaintenancePage() {
   if (!maintenanceWindow) {
     redirect("/");
   }
+
+  const session = await auth();
+  const userId = session?.user?.id;
+  const isAdmin = userId ? await hasTopAdminRole(userId) : false;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 text-slate-950">
@@ -46,6 +53,12 @@ export default async function MaintenancePage() {
               {maintenanceWindow.message ??
                 "ただいまシステムメンテナンスを実施しています。終了後に再度アクセスしてください。"}
             </p>
+
+            {isAdmin ? (
+              <div className="mt-6 border-t border-slate-200 pt-6">
+                <StopMaintenanceButton windowId={maintenanceWindow.id} />
+              </div>
+            ) : null}
           </div>
         </div>
       </section>

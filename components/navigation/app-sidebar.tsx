@@ -7,12 +7,15 @@ import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 import {
   Ban,
+  Bell,
   ChevronRight,
   Home,
   List,
   LogOut,
   Menu,
   Settings,
+  Tv,
+  Wrench,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -20,7 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type NavigationKey = "dashboard" | "logs" | "block" | "search" | "settings";
+type NavigationKey = "dashboard" | "logs" | "block" | "search" | "settings" | "admin-rooms" | "admin-maintenance" | "admin-notices";
 
 type NavigationItem = {
   key: NavigationKey;
@@ -46,6 +49,18 @@ function isDesktopSidebarLayout() {
 }
 
 function getActiveNavigationKey(pathname: string | null): NavigationKey {
+  if (pathname?.startsWith("/admin/rooms")) {
+    return "admin-rooms";
+  }
+
+  if (pathname?.startsWith("/admin/maintenance")) {
+    return "admin-maintenance";
+  }
+
+  if (pathname?.startsWith("/admin/notices")) {
+    return "admin-notices";
+  }
+
   if (pathname?.startsWith("/logs")) {
     return "logs";
   }
@@ -67,9 +82,11 @@ function getActiveNavigationKey(pathname: string | null): NavigationKey {
 
 function SidebarContent({
   activeKey,
+  isAdmin = false,
   onSelect,
 }: {
   activeKey: NavigationKey;
+  isAdmin?: boolean;
   onSelect?: () => void;
 }) {
   const [isSigningOut, startSignOutTransition] = useTransition();
@@ -139,6 +156,66 @@ function SidebarContent({
             </Link>
           );
         })}
+
+        {isAdmin ? (
+          <>
+            <div className="my-2 border-t border-slate-100" />
+            <p className="px-4 pb-1 text-xs font-medium tracking-wider text-slate-400">
+              管理者
+            </p>
+            <Link
+              href="/admin/rooms"
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition",
+                activeKey === "admin-rooms"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              )}
+              onClick={onSelect}
+              aria-current={activeKey === "admin-rooms" ? "page" : undefined}
+            >
+              <span className="flex items-center gap-3">
+                <Tv className="h-5 w-5" aria-hidden />
+                <span className="font-medium">ルーム一覧</span>
+              </span>
+              <ChevronRight className="h-4 w-4 opacity-70" aria-hidden />
+            </Link>
+            <Link
+              href="/admin/maintenance"
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition",
+                activeKey === "admin-maintenance"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              )}
+              onClick={onSelect}
+              aria-current={activeKey === "admin-maintenance" ? "page" : undefined}
+            >
+              <span className="flex items-center gap-3">
+                <Wrench className="h-5 w-5" aria-hidden />
+                <span className="font-medium">メンテナンス</span>
+              </span>
+              <ChevronRight className="h-4 w-4 opacity-70" aria-hidden />
+            </Link>
+            <Link
+              href="/admin/notices"
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition",
+                activeKey === "admin-notices"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              )}
+              onClick={onSelect}
+              aria-current={activeKey === "admin-notices" ? "page" : undefined}
+            >
+              <span className="flex items-center gap-3">
+                <Bell className="h-5 w-5" aria-hidden />
+                <span className="font-medium">お知らせ</span>
+              </span>
+              <ChevronRight className="h-4 w-4 opacity-70" aria-hidden />
+            </Link>
+          </>
+        ) : null}
       </nav>
 
       <div className="space-y-3 border-t p-4">
@@ -170,10 +247,12 @@ function SidebarContent({
 
 function MobileSidebar({
   activeKey,
+  isAdmin = false,
   open,
   onClose,
 }: {
   activeKey: NavigationKey;
+  isAdmin?: boolean;
   open: boolean;
   onClose: () => void;
 }) {
@@ -211,7 +290,7 @@ function MobileSidebar({
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <SidebarContent activeKey={activeKey} onSelect={onClose} />
+        <SidebarContent activeKey={activeKey} isAdmin={isAdmin} onSelect={onClose} />
       </aside>
     </>
   );
@@ -219,9 +298,11 @@ function MobileSidebar({
 
 function AppSidebar({
   activeKey,
+  isAdmin = false,
   open,
 }: {
   activeKey: NavigationKey;
+  isAdmin?: boolean;
   open: boolean;
 }) {
   if (!open) {
@@ -230,7 +311,7 @@ function AppSidebar({
 
   return (
     <aside className="hidden xl:flex xl:w-72 xl:flex-col xl:border-r xl:bg-white">
-      <SidebarContent activeKey={activeKey} />
+      <SidebarContent activeKey={activeKey} isAdmin={isAdmin} />
     </aside>
   );
 }
@@ -280,11 +361,13 @@ function AppHeader({
 export function AppShell({
   activeKey,
   children,
+  isAdmin = false,
   mainClassName,
   showMenu = true,
 }: {
   activeKey?: NavigationKey;
   children: ReactNode;
+  isAdmin?: boolean;
   mainClassName?: string;
   showMenu?: boolean;
 }) {
@@ -308,9 +391,10 @@ export function AppShell({
       <div className="flex min-h-screen xl:h-screen">
         {showMenu ? (
           <>
-            <AppSidebar activeKey={resolvedActiveKey} open={desktopSidebarOpen} />
+            <AppSidebar activeKey={resolvedActiveKey} isAdmin={isAdmin} open={desktopSidebarOpen} />
             <MobileSidebar
               activeKey={resolvedActiveKey}
+              isAdmin={isAdmin}
               open={mobileSidebarOpen}
               onClose={() => setMobileSidebarOpen(false)}
             />

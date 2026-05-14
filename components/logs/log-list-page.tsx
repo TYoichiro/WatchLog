@@ -258,7 +258,7 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
         </h1>
       </section>
 
-      <Card className="rounded-lg border-slate-200 shadow-sm">
+      <Card className="shrink-0 rounded-lg border-slate-200 shadow-sm">
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-3">
             <FileJson className="h-5 w-5 shrink-0 text-slate-400" aria-hidden />

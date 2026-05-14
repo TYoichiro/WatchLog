@@ -9,6 +9,7 @@ import type {
 } from "@/lib/showroom";
 
 export type DashboardData = {
+  isAdmin: boolean;
   profile: RoomProfile | null;
   activeFan: ActiveFanSummary | null;
   eventAndSupport: EventAndSupportSummary | null;

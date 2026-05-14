@@ -44,7 +44,7 @@ export default async function Page() {
   if (isAdmin) {
     const logs = await listAllOnliveLogs();
     return (
-      <AppShell activeKey="logs">
+      <AppShell activeKey="logs" isAdmin>
         <LogListPage initialLogs={logs.map(toListItem)} />
       </AppShell>
     );
