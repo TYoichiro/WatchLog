@@ -4,6 +4,35 @@ import {
   toJstWallTimeDate,
 } from "@/lib/jst";
 
+export type MaintenanceWindowListItem = {
+  id: string;
+  title: string;
+  message: string | null;
+  startsAt: Date;
+  endsAt: Date;
+  isEnabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+const maintenanceWindowListSelect = {
+  id: true,
+  title: true,
+  message: true,
+  startsAt: true,
+  endsAt: true,
+  isEnabled: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+export async function listAllMaintenanceWindows(): Promise<MaintenanceWindowListItem[]> {
+  return prisma.maintenanceWindow.findMany({
+    orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }],
+    select: maintenanceWindowListSelect,
+  });
+}
+
 export type ActiveMaintenanceWindow = {
   id: string;
   title: string;

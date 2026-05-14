@@ -14,6 +14,7 @@ import {
   Menu,
   Settings,
   Tv,
+  Wrench,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -21,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type NavigationKey = "dashboard" | "logs" | "block" | "search" | "settings" | "admin-rooms";
+type NavigationKey = "dashboard" | "logs" | "block" | "search" | "settings" | "admin-rooms" | "admin-maintenance";
 
 type NavigationItem = {
   key: NavigationKey;
@@ -49,6 +50,10 @@ function isDesktopSidebarLayout() {
 function getActiveNavigationKey(pathname: string | null): NavigationKey {
   if (pathname?.startsWith("/admin/rooms")) {
     return "admin-rooms";
+  }
+
+  if (pathname?.startsWith("/admin/maintenance")) {
+    return "admin-maintenance";
   }
 
   if (pathname?.startsWith("/logs")) {
@@ -167,6 +172,23 @@ function SidebarContent({
               <span className="flex items-center gap-3">
                 <Tv className="h-5 w-5" aria-hidden />
                 <span className="font-medium">ルーム一覧</span>
+              </span>
+              <ChevronRight className="h-4 w-4 opacity-70" aria-hidden />
+            </Link>
+            <Link
+              href="/admin/maintenance"
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition",
+                activeKey === "admin-maintenance"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              )}
+              onClick={onSelect}
+              aria-current={activeKey === "admin-maintenance" ? "page" : undefined}
+            >
+              <span className="flex items-center gap-3">
+                <Wrench className="h-5 w-5" aria-hidden />
+                <span className="font-medium">メンテナンス</span>
               </span>
               <ChevronRight className="h-4 w-4 opacity-70" aria-hidden />
             </Link>
