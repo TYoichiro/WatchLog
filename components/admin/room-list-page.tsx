@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink, Hash, User } from "lucide-react";
+import { useState } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -14,6 +15,7 @@ export type RoomListItem = {
   user: {
     id: string;
     name: string | null;
+    isPremium: boolean;
   };
 };
 
@@ -33,6 +35,51 @@ function formatDate(value: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(date);
+}
+
+type RoleValue = "premiumuser" | "general";
+
+function RoleSelect({ userId, initialIsPremium }: { userId: string; initialIsPremium: boolean }) {
+  const [role, setRole] = useState<RoleValue>(initialIsPremium ? "premiumuser" : "general");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(false);
+
+  async function handleChange(next: RoleValue) {
+    if (next === role || pending) return;
+    setPending(true);
+    setError(false);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: next }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      setRole(next);
+    } catch {
+      setError(true);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-0.5 sm:items-end">
+      <select
+        value={role}
+        disabled={pending}
+        onChange={(e) => handleChange(e.target.value as RoleValue)}
+        className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+        aria-label="ロール変更"
+      >
+        <option value="general">一般ユーザー</option>
+        <option value="premiumuser">プレミアムユーザー</option>
+      </select>
+      {error && (
+        <p className="text-xs text-red-500">変更に失敗しました</p>
+      )}
+    </div>
+  );
 }
 
 export function RoomListPage({ rooms }: { rooms: RoomListItem[] }) {
@@ -89,6 +136,7 @@ export function RoomListPage({ rooms }: { rooms: RoomListItem[] }) {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <RoleSelect userId={room.user.id} initialIsPremium={room.user.isPremium} />
                 <a
                   href={`https://www.showroom-live.com/room/profile?room_id=${encodeURIComponent(room.roomId)}`}
                   target="_blank"

@@ -76,6 +76,7 @@ const room = {
   user: {
     id: "user-1",
     name: "User One",
+    isPremium: false,
   },
 };
 
@@ -188,6 +189,31 @@ describe("AdminRoomsPage", () => {
     expect(screen.getByText("alpha-room")).toBeDefined();
   });
 
+  it("renders role select for each room", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    listAllRegisteredRoomsMock.mockResolvedValue([room]);
+    toJstWallTimeIsoStringMock.mockReturnValue("2026-05-01T00:00:00.000Z");
+
+    await renderPage();
+
+    const select = screen.getByRole("combobox", { name: "ロール変更" }) as HTMLSelectElement;
+    expect(select).toBeDefined();
+    expect(select.value).toBe("general");
+  });
+
+  it("renders role select with premiumuser value for premium user", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    listAllRegisteredRoomsMock.mockResolvedValue([{ ...room, user: { ...room.user, isPremium: true } }]);
+    toJstWallTimeIsoStringMock.mockReturnValue("2026-05-01T00:00:00.000Z");
+
+    await renderPage();
+
+    const select = screen.getByRole("combobox", { name: "ロール変更" }) as HTMLSelectElement;
+    expect(select.value).toBe("premiumuser");
+  });
+
   it("renders multiple rooms with correct links", async () => {
     const room2 = {
       id: "reg-2",
@@ -196,7 +222,7 @@ describe("AdminRoomsPage", () => {
       roomName: "Beta Room",
       imageUrl: null,
       createdAt: new Date("2026-04-01T00:00:00.000Z"),
-      user: { id: "user-2", name: "User Two" },
+      user: { id: "user-2", name: "User Two", isPremium: true },
     };
     authMock.mockResolvedValue(session);
     hasTopAdminRoleMock.mockResolvedValue(true);
