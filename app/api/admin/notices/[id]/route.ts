@@ -174,7 +174,7 @@ export async function PATCH(
           action: "dashboard_notice.update",
           resource: "dashboard_notice",
           resourceId: String(id),
-          detail: updateData as Record<string, unknown>,
+          detail: JSON.parse(JSON.stringify(updateData)),
         },
         tx,
       );
