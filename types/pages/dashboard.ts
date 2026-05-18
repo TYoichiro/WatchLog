@@ -39,6 +39,3 @@ export type DashboardStat = {
   icon: LucideIcon;
 };
 
-export type DashboardRealtimeMessage = {
-  t?: number | string | null;
-};

@@ -112,9 +112,13 @@ async function readErrorMessage(response: Response): Promise<string> {
 
 function getDownloadFilename(log: LogListItem): string {
   const date = new Date(log.capturedAt);
-  const dateStr = Number.isNaN(date.getTime())
-    ? "unknown"
-    : `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+  if (Number.isNaN(date.getTime())) return `watchlog-${log.liveId}-unknown.json`;
+  const dateStr = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date).replace(/\//g, "");
   return `watchlog-${log.liveId}-${dateStr}.json`;
 }
 
@@ -130,6 +134,176 @@ function triggerJsonDownload(filename: string, data: LogDownloadPayload): void {
   URL.revokeObjectURL(url);
 }
 
+function getLogHref(log: LogListItem): string {
+  return log.id.startsWith("local:")
+    ? `/logs/local/${log.roomId}`
+    : `/logs/${encodeURIComponent(log.id)}`;
+}
+
+type JsonImportCardProps = {
+  error: string | null;
+  onClearError: () => void;
+  onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+};
+
+function JsonImportCard({ error, onClearError, onFileChange }: JsonImportCardProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <Card className="shrink-0 rounded-lg border-slate-200 shadow-sm">
+      <CardContent className="p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <FileJson className="h-5 w-5 shrink-0 text-slate-400" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-slate-800">JSONログ閲覧</p>
+            <p className="text-xs text-slate-500">
+              ダウンロードしたJSONファイルを選択してログを閲覧できます
+            </p>
+            <p className="text-xs text-slate-500">
+              （旧バージョン（v2.X.X系）の互換性はありません）
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              onClearError();
+              fileInputRef.current?.click();
+            }}
+          >
+            JSONを選択
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={onFileChange}
+          />
+        </div>
+        {error ? (
+          <p className="mt-3 text-xs text-rose-600">{error}</p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+type LogRowProps = {
+  downloadingLogId: string | null;
+  log: LogListItem;
+  onDelete: () => void;
+  onDownload: () => void;
+};
+
+function LogRow({ downloadingLogId, log, onDelete, onDownload }: LogRowProps) {
+  return (
+    <div className="grid gap-3 border-b border-slate-100 p-4 transition hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center last:border-b-0">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <CalendarClock className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="font-semibold text-slate-950">
+            {formatLogDate(log.capturedAt)}
+          </span>
+          <Badge variant="outline">Live ID: {log.liveId}</Badge>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
+            <MessageSquareText className="h-3.5 w-3.5" />
+            コメント {log.commentCount}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
+            <Gift className="h-3.5 w-3.5" />
+            ギフト {log.giftCount}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <Button asChild variant="outline" size="sm">
+          <Link href={getLogHref(log)}>
+            閲覧
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </Link>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={downloadingLogId === log.id}
+          onClick={onDownload}
+        >
+          {downloadingLogId === log.id ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          ) : (
+            <Download className="h-3.5 w-3.5" aria-hidden />
+          )}
+          ダウンロード
+        </Button>
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5" aria-hidden />
+          削除
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+type LogDeleteDialogProps = {
+  errorMessage: string | null;
+  isDeleting: boolean;
+  log: LogListItem | null;
+  onConfirm: () => void;
+  onOpenChange: (open: boolean) => void;
+};
+
+function LogDeleteDialog({
+  errorMessage,
+  isDeleting,
+  log,
+  onConfirm,
+  onOpenChange,
+}: LogDeleteDialogProps) {
+  return (
+    <AlertDialog open={log !== null} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogTitle>ログを削除しますか？</AlertDialogTitle>
+        <AlertDialogDescription>
+          {log
+            ? `${formatLogDate(log.capturedAt)} のログを削除します。`
+            : "ログを削除します。"}
+        </AlertDialogDescription>
+        {errorMessage ? (
+          <div className="rounded-lg border border-rose-100 bg-rose-50 p-3 text-sm text-rose-700">
+            {errorMessage}
+          </div>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>いいえ</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={isDeleting}
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
+          >
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : null}
+            はい
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPageProps) {
   const router = useRouter();
   const [logs, setLogs] = useState<LogListItem[]>(() => {
@@ -139,20 +313,14 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
     }
     return initialLogs;
   });
-  const [pendingDeleteLog, setPendingDeleteLog] = useState<LogListItem | null>(
-    null
-  );
+  const [pendingDeleteLog, setPendingDeleteLog] = useState<LogListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(
-    null
-  );
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const [downloadingLogId, setDownloadingLogId] = useState<string | null>(null);
   const [jsonImportError, setJsonImportError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleJsonFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!event.target) return;
     event.target.value = "";
     if (!file) return;
 
@@ -208,9 +376,7 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
   };
 
   const handleConfirmDelete = async () => {
-    if (!pendingDeleteLog) {
-      return;
-    }
+    if (!pendingDeleteLog) return;
 
     if (!isPremium) {
       if (roomId) deleteOnliveLocalLog(roomId);
@@ -258,43 +424,11 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
         </h1>
       </section>
 
-      <Card className="shrink-0 rounded-lg border-slate-200 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <FileJson className="h-5 w-5 shrink-0 text-slate-400" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-slate-800">JSONログ閲覧</p>
-              <p className="text-xs text-slate-500">
-                ダウンロードしたJSONファイルを選択してログを閲覧できます
-              </p>
-              <p className="text-xs text-slate-500">
-                （旧バージョン（v2.X.X系）の互換性はありません）
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setJsonImportError(null);
-                fileInputRef.current?.click();
-              }}
-            >
-              JSONを選択
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,application/json"
-              className="hidden"
-              onChange={handleJsonFileChange}
-            />
-          </div>
-          {jsonImportError ? (
-            <p className="mt-3 text-xs text-rose-600">{jsonImportError}</p>
-          ) : null}
-        </CardContent>
-      </Card>
+      <JsonImportCard
+        error={jsonImportError}
+        onClearError={() => setJsonImportError(null)}
+        onFileChange={handleJsonFileChange}
+      />
 
       {logs.length === 0 ? (
         <Card className="rounded-lg border-slate-200 shadow-sm">
@@ -305,107 +439,32 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
       ) : (
         <div className="rounded-lg border border-slate-200 bg-white">
           {logs.map((log) => (
-            <div
+            <LogRow
               key={log.id}
-              className="grid gap-3 border-b border-slate-100 p-4 transition hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center last:border-b-0"
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <CalendarClock className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="font-semibold text-slate-950">
-                    {formatLogDate(log.capturedAt)}
-                  </span>
-                  <Badge variant="outline">Live ID: {log.liveId}</Badge>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                  <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
-                    <MessageSquareText className="h-3.5 w-3.5" />
-                    コメント {log.commentCount}
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
-                    <Gift className="h-3.5 w-3.5" />
-                    ギフト {log.giftCount}
-                  </span>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <Button asChild variant="outline" size="sm">
-                  <Link href={log.id.startsWith("local:") ? `/logs/local/${log.roomId}` : `/logs/${encodeURIComponent(log.id)}`}>
-                    閲覧
-                    <ChevronRight className="h-4 w-4" aria-hidden />
-                  </Link>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={downloadingLogId === log.id}
-                  onClick={() => void handleDownload(log)}
-                >
-                  {downloadingLogId === log.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                  ) : (
-                    <Download className="h-3.5 w-3.5" aria-hidden />
-                  )}
-                  ダウンロード
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    setDeleteErrorMessage(null);
-                    setPendingDeleteLog(log);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                  削除
-                </Button>
-              </div>
-            </div>
+              log={log}
+              downloadingLogId={downloadingLogId}
+              onDownload={() => void handleDownload(log)}
+              onDelete={() => {
+                setDeleteErrorMessage(null);
+                setPendingDeleteLog(log);
+              }}
+            />
           ))}
         </div>
       )}
 
-      <AlertDialog
-        open={pendingDeleteLog !== null}
+      <LogDeleteDialog
+        log={pendingDeleteLog}
+        isDeleting={isDeleting}
+        errorMessage={deleteErrorMessage}
+        onConfirm={() => void handleConfirmDelete()}
         onOpenChange={(open) => {
           if (!open && !isDeleting) {
             setPendingDeleteLog(null);
             setDeleteErrorMessage(null);
           }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogTitle>ログを削除しますか？</AlertDialogTitle>
-          <AlertDialogDescription>
-            {pendingDeleteLog
-              ? `${formatLogDate(pendingDeleteLog.capturedAt)} のログを削除します。`
-              : "ログを削除します。"}
-          </AlertDialogDescription>
-          {deleteErrorMessage ? (
-            <div className="rounded-lg border border-rose-100 bg-rose-50 p-3 text-sm text-rose-700">
-              {deleteErrorMessage}
-            </div>
-          ) : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>いいえ</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={isDeleting}
-              onClick={(event) => {
-                event.preventDefault();
-                void handleConfirmDelete();
-              }}
-            >
-              {isDeleting ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              ) : null}
-              はい
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      />
     </>
   );
 }

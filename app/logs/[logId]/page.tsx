@@ -8,7 +8,7 @@ import {
 } from "@/components/onlive/onlive-room-page";
 import { hasTopAdminRole } from "@/lib/authz";
 import { toJstWallTimeIsoString } from "@/lib/jst";
-import { getAnyOnliveLog, getUserOnliveLog } from "@/lib/onlive-log";
+import { getAnyOnliveLog, getUserOnliveLog, type OnliveLogDetail } from "@/lib/onlive-log";
 
 export const metadata: Metadata = {
   title: "配信ログ詳細 | WatchLog",
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-function toViewerData(log: NonNullable<Awaited<ReturnType<typeof getUserOnliveLog>>>): OnliveLogViewerData {
+function toViewerData(log: OnliveLogDetail): OnliveLogViewerData {
   return {
     capturedAt: toJstWallTimeIsoString(log.capturedAt),
     createdAt: toJstWallTimeIsoString(log.createdAt),

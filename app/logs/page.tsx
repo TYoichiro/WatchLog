@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { LogListPage, type LogListItem } from "@/components/logs/log-list-page";
+import { AppShell } from "@/components/navigation/app-sidebar";
+import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
+import { toJstWallTimeIsoString } from "@/lib/jst";
+import { listAllOnliveLogs, listUserOnliveLogs, type OnliveLogListItem } from "@/lib/onlive-log";
+import { getUserRegisteredRoom } from "@/lib/user-registered-room";
 
 export const metadata: Metadata = {
   title: "配信ログ | WatchLog",
 };
-import { LogListPage, type LogListItem } from "@/components/logs/log-list-page";
-import { AppShell } from "@/components/navigation/app-sidebar";
-import { toJstWallTimeIsoString } from "@/lib/jst";
-import { listAllOnliveLogs, listUserOnliveLogs, type OnliveLogListItem } from "@/lib/onlive-log";
-import { getUserRegisteredRoom } from "@/lib/user-registered-room";
-import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 

@@ -49,6 +49,7 @@ vi.mock("@/components/navigation/app-sidebar", () => ({
     children,
   }: {
     activeKey?: string;
+    isAdmin?: boolean;
     children: ReactNode;
   }) => (
     <div data-active-key={activeKey} data-testid="app-shell">
@@ -60,6 +61,44 @@ vi.mock("@/components/navigation/app-sidebar", () => ({
 vi.mock("@/components/settings/generate-invitation-code-button", () => ({
   GenerateInvitationCodeButton: () => (
     <button data-testid="generate-invitation-code-button">招待コード生成</button>
+  ),
+}));
+
+vi.mock("@/components/settings/role-card", () => ({
+  RoleCard: ({ roleLabel }: { roleLabel: string }) => (
+    <div data-testid="role-card">
+      <h2>権限</h2>
+      <p>
+        あなたは<span>{roleLabel}</span>ユーザーです
+      </p>
+    </div>
+  ),
+}));
+
+vi.mock("@/components/settings/invitation-code-card", () => ({
+  InvitationCodeCard: ({
+    invitationCodes,
+    isAdmin,
+    heading,
+  }: {
+    invitationCodes: { code: string; isActive: boolean }[];
+    isAdmin: boolean;
+    heading: string;
+  }) => (
+    <div data-testid="invitation-code-card">
+      <h2>{heading}</h2>
+      {isAdmin && <button data-testid="generate-invitation-code-button">招待コード生成</button>}
+      {invitationCodes.length > 0 ? (
+        invitationCodes.map((c) => (
+          <div key={c.code}>
+            <span>{c.code}</span>
+            <span>{c.isActive ? "有効" : "無効"}</span>
+          </div>
+        ))
+      ) : (
+        <p>招待コードはありません</p>
+      )}
+    </div>
   ),
 }));
 

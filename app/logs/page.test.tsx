@@ -14,6 +14,7 @@ const {
   listAllOnliveLogsMock,
   listUserOnliveLogsMock,
   redirectMock,
+  routerPush,
   routerRefresh,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
@@ -25,6 +26,7 @@ const {
   redirectMock: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   }),
+  routerPush: vi.fn(),
   routerRefresh: vi.fn(),
 }));
 
@@ -35,6 +37,7 @@ vi.mock("@/auth", () => ({
 vi.mock("next/navigation", () => ({
   redirect: redirectMock,
   useRouter: () => ({
+    push: routerPush,
     refresh: routerRefresh,
   }),
 }));
@@ -205,6 +208,7 @@ afterEach(() => {
   listAllOnliveLogsMock.mockReset();
   listUserOnliveLogsMock.mockReset();
   redirectMock.mockClear();
+  routerPush.mockReset();
   routerRefresh.mockReset();
   fetchMock.mockReset();
   // Restore URL download methods to their saved originals
@@ -471,5 +475,76 @@ describe("LogListPage", () => {
       expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("LogListPage - JSON import", () => {
+  function getFileInput() {
+    return document.querySelector('input[type="file"]') as HTMLInputElement;
+  }
+
+  function triggerFileChange(input: HTMLInputElement, file: File) {
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      value: [file],
+    });
+    fireEvent.change(input);
+  }
+
+  it("有効なJSONファイルを選択すると/logs/json-importへ遷移する", async () => {
+    render(<LogListPage initialLogs={[]} />);
+
+    const validLog = {
+      capturedAt: "2026-05-09T12:00:00.000+09:00",
+      liveId: "live-1",
+      log: { comments: [] },
+      roomId: "12345",
+    };
+    const file = new File(
+      [JSON.stringify(validLog)],
+      "watchlog.json",
+      { type: "application/json" },
+    );
+
+    triggerFileChange(getFileInput(), file);
+
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalledWith("/logs/json-import");
+    });
+  });
+
+  it("無効なJSONファイルを選択するとエラーメッセージを表示する", async () => {
+    render(<LogListPage initialLogs={[]} />);
+
+    const invalidLog = { foo: "bar" };
+    const file = new File(
+      [JSON.stringify(invalidLog)],
+      "invalid.json",
+      { type: "application/json" },
+    );
+
+    triggerFileChange(getFileInput(), file);
+
+    expect(
+      await screen.findByText("正しい形式のWatchLog JSONファイルではありません。"),
+    ).toBeDefined();
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it("壊れたJSONファイルを選択するとエラーメッセージを表示する", async () => {
+    render(<LogListPage initialLogs={[]} />);
+
+    const file = new File(
+      ["not valid json {{"],
+      "broken.json",
+      { type: "application/json" },
+    );
+
+    triggerFileChange(getFileInput(), file);
+
+    expect(
+      await screen.findByText("JSONファイルの読み込みに失敗しました。"),
+    ).toBeDefined();
+    expect(routerPush).not.toHaveBeenCalled();
   });
 });
