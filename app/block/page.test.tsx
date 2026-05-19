@@ -8,11 +8,13 @@ const {
   authMock,
   getUserRegisteredRoomMock,
   hasTopAdminRoleMock,
+  hasPremiumRoleMock,
   redirectMock,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
   getUserRegisteredRoomMock: vi.fn(),
   hasTopAdminRoleMock: vi.fn(),
+  hasPremiumRoleMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   }),
@@ -28,6 +30,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/authz", () => ({
   hasTopAdminRole: hasTopAdminRoleMock,
+  hasPremiumRole: hasPremiumRoleMock,
 }));
 
 vi.mock("@/lib/user-registered-room", () => ({
@@ -235,9 +238,10 @@ function setupFetchScenario({
   });
 }
 
-function setupAuthenticatedPage({ isAdmin = false }: { isAdmin?: boolean } = {}) {
+function setupAuthenticatedPage({ isAdmin = false, isPremium = false }: { isAdmin?: boolean; isPremium?: boolean } = {}) {
   authMock.mockResolvedValue(session);
   hasTopAdminRoleMock.mockResolvedValue(isAdmin);
+  hasPremiumRoleMock.mockResolvedValue(isPremium);
   getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
 }
 
@@ -251,12 +255,14 @@ afterEach(() => {
   authMock.mockReset();
   getUserRegisteredRoomMock.mockReset();
   hasTopAdminRoleMock.mockReset();
+  hasPremiumRoleMock.mockReset();
   redirectMock.mockClear();
   fetchMock.mockReset();
 });
 
 beforeEach(() => {
   hasTopAdminRoleMock.mockResolvedValue(false);
+  hasPremiumRoleMock.mockResolvedValue(false);
   vi.stubGlobal("fetch", fetchMock);
 });
 

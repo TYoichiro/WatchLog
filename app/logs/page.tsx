@@ -70,7 +70,7 @@ export default async function Page() {
   const logs = await listUserOnliveLogs(userId);
 
   return (
-    <AppShell activeKey="logs">
+    <AppShell activeKey="logs" isPremium={isPremium}>
       <LogListPage initialLogs={logs.map(toListItem)} />
     </AppShell>
   );

@@ -10,6 +10,7 @@ import type {
 
 export type DashboardData = {
   isAdmin: boolean;
+  isPremium: boolean;
   profile: RoomProfile | null;
   activeFan: ActiveFanSummary | null;
   eventAndSupport: EventAndSupportSummary | null;
@@ -20,6 +21,7 @@ export type DashboardData = {
 export type DashboardBffOkPayload = {
   status: "ok" | "is_live";
   isAdmin: boolean;
+  isPremium: boolean;
   registeredRoom: { roomId: string; roomUrl: string };
   profile: RoomProfile | null;
   activeFan: ActiveFanSummary | null;

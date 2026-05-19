@@ -13,6 +13,7 @@ import {
   List,
   LogOut,
   Menu,
+  Play,
   Settings,
   Tv,
   Wrench,
@@ -23,7 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type NavigationKey = "dashboard" | "logs" | "block" | "search" | "settings" | "admin-rooms" | "admin-maintenance" | "admin-notices";
+type NavigationKey = "dashboard" | "logs" | "block" | "search" | "settings" | "admin-rooms" | "admin-maintenance" | "admin-notices" | "showtube";
 
 type NavigationItem = {
   key: NavigationKey;
@@ -61,6 +62,10 @@ function getActiveNavigationKey(pathname: string | null): NavigationKey {
     return "admin-notices";
   }
 
+  if (pathname?.startsWith("/showtube")) {
+    return "showtube";
+  }
+
   if (pathname?.startsWith("/logs")) {
     return "logs";
   }
@@ -83,10 +88,12 @@ function getActiveNavigationKey(pathname: string | null): NavigationKey {
 function SidebarContent({
   activeKey,
   isAdmin = false,
+  isPremium = false,
   onSelect,
 }: {
   activeKey: NavigationKey;
   isAdmin?: boolean;
+  isPremium?: boolean;
   onSelect?: () => void;
 }) {
   const [isSigningOut, startSignOutTransition] = useTransition();
@@ -156,6 +163,32 @@ function SidebarContent({
             </Link>
           );
         })}
+
+        {(isAdmin || isPremium) ? (
+          <>
+            <div className="my-2 border-t border-slate-100" />
+            <p className="px-4 pb-1 text-xs font-medium tracking-wider text-slate-400">
+              プレミア機能
+            </p>
+            <Link
+              href="/showtube"
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition",
+                activeKey === "showtube"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              )}
+              onClick={onSelect}
+              aria-current={activeKey === "showtube" ? "page" : undefined}
+            >
+              <span className="flex items-center gap-3">
+                <Play className="h-5 w-5" aria-hidden />
+                <span className="font-medium">ShowTube</span>
+              </span>
+              <ChevronRight className="h-4 w-4 opacity-70" aria-hidden />
+            </Link>
+          </>
+        ) : null}
 
         {isAdmin ? (
           <>
@@ -248,11 +281,13 @@ function SidebarContent({
 function MobileSidebar({
   activeKey,
   isAdmin = false,
+  isPremium = false,
   open,
   onClose,
 }: {
   activeKey: NavigationKey;
   isAdmin?: boolean;
+  isPremium?: boolean;
   open: boolean;
   onClose: () => void;
 }) {
@@ -290,7 +325,7 @@ function MobileSidebar({
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <SidebarContent activeKey={activeKey} isAdmin={isAdmin} onSelect={onClose} />
+        <SidebarContent activeKey={activeKey} isAdmin={isAdmin} isPremium={isPremium} onSelect={onClose} />
       </aside>
     </>
   );
@@ -299,10 +334,12 @@ function MobileSidebar({
 function AppSidebar({
   activeKey,
   isAdmin = false,
+  isPremium = false,
   open,
 }: {
   activeKey: NavigationKey;
   isAdmin?: boolean;
+  isPremium?: boolean;
   open: boolean;
 }) {
   if (!open) {
@@ -311,7 +348,7 @@ function AppSidebar({
 
   return (
     <aside className="hidden xl:flex xl:w-72 xl:flex-col xl:border-r xl:bg-white">
-      <SidebarContent activeKey={activeKey} isAdmin={isAdmin} />
+      <SidebarContent activeKey={activeKey} isAdmin={isAdmin} isPremium={isPremium} />
     </aside>
   );
 }
@@ -362,12 +399,14 @@ export function AppShell({
   activeKey,
   children,
   isAdmin = false,
+  isPremium = false,
   mainClassName,
   showMenu = true,
 }: {
   activeKey?: NavigationKey;
   children: ReactNode;
   isAdmin?: boolean;
+  isPremium?: boolean;
   mainClassName?: string;
   showMenu?: boolean;
 }) {
@@ -391,10 +430,11 @@ export function AppShell({
       <div className="flex min-h-screen xl:h-screen">
         {showMenu ? (
           <>
-            <AppSidebar activeKey={resolvedActiveKey} isAdmin={isAdmin} open={desktopSidebarOpen} />
+            <AppSidebar activeKey={resolvedActiveKey} isAdmin={isAdmin} isPremium={isPremium} open={desktopSidebarOpen} />
             <MobileSidebar
               activeKey={resolvedActiveKey}
               isAdmin={isAdmin}
+              isPremium={isPremium}
               open={mobileSidebarOpen}
               onClose={() => setMobileSidebarOpen(false)}
             />
