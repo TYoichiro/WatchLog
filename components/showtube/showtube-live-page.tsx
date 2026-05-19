@@ -6,7 +6,7 @@ import type { OnliveItem } from "@/lib/showroom";
 
 function OnliveCard({ item }: { item: OnliveItem }) {
   return (
-    <div className="group overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md">
+    <div className="group cursor-pointer overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="aspect-video w-full overflow-hidden bg-slate-100">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
