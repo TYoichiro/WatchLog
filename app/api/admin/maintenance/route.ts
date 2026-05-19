@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const maintenanceWindowSelect = {
+export const maintenanceWindowSelect = {
   id: true,
   title: true,
   message: true,
@@ -17,7 +17,7 @@ const maintenanceWindowSelect = {
   updatedAt: true,
 } as const;
 
-function serializeWindow(w: {
+export function serializeWindow(w: {
   id: string;
   title: string;
   message: string | null;

@@ -1,14 +1,10 @@
-import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 import { toJstWallTimeIsoString } from "@/lib/jst";
+import { prisma } from "@/lib/prisma";
 import { DEVELOPER_USER_ID } from "@/lib/showroom-users";
+import type { UserBlockData } from "@/types/api/blocks";
 
-export type UserBlockData = {
-  id: string;
-  blockedUserId: string;
-  blockedUserName: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
+export type { UserBlockData };
 
 type SaveUserBlockInput = {
   blockedUserId: string;
@@ -81,6 +77,13 @@ export async function listBlockedShowroomUserIds(
   });
 
   return blocks.map((block) => block.blockedShowroomUserId);
+}
+
+export async function getOptionalBlockedUserIds(): Promise<Set<string>> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return new Set<string>();
+  return new Set(await listBlockedShowroomUserIds(userId));
 }
 
 export async function createUserBlock(

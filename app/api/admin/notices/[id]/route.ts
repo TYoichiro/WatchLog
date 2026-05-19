@@ -5,27 +5,9 @@ import { authzErrorResponse, requireTopAdminRole } from "@/lib/authz";
 import { parseJstWallTime } from "@/lib/jst";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import { serializeNotice } from "../route";
+import { noticeSelect, serializeNotice, VALID_TARGETS } from "../route";
 
 export const dynamic = "force-dynamic";
-
-const noticeSelect = {
-  id: true,
-  title: true,
-  content: true,
-  displayTarget: true,
-  publishedAt: true,
-  expiresAt: true,
-  linkUrl: true,
-  createdAt: true,
-  updatedAt: true,
-} as const;
-
-const VALID_TARGETS: readonly DashboardNoticeTarget[] = [
-  "AUTHENTICATED",
-  "LOGIN",
-  "ALL",
-];
 
 export async function PATCH(
   request: Request,
