@@ -87,11 +87,13 @@ function getActiveNavigationKey(pathname: string | null): NavigationKey {
 
 function SidebarContent({
   activeKey,
+  homeLabel,
   isAdmin = false,
   isPremium = false,
   onSelect,
 }: {
   activeKey: NavigationKey;
+  homeLabel?: string;
   isAdmin?: boolean;
   isPremium?: boolean;
   onSelect?: () => void;
@@ -131,7 +133,7 @@ function SidebarContent({
             <>
               <span className="flex items-center gap-3">
                 <Icon className="h-5 w-5" aria-hidden />
-                <span className="font-medium">{item.label}</span>
+                <span className="font-medium">{item.key === "dashboard" && homeLabel ? homeLabel : item.label}</span>
               </span>
               <ChevronRight className="h-4 w-4 opacity-70" aria-hidden />
             </>
@@ -280,12 +282,14 @@ function SidebarContent({
 
 function MobileSidebar({
   activeKey,
+  homeLabel,
   isAdmin = false,
   isPremium = false,
   open,
   onClose,
 }: {
   activeKey: NavigationKey;
+  homeLabel?: string;
   isAdmin?: boolean;
   isPremium?: boolean;
   open: boolean;
@@ -325,7 +329,7 @@ function MobileSidebar({
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <SidebarContent activeKey={activeKey} isAdmin={isAdmin} isPremium={isPremium} onSelect={onClose} />
+        <SidebarContent activeKey={activeKey} homeLabel={homeLabel} isAdmin={isAdmin} isPremium={isPremium} onSelect={onClose} />
       </aside>
     </>
   );
@@ -333,11 +337,13 @@ function MobileSidebar({
 
 function AppSidebar({
   activeKey,
+  homeLabel,
   isAdmin = false,
   isPremium = false,
   open,
 }: {
   activeKey: NavigationKey;
+  homeLabel?: string;
   isAdmin?: boolean;
   isPremium?: boolean;
   open: boolean;
@@ -348,7 +354,7 @@ function AppSidebar({
 
   return (
     <aside className="hidden xl:flex xl:w-72 xl:flex-col xl:border-r xl:bg-white">
-      <SidebarContent activeKey={activeKey} isAdmin={isAdmin} isPremium={isPremium} />
+      <SidebarContent activeKey={activeKey} homeLabel={homeLabel} isAdmin={isAdmin} isPremium={isPremium} />
     </aside>
   );
 }
@@ -357,10 +363,12 @@ function AppHeader({
   onToggleMenu,
   showMenu,
   isBrandLinkEnabled,
+  title = "WatchLog",
 }: {
   onToggleMenu: () => void;
   showMenu: boolean;
   isBrandLinkEnabled: boolean;
+  title?: string;
 }) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b bg-white/95 px-4 backdrop-blur">
@@ -383,10 +391,10 @@ function AppHeader({
               href="/dashboard"
               className="rounded-sm transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
             >
-              WatchLog
+              {title}
             </Link>
           ) : (
-            "WatchLog"
+            title
           )}
         </h1>
       </div>
@@ -398,17 +406,21 @@ function AppHeader({
 export function AppShell({
   activeKey,
   children,
+  homeLabel,
   isAdmin = false,
   isPremium = false,
   mainClassName,
   showMenu = true,
+  title,
 }: {
   activeKey?: NavigationKey;
-  children: ReactNode;
+  children?: ReactNode;
+  homeLabel?: string;
   isAdmin?: boolean;
   isPremium?: boolean;
   mainClassName?: string;
   showMenu?: boolean;
+  title?: string;
 }) {
   const pathname = usePathname();
   const resolvedActiveKey = activeKey ?? getActiveNavigationKey(pathname);
@@ -430,9 +442,10 @@ export function AppShell({
       <div className="flex min-h-screen xl:h-screen">
         {showMenu ? (
           <>
-            <AppSidebar activeKey={resolvedActiveKey} isAdmin={isAdmin} isPremium={isPremium} open={desktopSidebarOpen} />
+            <AppSidebar activeKey={resolvedActiveKey} homeLabel={homeLabel} isAdmin={isAdmin} isPremium={isPremium} open={desktopSidebarOpen} />
             <MobileSidebar
               activeKey={resolvedActiveKey}
+              homeLabel={homeLabel}
               isAdmin={isAdmin}
               isPremium={isPremium}
               open={mobileSidebarOpen}
@@ -446,6 +459,7 @@ export function AppShell({
             showMenu={showMenu}
             onToggleMenu={handleToggleMenu}
             isBrandLinkEnabled={isBrandLinkEnabled}
+            title={title}
           />
 
           <main

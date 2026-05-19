@@ -16,6 +16,7 @@ export const SHOWROOM_API_URL = {
   giftGroups: "https://www.showroom-live.com/api/live/gift_groups",
   giftLog: "https://www.showroom-live.com/api/live/gift_log",
   liveInfo: "https://www.showroom-live.com/api/live/live_info",
+  onlives: "https://www.showroom-live.com/api/live/onlives",
   telop: "https://www.showroom-live.com/api/live/telop",
   stageUserList: "https://www.showroom-live.com/api/live/stage_user_list",
   summaryRanking: "https://www.showroom-live.com/api/live/summary_ranking",
