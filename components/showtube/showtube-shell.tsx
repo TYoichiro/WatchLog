@@ -244,7 +244,7 @@ export function ShowTubeShell({
               >
                 <Menu className="h-5 w-5" />
               </Button>
-              <h1 className="text-base text-slate-900 sm:text-lg">ShowTube</h1>
+              <Link href="/showtube" className="text-base text-slate-900 sm:text-lg hover:text-slate-600 transition-colors">ShowTube</Link>
             </div>
             <div className="shrink-0 text-sm font-medium text-slate-500">v3.0.0-β</div>
           </header>

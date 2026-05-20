@@ -1,12 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { Hash } from "lucide-react";
 
 import type { OnliveItem } from "@/lib/showroom";
 
 function OnliveCard({ item }: { item: OnliveItem }) {
   return (
-    <div className="group cursor-pointer overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md">
+    <Link
+      href={`/showtube/watch?room_id=${item.roomId}`}
+      className="group block overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md"
+    >
       <div className="aspect-video w-full overflow-hidden bg-slate-100">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -26,7 +30,7 @@ function OnliveCard({ item }: { item: OnliveItem }) {
           <span className="font-medium text-slate-700">{item.roomId}</span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
