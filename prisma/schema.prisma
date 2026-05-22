@@ -30,7 +30,7 @@ model User {
   auditLogs         AuditLog[]          @relation("ActorAuditLogs")
   userBlocks        UserBlock[]         @relation("UserBlocks")
   createdAt         DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
-  updatedAt         DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  updatedAt         DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
 
   @@map("users")
 }
@@ -44,7 +44,7 @@ model UserRegisteredRoom {
   imageUrl     String?         @map("image_url") @db.Text
   inviteCodeId String?         @unique @map("invite_code_id")
   createdAt    DateTime        @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
-  updatedAt    DateTime        @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  updatedAt    DateTime        @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   inviteCode   InvitationCode? @relation(fields: [inviteCodeId], references: [id], onDelete: SetNull)
 
@@ -60,7 +60,7 @@ model InvitationCode {
   usedAt         DateTime?           @map("used_at")
   isDeleted      Boolean             @default(false) @map("is_deleted")
   createdAt      DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
-  updatedAt      DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  updatedAt      DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
   inviter        User?               @relation("InvitationCodeInviter", fields: [inviterUserId], references: [id], onDelete: SetNull)
   usedBy         User?               @relation("InvitationCodeUsedBy", fields: [usedByUserId], references: [id], onDelete: SetNull)
   registeredRoom UserRegisteredRoom?
@@ -77,7 +77,7 @@ model UserBlock {
   blockedShowroomUserId   String   @map("blocked_showroom_user_id")
   blockedShowroomUserName String   @map("blocked_showroom_user_name")
   createdAt               DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
-  updatedAt               DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  updatedAt               DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
   blocker                 User     @relation("UserBlocks", fields: [blockerUserId], references: [id], onDelete: Cascade)
 
   @@unique([blockerUserId, blockedShowroomUserId])
@@ -95,7 +95,7 @@ model DashboardNotice {
   expiresAt     DateTime?             @map("expires_at")
   linkUrl       String?               @map("link_url") @db.Text
   createdAt     DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
-  updatedAt     DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  updatedAt     DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
 
   @@index([displayTarget, publishedAt])
   @@index([publishedAt])
@@ -111,7 +111,7 @@ model MaintenanceWindow {
   endsAt    DateTime @map("ends_at")
   isEnabled Boolean  @default(true) @map("is_enabled")
   createdAt DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
-  updatedAt DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  updatedAt DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
 
   @@index([isEnabled, startsAt, endsAt])
   @@map("maintenance_windows")
@@ -125,7 +125,7 @@ model OnliveLog {
   log        Json
   isDeleted  Boolean  @default(false) @map("is_deleted")
   createdAt  DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
-  updatedAt  DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  updatedAt  DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
 
   @@unique([roomId, liveId, capturedAt])
   @@index([roomId, liveId])
@@ -180,7 +180,7 @@ model Role {
   userRoles       UserRole[]
   rolePermissions RolePermission[]
   createdAt       DateTime         @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
-  updatedAt       DateTime         @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  updatedAt       DateTime         @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
 
   @@map("roles")
 }
@@ -191,7 +191,7 @@ model Permission {
   description     String?
   rolePermissions RolePermission[]
   createdAt       DateTime         @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
-  updatedAt       DateTime         @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @updatedAt @map("updated_at")
+  updatedAt       DateTime         @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
 
   @@map("permissions")
 }
