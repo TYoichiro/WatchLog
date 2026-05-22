@@ -1,6 +1,6 @@
 // proxy.ts
 import { auth } from "@/auth";
-import { toJstIsoString } from "@/lib/jst";
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 
 export const proxy = auth((request) => {
@@ -15,18 +15,13 @@ export const proxy = auth((request) => {
       request.headers.get("x-real-ip") ??
       "unknown";
     const ua = request.headers.get("user-agent") ?? undefined;
-    console.log(
-      JSON.stringify({
-        time: toJstIsoString(),
-        level: "info",
-        msg: "API request",
-        method: request.method,
-        path: pathname,
-        userId,
-        ip,
-        ua,
-      })
-    );
+    logger.info("API request", {
+      method: request.method,
+      path: pathname,
+      userId,
+      ip,
+      ua,
+    });
   }
 
   if (request.auth || pathname === "/" || pathname === "/maintenance") {
