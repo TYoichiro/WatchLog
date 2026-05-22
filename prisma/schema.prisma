@@ -29,6 +29,7 @@ model User {
   assignedUserRoles UserRole[]          @relation("UserRoleAssignedBy")
   auditLogs         AuditLog[]          @relation("ActorAuditLogs")
   userBlocks        UserBlock[]         @relation("UserBlocks")
+  logFavorites      OnliveLogFavorite[]
   createdAt         DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
   updatedAt         DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
 
@@ -118,19 +119,34 @@ model MaintenanceWindow {
 }
 
 model OnliveLog {
-  id         String   @id @default(cuid())
-  roomId     String   @map("room_id")
-  liveId     String   @map("live_id")
-  capturedAt DateTime @map("captured_at")
+  id         String              @id @default(cuid())
+  roomId     String              @map("room_id")
+  liveId     String              @map("live_id")
+  capturedAt DateTime            @map("captured_at")
   log        Json
-  isDeleted  Boolean  @default(false) @map("is_deleted")
-  createdAt  DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
-  updatedAt  DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
+  title      String?
+  isDeleted  Boolean             @default(false) @map("is_deleted")
+  createdAt  DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt  DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
+  favorites  OnliveLogFavorite[]
 
   @@unique([roomId, liveId, capturedAt])
   @@index([roomId, liveId])
   @@index([roomId, isDeleted, capturedAt])
   @@map("onlive_logs")
+}
+
+model OnliveLogFavorite {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  logId     String    @map("log_id")
+  createdAt DateTime  @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  log       OnliveLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, logId])
+  @@index([userId, createdAt])
+  @@map("onlive_log_favorites")
 }
 
 model Account {

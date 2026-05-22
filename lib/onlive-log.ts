@@ -19,10 +19,12 @@ export type OnliveLogListItem = {
   createdAt: Date;
   giftCount: number;
   id: string;
+  isFavorite: boolean;
   liveId: string;
   liveRankingCount: number;
   roomId: string;
   roomName: string | null;
+  title: string | null;
   totalRankingCount: number;
   updatedAt: Date;
 };
@@ -130,35 +132,45 @@ export async function listUserOnliveLogs(
     return [];
   }
 
-  const logs = await prisma.onliveLog.findMany({
-    where: {
-      isDeleted: false,
-      roomId: registeredRoom.roomId,
-    },
-    orderBy: {
-      capturedAt: "desc",
-    },
-    take: 100,
-    select: {
-      id: true,
-      roomId: true,
-      liveId: true,
-      capturedAt: true,
-      createdAt: true,
-      updatedAt: true,
-      log: true,
-    },
-  });
+  const [logs, favorites] = await Promise.all([
+    prisma.onliveLog.findMany({
+      where: {
+        isDeleted: false,
+        roomId: registeredRoom.roomId,
+      },
+      orderBy: {
+        capturedAt: "desc",
+      },
+      take: 100,
+      select: {
+        id: true,
+        roomId: true,
+        liveId: true,
+        capturedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        log: true,
+        title: true,
+      },
+    }),
+    prisma.onliveLogFavorite.findMany({
+      where: { userId },
+      select: { logId: true },
+    }),
+  ]);
+
+  const favoriteSet = new Set(favorites.map((f) => f.logId));
 
   return logs.map((log) => ({
     ...log,
     ...getLogSummaryCounts(log.log),
+    isFavorite: favoriteSet.has(log.id),
     roomName: registeredRoom.roomName,
   }));
 }
 
-export async function listAllOnliveLogs(): Promise<OnliveLogListItem[]> {
-  const [logs, registeredRooms] = await Promise.all([
+export async function listAllOnliveLogs(userId?: string): Promise<OnliveLogListItem[]> {
+  const [logs, registeredRooms, favorites] = await Promise.all([
     prisma.onliveLog.findMany({
       where: { isDeleted: false },
       orderBy: { capturedAt: "desc" },
@@ -171,20 +183,29 @@ export async function listAllOnliveLogs(): Promise<OnliveLogListItem[]> {
         createdAt: true,
         updatedAt: true,
         log: true,
+        title: true,
       },
     }),
     prisma.userRegisteredRoom.findMany({
       select: { roomId: true, roomName: true },
     }),
+    userId
+      ? prisma.onliveLogFavorite.findMany({
+          where: { userId },
+          select: { logId: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   const roomNameMap = new Map(
     registeredRooms.map((r) => [r.roomId, r.roomName])
   );
+  const favoriteSet = new Set(favorites.map((f) => f.logId));
 
   return logs.map((log) => ({
     ...log,
     ...getLogSummaryCounts(log.log),
+    isFavorite: favoriteSet.has(log.id),
     roomName: roomNameMap.get(log.roomId) ?? null,
   }));
 }
@@ -259,6 +280,52 @@ export async function getUserOnliveLog(
     log: getJsonRecord(log.log),
     room: registeredRoom,
   };
+}
+
+export async function updateOnliveLogTitle(
+  userId: string,
+  logId: string,
+  title: string | null,
+  isAdmin: boolean
+): Promise<boolean> {
+  if (isAdmin) {
+    const result = await prisma.onliveLog.updateMany({
+      where: { id: logId, isDeleted: false },
+      data: { title },
+    });
+    return result.count > 0;
+  }
+
+  const registeredRoom = await getUserRegisteredRoom(userId);
+  if (!registeredRoom) return false;
+
+  const result = await prisma.onliveLog.updateMany({
+    where: { id: logId, isDeleted: false, roomId: registeredRoom.roomId },
+    data: { title },
+  });
+  return result.count > 0;
+}
+
+export async function toggleOnliveLogFavorite(
+  userId: string,
+  logId: string
+): Promise<boolean> {
+  const existing = await prisma.onliveLogFavorite.findUnique({
+    where: { userId_logId: { userId, logId } },
+    select: { id: true },
+  });
+
+  if (existing) {
+    await prisma.onliveLogFavorite.delete({
+      where: { userId_logId: { userId, logId } },
+    });
+    return false;
+  }
+
+  await prisma.onliveLogFavorite.create({
+    data: { userId, logId },
+  });
+  return true;
 }
 
 export async function deleteUserOnliveLog(

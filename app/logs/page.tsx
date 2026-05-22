@@ -22,10 +22,12 @@ function toListItem(log: OnliveLogListItem): LogListItem {
     createdAt: toJstWallTimeIsoString(log.createdAt),
     giftCount: log.giftCount,
     id: log.id,
+    isFavorite: log.isFavorite,
     liveId: log.liveId,
     liveRankingCount: log.liveRankingCount,
     roomId: log.roomId,
     roomName: log.roomName,
+    title: log.title,
     totalRankingCount: log.totalRankingCount,
     updatedAt: toJstWallTimeIsoString(log.updatedAt),
   };
@@ -42,7 +44,7 @@ export default async function Page() {
   const isAdmin = await hasTopAdminRole(userId);
 
   if (isAdmin) {
-    const logs = await listAllOnliveLogs();
+    const logs = await listAllOnliveLogs(userId);
     return (
       <AppShell activeKey="logs" isAdmin>
         <LogListPage initialLogs={logs.map(toListItem)} />

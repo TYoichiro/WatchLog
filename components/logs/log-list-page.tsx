@@ -10,8 +10,10 @@ import {
   Download,
   FileJson,
   Gift,
+  Heart,
   Loader2,
   MessageSquareText,
+  Pencil,
   Trash2,
 } from "lucide-react";
 
@@ -27,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import {
   deleteOnliveLocalLog,
   isValidJsonViewerLog,
@@ -41,10 +44,12 @@ export type LogListItem = {
   createdAt: string;
   giftCount: number;
   id: string;
+  isFavorite: boolean;
   liveId: string;
   liveRankingCount: number;
   roomId: string;
   roomName: string | null;
+  title: string | null;
   totalRankingCount: number;
   updatedAt: string;
 };
@@ -76,10 +81,12 @@ function localLogToListItem(log: OnliveLocalLog): LogListItem {
     createdAt: log.savedAt,
     giftCount: log.giftCount,
     id: `local:${log.roomId}`,
+    isFavorite: false,
     liveId: log.liveId,
     liveRankingCount: log.liveRankingCount,
     roomId: log.roomId,
     roomName: log.roomName,
+    title: null,
     totalRankingCount: 0,
     updatedAt: log.savedAt,
   };
@@ -267,32 +274,129 @@ function JsonImportCard({ error, onClearError, onFileChange }: JsonImportCardPro
 }
 
 type LogRowProps = {
+  canEdit: boolean;
   downloadingLogId: string | null;
   log: LogListItem;
   onDelete: () => void;
   onDownload: () => void;
+  onFavoriteToggle: (logId: string) => void;
+  onTitleSave: (logId: string, title: string | null) => void;
 };
 
-function LogRow({ downloadingLogId, log, onDelete, onDownload }: LogRowProps) {
+function LogRow({ canEdit, downloadingLogId, log, onDelete, onDownload, onFavoriteToggle, onTitleSave }: LogRowProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const cancelledRef = useRef(false);
+  const isSavingRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEditing = () => {
+    setEditTitle(log.title ?? "");
+    cancelledRef.current = false;
+    setIsEditing(true);
+  };
+
+  const saveTitle = async () => {
+    if (cancelledRef.current) {
+      cancelledRef.current = false;
+      return;
+    }
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    setIsEditing(false);
+
+    const newTitle = editTitle.trim() || null;
+    try {
+      const response = await fetch(`/api/onlive/logs/${encodeURIComponent(log.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle }),
+        cache: "no-store",
+      });
+      if (response.ok) {
+        onTitleSave(log.id, newTitle);
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      isSavingRef.current = false;
+    }
+  };
+
+  const cancelEditing = () => {
+    cancelledRef.current = true;
+    setIsEditing(false);
+    setEditTitle("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      inputRef.current?.blur();
+    } else if (e.key === "Escape") {
+      cancelEditing();
+    }
+  };
+
   return (
     <div className="grid gap-3 border-b border-slate-100 p-4 transition hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center last:border-b-0">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <CalendarClock className="h-4 w-4 shrink-0 text-slate-400" />
-          <span className="font-semibold text-slate-950">
-            {formatLogDate(log.capturedAt)}
-          </span>
-          <Badge variant="outline">Live ID: {log.liveId}</Badge>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-          <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
-            <MessageSquareText className="h-3.5 w-3.5" />
-            コメント {log.commentCount}
-          </span>
-          <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
-            <Gift className="h-3.5 w-3.5" />
-            ギフト {log.giftCount}
-          </span>
+      <div className="flex items-start gap-3 min-w-0">
+        {canEdit && (
+          <button
+            type="button"
+            className="mt-0.5 shrink-0 text-slate-300 transition-colors hover:text-pink-400"
+            onClick={() => onFavoriteToggle(log.id)}
+            aria-label={log.isFavorite ? "お気に入りを解除" : "お気に入りに追加"}
+          >
+            <Heart
+              className={cn(
+                "h-5 w-5 transition-colors",
+                log.isFavorite ? "fill-pink-500 text-pink-500" : "fill-none"
+              )}
+            />
+          </button>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <CalendarClock className="h-4 w-4 shrink-0 text-slate-400" />
+            {isEditing ? (
+              <input
+                ref={inputRef}
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={() => void saveTitle()}
+                autoFocus
+                placeholder={formatLogDate(log.capturedAt)}
+                className="min-w-45 border-b border-slate-400 bg-transparent font-semibold text-slate-950 focus:border-slate-600 focus:outline-none"
+              />
+            ) : (
+              <span className="font-semibold text-slate-950">
+                {log.title ?? formatLogDate(log.capturedAt)}
+              </span>
+            )}
+            {canEdit && !isEditing && (
+              <button
+                type="button"
+                onClick={startEditing}
+                aria-label="タイトルを編集"
+                className="text-slate-400 transition-colors hover:text-slate-600"
+              >
+                <Pencil className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            )}
+            <Badge variant="outline">Live ID: {log.liveId}</Badge>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
+              <MessageSquareText className="h-3.5 w-3.5" />
+              コメント {log.commentCount}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
+              <Gift className="h-3.5 w-3.5" />
+              ギフト {log.giftCount}
+            </span>
+          </div>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -351,7 +455,7 @@ function LogDeleteDialog({
         <AlertDialogTitle>ログを削除しますか？</AlertDialogTitle>
         <AlertDialogDescription>
           {log
-            ? `${formatLogDate(log.capturedAt)} のログを削除します。`
+            ? `${log.title ?? formatLogDate(log.capturedAt)} のログを削除します。`
             : "ログを削除します。"}
         </AlertDialogDescription>
         {errorMessage ? (
@@ -397,6 +501,8 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
   const [pageSize, setPageSize] = useState<PageSize>(20);
   const [currentPage, setCurrentPage] = useState(1);
 
+  const canEdit = isPremium !== false;
+
   const totalPages = Math.max(1, Math.ceil(logs.length / pageSize));
   const clampedPage = Math.min(currentPage, totalPages);
   const paginatedLogs = logs.slice((clampedPage - 1) * pageSize, clampedPage * pageSize);
@@ -430,6 +536,40 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
       setJsonImportError("ファイルの読み込みに失敗しました。");
     };
     reader.readAsText(file);
+  };
+
+  const handleFavoriteToggle = async (logId: string) => {
+    setLogs((current) =>
+      current.map((log) =>
+        log.id === logId ? { ...log, isFavorite: !log.isFavorite } : log
+      )
+    );
+
+    try {
+      const response = await fetch(
+        `/api/onlive/logs/${encodeURIComponent(logId)}/favorite`,
+        { method: "PUT", cache: "no-store" }
+      );
+      if (!response.ok) {
+        setLogs((current) =>
+          current.map((log) =>
+            log.id === logId ? { ...log, isFavorite: !log.isFavorite } : log
+          )
+        );
+      }
+    } catch {
+      setLogs((current) =>
+        current.map((log) =>
+          log.id === logId ? { ...log, isFavorite: !log.isFavorite } : log
+        )
+      );
+    }
+  };
+
+  const handleTitleSave = (logId: string, title: string | null) => {
+    setLogs((current) =>
+      current.map((log) => (log.id === logId ? { ...log, title } : log))
+    );
   };
 
   const handleDownload = async (log: LogListItem) => {
@@ -551,12 +691,15 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
               <LogRow
                 key={log.id}
                 log={log}
+                canEdit={canEdit}
                 downloadingLogId={downloadingLogId}
                 onDownload={() => void handleDownload(log)}
                 onDelete={() => {
                   setDeleteErrorMessage(null);
                   setPendingDeleteLog(log);
                 }}
+                onFavoriteToggle={(logId) => void handleFavoriteToggle(logId)}
+                onTitleSave={handleTitleSave}
               />
             ))}
           </div>
