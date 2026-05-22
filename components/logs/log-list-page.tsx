@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CalendarClock,
+  ChevronLeft,
   ChevronRight,
   Download,
   FileJson,
@@ -64,6 +65,9 @@ type LogListPageProps = {
   isPremium?: boolean;
   roomId?: string;
 };
+
+const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 
 function localLogToListItem(log: OnliveLocalLog): LogListItem {
   return {
@@ -138,6 +142,78 @@ function getLogHref(log: LogListItem): string {
   return log.id.startsWith("local:")
     ? `/logs/local/${log.roomId}`
     : `/logs/${encodeURIComponent(log.id)}`;
+}
+
+function buildPageNumbers(current: number, total: number): (number | "ellipsis-start" | "ellipsis-end")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const pages: (number | "ellipsis-start" | "ellipsis-end")[] = [1];
+
+  const rangeStart = Math.max(2, current - 1);
+  const rangeEnd = Math.min(total - 1, current + 1);
+
+  if (rangeStart > 2) pages.push("ellipsis-start");
+  for (let p = rangeStart; p <= rangeEnd; p++) pages.push(p);
+  if (rangeEnd < total - 1) pages.push("ellipsis-end");
+
+  pages.push(total);
+  return pages;
+}
+
+type PaginationControlsProps = {
+  currentPage: number;
+  onPageChange: (page: number) => void;
+  totalPages: number;
+};
+
+function PaginationControls({ currentPage, onPageChange, totalPages }: PaginationControlsProps) {
+  if (totalPages <= 1) return null;
+
+  const pages = buildPageNumbers(currentPage, totalPages);
+
+  return (
+    <div className="flex items-center justify-center gap-1">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={currentPage === 1}
+        onClick={() => onPageChange(currentPage - 1)}
+        aria-label="前のページ"
+      >
+        <ChevronLeft className="h-4 w-4" aria-hidden />
+      </Button>
+      {pages.map((page) =>
+        typeof page === "string" ? (
+          <span key={page} className="select-none px-2 text-slate-400">
+            ...
+          </span>
+        ) : (
+          <Button
+            key={page}
+            type="button"
+            variant={page === currentPage ? "default" : "outline"}
+            size="sm"
+            onClick={() => onPageChange(page)}
+          >
+            {page}
+          </Button>
+        )
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={currentPage === totalPages}
+        onClick={() => onPageChange(currentPage + 1)}
+        aria-label="次のページ"
+      >
+        <ChevronRight className="h-4 w-4" aria-hidden />
+      </Button>
+    </div>
+  );
 }
 
 type JsonImportCardProps = {
@@ -318,6 +394,17 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
   const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const [downloadingLogId, setDownloadingLogId] = useState<string | null>(null);
   const [jsonImportError, setJsonImportError] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState<PageSize>(20);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(logs.length / pageSize));
+  const clampedPage = Math.min(currentPage, totalPages);
+  const paginatedLogs = logs.slice((clampedPage - 1) * pageSize, clampedPage * pageSize);
+
+  const handlePageSizeChange = (newSize: PageSize) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   const handleJsonFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -418,10 +505,31 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
   return (
     <>
       <section className="shrink-0">
-        <h1 className="text-xl font-semibold text-slate-950">
-          ログ一覧{" "}
-          <span className="font-normal text-slate-500">{logs.length}件</span>
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-slate-950">
+            ログ一覧{" "}
+            <span className="font-normal text-slate-500">{logs.length}件</span>
+          </h1>
+          {logs.length > 0 && (
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <label htmlFor="page-size-select" className="shrink-0">
+                表示件数
+              </label>
+              <select
+                id="page-size-select"
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value) as PageSize)}
+                className="rounded border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}件
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       </section>
 
       <JsonImportCard
@@ -437,20 +545,27 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-lg border border-slate-200 bg-white">
-          {logs.map((log) => (
-            <LogRow
-              key={log.id}
-              log={log}
-              downloadingLogId={downloadingLogId}
-              onDownload={() => void handleDownload(log)}
-              onDelete={() => {
-                setDeleteErrorMessage(null);
-                setPendingDeleteLog(log);
-              }}
-            />
-          ))}
-        </div>
+        <>
+          <div className="rounded-lg border border-slate-200 bg-white">
+            {paginatedLogs.map((log) => (
+              <LogRow
+                key={log.id}
+                log={log}
+                downloadingLogId={downloadingLogId}
+                onDownload={() => void handleDownload(log)}
+                onDelete={() => {
+                  setDeleteErrorMessage(null);
+                  setPendingDeleteLog(log);
+                }}
+              />
+            ))}
+          </div>
+          <PaginationControls
+            currentPage={clampedPage}
+            onPageChange={setCurrentPage}
+            totalPages={totalPages}
+          />
+        </>
       )}
 
       <LogDeleteDialog
