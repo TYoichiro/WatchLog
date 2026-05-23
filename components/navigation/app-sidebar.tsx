@@ -16,6 +16,7 @@ import {
   Play,
   Settings,
   Tv,
+  Users,
   Wrench,
   X,
   type LucideIcon,
@@ -24,7 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type NavigationKey = "dashboard" | "logs" | "block" | "search" | "settings" | "admin-rooms" | "admin-maintenance" | "admin-notices" | "showtube";
+type NavigationKey = "dashboard" | "logs" | "block" | "search" | "settings" | "admin-rooms" | "admin-maintenance" | "admin-notices" | "admin-users" | "showtube";
 
 type NavigationItem = {
   key: NavigationKey;
@@ -60,6 +61,10 @@ function getActiveNavigationKey(pathname: string | null): NavigationKey {
 
   if (pathname?.startsWith("/admin/notices")) {
     return "admin-notices";
+  }
+
+  if (pathname?.startsWith("/admin/users")) {
+    return "admin-users";
   }
 
   if (pathname?.startsWith("/showtube")) {
@@ -198,6 +203,23 @@ function SidebarContent({
             <p className="px-4 pb-1 text-xs font-medium tracking-wider text-slate-400">
               管理者
             </p>
+            <Link
+              href="/admin/users"
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition",
+                activeKey === "admin-users"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              )}
+              onClick={onSelect}
+              aria-current={activeKey === "admin-users" ? "page" : undefined}
+            >
+              <span className="flex items-center gap-3">
+                <Users className="h-5 w-5" aria-hidden />
+                <span className="font-medium">ユーザー一覧</span>
+              </span>
+              <ChevronRight className="h-4 w-4 opacity-70" aria-hidden />
+            </Link>
             <Link
               href="/admin/rooms"
               className={cn(

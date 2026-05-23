@@ -1,0 +1,48 @@
+-- AlterTable
+ALTER TABLE "audit_logs" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "dashboard_notices" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo'),
+ALTER COLUMN "updated_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "invitation_codes" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo'),
+ALTER COLUMN "updated_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "maintenance_windows" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo'),
+ALTER COLUMN "updated_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "onlive_log_favorites" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "onlive_logs" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo'),
+ALTER COLUMN "updated_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "permissions" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo'),
+ALTER COLUMN "updated_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "role_permissions" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "roles" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo'),
+ALTER COLUMN "updated_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "user_blocks" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo'),
+ALTER COLUMN "updated_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "user_registered_rooms" ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo'),
+ALTER COLUMN "updated_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "user_roles" ALTER COLUMN "assigned_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');
+
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN     "is_banned" BOOLEAN NOT NULL DEFAULT false,
+ALTER COLUMN "created_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo'),
+ALTER COLUMN "updated_at" SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo');

@@ -1,4 +1,3 @@
-// proxy.ts
 import { auth } from "@/auth";
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
