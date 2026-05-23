@@ -538,6 +538,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /registered-room/check:
+    get:
+      tags: [Registered Room]
+      summary: ルーム重複確認
+      description: |
+        指定した roomId または roomUrl が、自分以外のユーザーによって既に登録済みかどうかを確認します。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: roomId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: SHOWROOM ルーム ID
+        - name: roomUrl
+          in: query
+          required: true
+          schema:
+            type: string
+          description: SHOWROOM ルーム URL キー
+      responses:
+        "200":
+          description: 重複確認結果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [isDuplicate]
+                properties:
+                  isDuplicate:
+                    type: boolean
+                    description: 他ユーザーが同じ roomId または roomUrl を登録済みの場合 true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   # ───────────────────────────── Blocks ─────────────────────────────
   /blocks:
     get:
@@ -724,7 +764,7 @@ paths:
         保存時にサーバー側でも総合ランキングを取得してログにマージします。
         ユーザーの登録ルームと一致しない `roomId` は拒否されます。
 
-        **認証**: 必須
+        **ロール**: `premiumuser` または `admin`
       security:
         - sessionCookie: []
       requestBody:
@@ -749,7 +789,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: ユーザーの登録ルームと roomId が不一致
+          description: ユーザーの登録ルームと roomId が不一致、またはプレミアムロールを持っていない
           content:
             application/json:
               schema:
@@ -790,6 +830,48 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /onlive/logs/{logId}/favorite:
+    put:
+      tags: [Onlive]
+      summary: オンライブログのお気に入りトグル
+      description: |
+        指定したオンライブログのお気に入り状態をトグルします。
+        既にお気に入り登録済みの場合は解除します。
+
+        **ロール**: `admin` または `premiumuser`
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: logId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: オンライブログ ID
+      responses:
+        "200":
+          description: トグル成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, isFavorite]
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  isFavorite:
+                    type: boolean
+                    description: トグル後のお気に入り状態
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   # ───────────────────────────── Invitations ─────────────────────────────
   /invitations:
@@ -1023,6 +1105,67 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /admin/users/{userId}/ban:
+    patch:
+      tags: [Admin]
+      summary: ユーザー BAN 状態設定
+      description: |
+        指定ユーザーの BAN 状態を更新します。
+        BAN 時は対象ユーザーの全セッションを削除し即時ログアウトさせます。
+        自分自身および管理者ユーザーへの操作は禁止されています。
+        操作は監査ログに記録されます。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: BAN 操作対象のユーザー ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [banned]
+              properties:
+                banned:
+                  type: boolean
+                  description: "true: BAN する、false: BAN を解除する"
+      responses:
+        "200":
+          description: BAN 状態更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [banned]
+                properties:
+                  banned:
+                    type: boolean
+        "400":
+          description: リクエストボディが無効、または自分自身を BAN しようとした
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: パーミッション不足、または管理者ユーザーを BAN しようとした
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -2164,25 +2307,11 @@ components:
 
     OnliveLog:
       type: object
-      required: [id, roomId, liveId, capturedAt, log, isDeleted, createdAt, updatedAt]
+      required: [id, capturedAt, updatedAt]
       properties:
         id:
           type: string
-        roomId:
-          type: string
-        liveId:
-          type: string
         capturedAt:
-          type: string
-          format: date-time
-          description: JST ISO 8601
-        log:
-          type: object
-          description: マージ済みログ（クライアントログ + サーバー側総合ランキングスナップショット）
-          additionalProperties: true
-        isDeleted:
-          type: boolean
-        createdAt:
           type: string
           format: date-time
           description: JST ISO 8601
@@ -2194,7 +2323,7 @@ components:
     # ── Admin ──
     AdminUser:
       type: object
-      required: [id, createdAt, updatedAt, roles]
+      required: [id, isBanned, createdAt, updatedAt, roles]
       properties:
         id:
           type: string
@@ -2209,6 +2338,9 @@ components:
           type: string
           nullable: true
           format: uri
+        isBanned:
+          type: boolean
+          description: BAN 状態
         createdAt:
           type: string
           format: date-time

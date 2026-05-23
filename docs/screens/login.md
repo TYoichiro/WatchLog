@@ -161,11 +161,12 @@ Google OAuth 認可ページ
 ## お知らせ取得
 
 - **関数**: `getLoginNotices()` ([lib/dashboard-notices.ts](../lib/dashboard-notices.ts))
+- **内部実装**: `getNotices("login")` を呼び出す
 - **取得条件**:
-  - `surface: "login"`
-  - `publishedAt <= 現在時刻`
-  - `expiresAt is null OR expiresAt > 現在時刻`
-  - `displayTarget: LOGIN or ALL`
+  - `displayTarget: LOGIN または ALL`
+  - `publishedAt <= 現在JST時刻`
+  - `expiresAt is null OR expiresAt > 現在JST時刻`
+- **ソート**: `publishedAt DESC`, `createdAt DESC`
 
 **AppNotice 型**:
 

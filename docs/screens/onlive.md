@@ -659,6 +659,7 @@ roomId      String
 liveId      String
 capturedAt  DateTime
 log         Json
+title       String?
 isDeleted   Boolean  @default(false)
 createdAt   DateTime @default(dbgenerated(...))
 updatedAt   DateTime @updatedAt
