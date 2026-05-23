@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { hasTopAdminRole } from "@/lib/authz";
+import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
 import { getDashboardNotices } from "@/lib/dashboard-notices";
 import {
   getRoomActiveFan,
@@ -25,7 +25,10 @@ export async function GET() {
   }
 
   const { roomId, roomUrl } = registeredRoom;
-  const isAdmin = await hasTopAdminRole(session.user.id);
+  const [isAdmin, isPremium] = await Promise.all([
+    hasTopAdminRole(session.user.id),
+    hasPremiumRole(session.user.id),
+  ]);
 
   const [profileResult, activeFanResult, eventAndSupportResult, noticesResult, roomStatusResult] =
     await Promise.allSettled([
@@ -48,6 +51,7 @@ export async function GET() {
   return Response.json({
     status: isLive ? "is_live" : "ok",
     isAdmin,
+    isPremium,
     registeredRoom: { roomId, roomUrl },
     profile,
     activeFan,

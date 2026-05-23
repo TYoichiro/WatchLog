@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const noticeSelect = {
+export const noticeSelect = {
   id: true,
   title: true,
   content: true,
@@ -44,7 +44,7 @@ export function serializeNotice(n: {
   };
 }
 
-const VALID_TARGETS: readonly DashboardNoticeTarget[] = [
+export const VALID_TARGETS: readonly DashboardNoticeTarget[] = [
   "AUTHENTICATED",
   "LOGIN",
   "ALL",

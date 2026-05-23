@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getRoomStatus: vi.fn(),
   getUserRegisteredRoom: vi.fn(),
   hasTopAdminRole: vi.fn(),
+  hasPremiumRole: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({
@@ -19,6 +20,7 @@ vi.mock("@/auth", () => ({
 
 vi.mock("@/lib/authz", () => ({
   hasTopAdminRole: mocks.hasTopAdminRole,
+  hasPremiumRole: mocks.hasPremiumRole,
 }));
 
 vi.mock("@/lib/dashboard-notices", () => ({
@@ -97,6 +99,7 @@ async function expectJson(response: Response) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.hasTopAdminRole.mockResolvedValue(false);
+  mocks.hasPremiumRole.mockResolvedValue(false);
 });
 
 describe("GET /api/dashboard", () => {

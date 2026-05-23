@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  checkRoomDuplicate,
   fetchRegisteredRoom,
   saveRegisteredRoom,
 } from "@/lib/registered-room";
@@ -264,6 +265,9 @@ function ConfirmRegisterModal({
           <dt className="text-slate-500">ルームURL</dt>
           <dd className="truncate font-medium text-slate-900">{room.roomUrl}</dd>
         </dl>
+        <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
+          ルームは配信者本人しか登録できません。他人が登録をすると配信者本人が使えなくなるので注意してください。
+        </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button
             type="button"
@@ -313,6 +317,17 @@ function RegisterErrorModal({
           登録できません
         </h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">{message}</p>
+        <p className="mt-3 text-sm leading-6 text-slate-500">
+          配信者本人ですが、他人に取られている場合は
+          <a
+            href="https://x.com/yoichiro_sub"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline hover:text-blue-800"
+          >
+            こちら
+          </a>
+        </p>
         <div className="mt-6 flex justify-end">
           <Button type="button" className="rounded-xl" onClick={onClose}>
             OK
@@ -582,6 +597,22 @@ function RoomSearchBody() {
     if (!verifiedInviteCode) {
       setSelectedRoom(null);
       setInviteCodeErrorMessage("招待コードを入力してください。");
+      return;
+    }
+
+    try {
+      const isDuplicate = await checkRoomDuplicate(room.roomId, room.roomUrl);
+
+      if (isDuplicate) {
+        setSelectedRoom(null);
+        setRegisterErrorMessage("既に登録されているため登録できません");
+        return;
+      }
+    } catch {
+      setSelectedRoom(null);
+      setRegisterErrorMessage(
+        "ルームの重複確認ができませんでした。時間をおいて再試行してください。"
+      );
       return;
     }
 

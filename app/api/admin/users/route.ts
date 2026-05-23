@@ -19,6 +19,7 @@ export async function GET() {
         name: true,
         email: true,
         image: true,
+        isBanned: true,
         createdAt: true,
         updatedAt: true,
         userRoles: {
@@ -42,6 +43,7 @@ export async function GET() {
         name: user.name,
         email: user.email,
         image: user.image,
+        isBanned: user.isBanned,
         createdAt: toJstWallTimeIsoString(user.createdAt),
         updatedAt: toJstWallTimeIsoString(user.updatedAt),
         roles: user.userRoles.map((userRole) => ({

@@ -1,13 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 
 import { UserProfileModal } from "@/components/onlive/onlive-room-page";
-import type {
-  ProfileTarget,
-  ProfileView,
-} from "@/components/onlive/onlive-room-page";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,11 +16,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useUserBlocks, type UserBlockListItem } from "@/hooks/use-user-blocks";
+import { useUserProfile, type ProfileTarget } from "@/hooks/use-user-profile";
 import type { RoomUserProfile } from "@/lib/showroom";
-
-type UserProfileResponse = {
-  profile: RoomUserProfile;
-};
 
 function formatBlockedAt(value: string): string {
   const date = new Date(value);
@@ -77,99 +70,40 @@ export function BlockListPage({ roomId }: { roomId: string }) {
     hasError,
     isLoading,
   } = useUserBlocks();
-  const [selectedProfileTarget, setSelectedProfileTarget] =
-    useState<ProfileTarget | null>(null);
-  const [profileCache, setProfileCache] = useState<Record<string, RoomUserProfile>>(
-    {}
-  );
-  const [isProfileLoading, setIsProfileLoading] = useState(false);
-  const [hasProfileError, setHasProfileError] = useState(false);
-  const [profileView, setProfileView] = useState<ProfileView>("user");
+
+  const {
+    closeProfile,
+    hasError: hasProfileError,
+    isLoading: isProfileLoading,
+    openProfile,
+    profile: activeProfile,
+    setView: setProfileView,
+    target: selectedProfileTarget,
+    view: profileView,
+  } = useUserProfile(roomId);
+
   const [pendingDeleteBlock, setPendingDeleteBlock] =
     useState<UserBlockListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(
-    null
-  );
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const [isBlockActionPending, setIsBlockActionPending] = useState(false);
-  const [blockErrorMessage, setBlockErrorMessage] = useState<string | null>(
-    null
-  );
-  const activeProfile = selectedProfileTarget
-    ? profileCache[selectedProfileTarget.userId] ?? null
-    : null;
+  const [blockErrorMessage, setBlockErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!selectedProfileTarget || activeProfile) {
-      return;
-    }
-
-    const currentTarget = selectedProfileTarget;
-    const controller = new AbortController();
-
-    async function loadProfile() {
-      setIsProfileLoading(true);
-      setHasProfileError(false);
-
-      try {
-        const response = await fetch(
-          `/api/room/user-profile?room_id=${encodeURIComponent(
-            roomId
-          )}&user_id=${encodeURIComponent(currentTarget.userId)}`,
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch user profile");
-        }
-
-        const data = (await response.json()) as UserProfileResponse;
-        setProfileCache((current) => ({
-          ...current,
-          [currentTarget.userId]: data.profile,
-        }));
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          return;
-        }
-
-        setHasProfileError(true);
-      } finally {
-        setIsProfileLoading(false);
-      }
-    }
-
-    void loadProfile();
-
-    return () => controller.abort();
-  }, [activeProfile, roomId, selectedProfileTarget]);
-
-  const openProfile = (block: UserBlockListItem) => {
-    setHasProfileError(false);
+  const handleOpenProfile = (block: UserBlockListItem) => {
     setBlockErrorMessage(null);
-    setProfileView("user");
-    setSelectedProfileTarget({
-      userId: block.blockedUserId,
-      userName: block.blockedUserName,
-    });
+    openProfile(block.blockedUserId, block.blockedUserName);
   };
 
   const handleProfileOpenChange = (open: boolean) => {
     if (!open) {
-      setSelectedProfileTarget(null);
-      setHasProfileError(false);
-      setIsProfileLoading(false);
+      closeProfile();
       setBlockErrorMessage(null);
-      setProfileView("user");
     }
   };
 
   const handleBlockUser = async (
     target: ProfileTarget,
-    profile: RoomUserProfile | null
+    profile: RoomUserProfile | null,
   ) => {
     setIsBlockActionPending(true);
     setBlockErrorMessage(null);
@@ -178,9 +112,7 @@ export function BlockListPage({ roomId }: { roomId: string }) {
       await blockUser(target.userId, profile?.name || target.userName);
     } catch (error) {
       setBlockErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "ブロック登録に失敗しました"
+        error instanceof Error ? error.message : "ブロック登録に失敗しました",
       );
     } finally {
       setIsBlockActionPending(false);
@@ -200,9 +132,7 @@ export function BlockListPage({ roomId }: { roomId: string }) {
       setPendingDeleteBlock(null);
     } catch (error) {
       setDeleteErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "ブロック解除に失敗しました"
+        error instanceof Error ? error.message : "ブロック解除に失敗しました",
       );
     } finally {
       setIsDeleting(false);
@@ -221,7 +151,7 @@ export function BlockListPage({ roomId }: { roomId: string }) {
       <Card className="overflow-hidden rounded-lg border-slate-200 py-0 shadow-sm">
         <CardContent className="p-0">
           <div className="overflow-auto">
-            <table className="w-full min-w-[720px] border-collapse bg-white">
+            <table className="w-full min-w-180 border-collapse bg-white">
               <thead className="bg-slate-50">
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="px-4 py-3 font-medium">ID</th>
@@ -266,7 +196,7 @@ export function BlockListPage({ roomId }: { roomId: string }) {
                         <button
                           type="button"
                           className="text-left text-sm font-semibold text-slate-950 underline-offset-4 hover:underline"
-                          onClick={() => openProfile(block)}
+                          onClick={() => handleOpenProfile(block)}
                         >
                           {block.blockedUserName}
                         </button>

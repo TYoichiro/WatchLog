@@ -39,6 +39,10 @@ tags:
     description: 招待コード
   - name: Admin
     description: 管理機能（特権パーミッション必須）
+  - name: Admin Maintenance
+    description: メンテナンスウィンドウ管理（admin ロール必須）
+  - name: Admin Notices
+    description: ダッシュボード通知管理（admin ロール必須）
   - name: Auth
     description: NextAuth 認証
 
@@ -788,6 +792,28 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   # ───────────────────────────── Invitations ─────────────────────────────
+  /invitations:
+    post:
+      tags: [Invitations]
+      summary: 招待コード生成
+      description: |
+        新しい招待コードを生成します。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      responses:
+        "201":
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInvitationCode"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /invitations/verify:
     post:
       tags: [Invitations]
@@ -901,25 +927,15 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: "#/components/schemas/ErrorResponse"
-                  - type: object
-                    required: [error]
-                    properties:
-                      error:
-                        type: string
-                        enum: [admin_role_not_assignable]
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: 対象ユーザーまたはロールが存在しない
           content:
             application/json:
               schema:
-                type: object
-                required: [error]
-                properties:
-                  error:
-                    type: string
-                    enum: [target_user_not_found, role_not_found]
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /admin/audit-logs:
     get:
@@ -958,6 +974,60 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /admin/users/{userId}/role:
+    patch:
+      tags: [Admin]
+      summary: ユーザーロール設定
+      description: |
+        指定ユーザーのロールを `premiumuser` または `general`（プレミアム剥奪）に設定します。
+        `premiumuser` への変更は upsert、`general` への変更は premiumuser ロールを削除します。
+        操作は監査ログに記録されます。
+
+        **パーミッション**: `role.assign`
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ロール設定対象のユーザー ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [premiumuser, general]
+                  description: 設定するロール名
+      responses:
+        "200":
+          description: ロール設定成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [role]
+                properties:
+                  role:
+                    type: string
+                    enum: [premiumuser, general]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /admin/sessions/cleanup:
     post:
       tags: [Admin]
@@ -990,6 +1060,315 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ───────────────────────────── Admin Maintenance ─────────────────────────────
+  /admin/maintenance:
+    get:
+      tags: [Admin Maintenance]
+      summary: メンテナンスウィンドウ一覧取得
+      description: |
+        全メンテナンスウィンドウを `startsAt` 降順で取得します。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: メンテナンスウィンドウ一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [maintenanceWindows]
+                properties:
+                  maintenanceWindows:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MaintenanceWindow"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags: [Admin Maintenance]
+      summary: メンテナンスウィンドウ作成
+      description: |
+        新しいメンテナンスウィンドウを作成します。
+        `startsAt` および `endsAt` は JST 壁時刻の文字列（`parseJstWallTime` でパース）。
+        `isEnabled` のデフォルトは `true`。
+        操作は監査ログに記録されます。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceWindowRequest"
+      responses:
+        "201":
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [maintenanceWindow]
+                properties:
+                  maintenanceWindow:
+                    $ref: "#/components/schemas/MaintenanceWindow"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /admin/maintenance/{id}:
+    patch:
+      tags: [Admin Maintenance]
+      summary: メンテナンスウィンドウ更新
+      description: |
+        指定 ID のメンテナンスウィンドウを部分更新します。
+        省略したフィールドは現在の値を維持します。
+        操作は監査ログに記録されます。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: メンテナンスウィンドウ ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceWindowPatchRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [maintenanceWindow]
+                properties:
+                  maintenanceWindow:
+                    $ref: "#/components/schemas/MaintenanceWindow"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      tags: [Admin Maintenance]
+      summary: メンテナンスウィンドウ削除
+      description: |
+        指定 ID のメンテナンスウィンドウを削除します。
+        操作は監査ログに記録されます。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: メンテナンスウィンドウ ID
+      responses:
+        "200":
+          description: 削除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ───────────────────────────── Admin Notices ─────────────────────────────
+  /admin/notices:
+    get:
+      tags: [Admin Notices]
+      summary: ダッシュボード通知一覧取得（管理）
+      description: |
+        全ダッシュボード通知を `publishedAt` 降順で取得します（期限切れ・非公開を含む）。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: 通知一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notices]
+                properties:
+                  notices:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminNotice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags: [Admin Notices]
+      summary: ダッシュボード通知作成
+      description: |
+        新しいダッシュボード通知を作成します。
+        `publishedAt` は必須。`expiresAt` は省略可（省略時は無期限）。
+        `displayTarget` のデフォルトは `AUTHENTICATED`。
+        操作は監査ログに記録されます。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminNoticeRequest"
+      responses:
+        "201":
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notice]
+                properties:
+                  notice:
+                    $ref: "#/components/schemas/AdminNotice"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /admin/notices/{id}:
+    patch:
+      tags: [Admin Notices]
+      summary: ダッシュボード通知更新
+      description: |
+        指定 ID のダッシュボード通知を部分更新します。
+        省略したフィールドは現在の値を維持します。
+        `expiresAt` に `null` または空文字を指定すると有効期限を削除します。
+        操作は監査ログに記録されます。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 通知 ID（整数）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminNoticePatchRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notice]
+                properties:
+                  notice:
+                    $ref: "#/components/schemas/AdminNotice"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      tags: [Admin Notices]
+      summary: ダッシュボード通知削除
+      description: |
+        指定 ID のダッシュボード通知を削除します。
+        操作は監査ログに記録されます。
+
+        **ロール**: `admin`
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 通知 ID（整数）
+      responses:
+        "200":
+          description: 削除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -1873,6 +2252,180 @@ components:
               type: string
             name:
               type: string
+
+    # ── Invitations ──
+    UserInvitationCode:
+      type: object
+      required: [code, isActive]
+      properties:
+        code:
+          type: string
+          description: 10文字の英数字招待コード
+        isActive:
+          type: boolean
+          description: 未使用かつ削除されていない場合 true
+
+    # ── Admin Maintenance ──
+    MaintenanceWindow:
+      type: object
+      required: [id, title, startsAt, endsAt, isEnabled, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          description: メンテナンスウィンドウ ID（cuid）
+        title:
+          type: string
+        message:
+          type: string
+          nullable: true
+          description: 詳細メッセージ
+        startsAt:
+          type: string
+          format: date-time
+          description: 開始日時（JST ISO 8601）
+        endsAt:
+          type: string
+          format: date-time
+          description: 終了日時（JST ISO 8601）
+        isEnabled:
+          type: boolean
+          description: 有効フラグ
+        createdAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+        updatedAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+
+    MaintenanceWindowRequest:
+      type: object
+      required: [title, startsAt, endsAt]
+      properties:
+        title:
+          type: string
+          description: タイトル（空白のみ不可）
+        message:
+          type: string
+          description: 詳細メッセージ（省略可）
+        startsAt:
+          type: string
+          description: 開始日時（JST 壁時刻文字列）
+        endsAt:
+          type: string
+          description: 終了日時（JST 壁時刻文字列）。startsAt より後である必要あり。
+        isEnabled:
+          type: boolean
+          description: 有効フラグ（デフォルト true）
+
+    MaintenanceWindowPatchRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: タイトル（空白のみ不可）
+        message:
+          type: string
+          nullable: true
+          description: 詳細メッセージ（null または空文字で削除）
+        startsAt:
+          type: string
+          description: 開始日時（JST 壁時刻文字列）
+        endsAt:
+          type: string
+          description: 終了日時（JST 壁時刻文字列）
+        isEnabled:
+          type: boolean
+
+    # ── Admin Notices ──
+    AdminNotice:
+      type: object
+      required: [id, title, content, displayTarget, publishedAt, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        displayTarget:
+          type: string
+          enum: [AUTHENTICATED, LOGIN, ALL]
+          description: |
+            表示対象。
+            - `AUTHENTICATED`: 認証済みユーザーのダッシュボード
+            - `LOGIN`: ログイン画面
+            - `ALL`: 両方
+        publishedAt:
+          type: string
+          format: date-time
+          description: 公開日時（JST ISO 8601）
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 有効期限（JST ISO 8601）。null の場合は無期限。
+        linkUrl:
+          type: string
+          nullable: true
+          description: 外部リンク URL（http/https のみ）
+        createdAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+        updatedAt:
+          type: string
+          format: date-time
+          description: JST ISO 8601
+
+    AdminNoticeRequest:
+      type: object
+      required: [title, content, publishedAt]
+      properties:
+        title:
+          type: string
+          description: タイトル（空白のみ不可）
+        content:
+          type: string
+          description: 本文（空白のみ不可）
+        displayTarget:
+          type: string
+          enum: [AUTHENTICATED, LOGIN, ALL]
+          description: 表示対象（デフォルト AUTHENTICATED）
+        publishedAt:
+          type: string
+          description: 公開日時（JST 壁時刻文字列）
+        expiresAt:
+          type: string
+          description: 有効期限（JST 壁時刻文字列）。省略可。publishedAt より後である必要あり。
+        linkUrl:
+          type: string
+          description: 外部リンク URL（省略可）
+
+    AdminNoticePatchRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: タイトル（空白のみ不可）
+        content:
+          type: string
+          description: 本文（空白のみ不可）
+        displayTarget:
+          type: string
+          enum: [AUTHENTICATED, LOGIN, ALL]
+        publishedAt:
+          type: string
+          description: 公開日時（JST 壁時刻文字列）
+        expiresAt:
+          type: string
+          nullable: true
+          description: 有効期限（JST 壁時刻文字列）。null または空文字で削除。
+        linkUrl:
+          type: string
+          nullable: true
+          description: 外部リンク URL（null または空文字で削除）
 
     AuditLog:
       type: object

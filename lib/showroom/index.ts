@@ -29,3 +29,9 @@ export { getRoomUserProfile } from "./user";
 
 export type { RoomSearchResult } from "./search";
 export { searchShowroomRooms } from "./search";
+
+export type { OnliveBadge, OnliveGenre, OnliveItem, OnlivesResult, OnliveStreamingUrl } from "./onlives";
+export { getOnlives } from "./onlives";
+
+export type { HlsStreamingUrl } from "./streaming";
+export { getHlsStreamingUrls } from "./streaming";

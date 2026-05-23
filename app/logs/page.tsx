@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { LogListPage, type LogListItem } from "@/components/logs/log-list-page";
+import { AppShell } from "@/components/navigation/app-sidebar";
+import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
+import { toJstWallTimeIsoString } from "@/lib/jst";
+import { listAllOnliveLogs, listUserOnliveLogs, type OnliveLogListItem } from "@/lib/onlive-log";
+import { getUserRegisteredRoom } from "@/lib/user-registered-room";
 
 export const metadata: Metadata = {
   title: "配信ログ | WatchLog",
 };
-import { LogListPage, type LogListItem } from "@/components/logs/log-list-page";
-import { AppShell } from "@/components/navigation/app-sidebar";
-import { toJstWallTimeIsoString } from "@/lib/jst";
-import { listAllOnliveLogs, listUserOnliveLogs, type OnliveLogListItem } from "@/lib/onlive-log";
-import { getUserRegisteredRoom } from "@/lib/user-registered-room";
-import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +22,12 @@ function toListItem(log: OnliveLogListItem): LogListItem {
     createdAt: toJstWallTimeIsoString(log.createdAt),
     giftCount: log.giftCount,
     id: log.id,
+    isFavorite: log.isFavorite,
     liveId: log.liveId,
     liveRankingCount: log.liveRankingCount,
     roomId: log.roomId,
     roomName: log.roomName,
+    title: log.title,
     totalRankingCount: log.totalRankingCount,
     updatedAt: toJstWallTimeIsoString(log.updatedAt),
   };
@@ -42,7 +44,7 @@ export default async function Page() {
   const isAdmin = await hasTopAdminRole(userId);
 
   if (isAdmin) {
-    const logs = await listAllOnliveLogs();
+    const logs = await listAllOnliveLogs(userId);
     return (
       <AppShell activeKey="logs" isAdmin>
         <LogListPage initialLogs={logs.map(toListItem)} />
@@ -70,7 +72,7 @@ export default async function Page() {
   const logs = await listUserOnliveLogs(userId);
 
   return (
-    <AppShell activeKey="logs">
+    <AppShell activeKey="logs" isPremium={isPremium}>
       <LogListPage initialLogs={logs.map(toListItem)} />
     </AppShell>
   );

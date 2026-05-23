@@ -12,6 +12,7 @@ import {
   Eye,
   ExternalLink,
   Gem,
+  type LucideIcon,
   Minus,
   ShieldCheck,
   ShieldX,
@@ -50,6 +51,7 @@ import { AppShell } from "@/components/navigation/app-sidebar";
 import { toJstIsoString } from "@/lib/jst";
 import { writeOnliveLocalLog, type OnliveLocalLog } from "@/lib/onlive-local-log";
 import { useUserBlocks } from "@/hooks/use-user-blocks";
+import type { ProfileTarget, ProfileView } from "@/hooks/use-user-profile";
 import { cn } from "@/lib/utils";
 
 const POLLING_INTERVAL_MS = 60_000;
@@ -165,13 +167,6 @@ export type OnliveLogViewerData = {
   roomId: string;
   updatedAt: string;
 };
-
-export type ProfileTarget = {
-  userId: string;
-  userName: string;
-};
-
-export type ProfileView = "user" | "room";
 
 type OpenProfileHandler = (userId: string, userName: string) => void;
 
@@ -1672,8 +1667,8 @@ function useOnlivePoll(isEnabled = true) {
 function SectionCard({
   header,
   children,
-  className = "",
-  contentClassName = "",
+  className,
+  contentClassName,
 }: {
   header?: ReactNode;
   children: ReactNode;
@@ -1681,12 +1676,151 @@ function SectionCard({
   contentClassName?: string;
 }) {
   return (
-    <Card
-      className={`flex min-h-0 flex-col rounded-3xl border-0 shadow-sm ${className}`}
-    >
+    <Card className={cn("flex min-h-0 flex-col rounded-3xl border-0 shadow-sm", className)}>
       {header ? <CardHeader className="pb-3">{header}</CardHeader> : null}
-      <CardContent className={`min-h-0 flex-1 ${contentClassName}`}>
+      <CardContent className={cn("min-h-0 flex-1", contentClassName)}>
         {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function useLiveProfile(roomId: number) {
+  const { blockedUserIds, blockUser, isLoading: isBlockListLoading } = useUserBlocks();
+  const [selectedProfileTarget, setSelectedProfileTarget] = useState<ProfileTarget | null>(null);
+  const [profileCache, setProfileCache] = useState<Record<string, RoomUserProfile>>({});
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [hasProfileError, setHasProfileError] = useState(false);
+  const [profileView, setProfileView] = useState<ProfileView>("user");
+  const [isBlockActionPending, setIsBlockActionPending] = useState(false);
+  const [blockErrorMessage, setBlockErrorMessage] = useState<string | null>(null);
+  const activeProfile = selectedProfileTarget
+    ? profileCache[selectedProfileTarget.userId] ?? null
+    : null;
+
+  useEffect(() => {
+    if (!selectedProfileTarget || activeProfile) {
+      return;
+    }
+
+    const currentTarget = selectedProfileTarget;
+    const controller = new AbortController();
+
+    async function loadProfile() {
+      setIsProfileLoading(true);
+      setHasProfileError(false);
+
+      try {
+        const response = await fetch(
+          `/api/room/user-profile?room_id=${roomId}&user_id=${currentTarget.userId}`,
+          { cache: "no-store", signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch user profile");
+        }
+
+        const data = (await response.json()) as UserProfileResponse;
+        setProfileCache((current) => ({
+          ...current,
+          [currentTarget.userId]: data.profile,
+        }));
+      } catch (error) {
+        if ((error as Error).name === "AbortError") {
+          return;
+        }
+
+        setHasProfileError(true);
+      } finally {
+        setIsProfileLoading(false);
+      }
+    }
+
+    void loadProfile();
+
+    return () => controller.abort();
+  }, [activeProfile, roomId, selectedProfileTarget]);
+
+  const openProfile: OpenProfileHandler = (userId, userName) => {
+    setHasProfileError(false);
+    setBlockErrorMessage(null);
+    setProfileView("user");
+    setSelectedProfileTarget({ userId, userName });
+  };
+
+  const handleProfileOpenChange = (open: boolean) => {
+    if (!open) {
+      setSelectedProfileTarget(null);
+      setHasProfileError(false);
+      setIsProfileLoading(false);
+      setBlockErrorMessage(null);
+      setProfileView("user");
+    }
+  };
+
+  const handleBlockUser = async (target: ProfileTarget, profile: RoomUserProfile | null) => {
+    setIsBlockActionPending(true);
+    setBlockErrorMessage(null);
+
+    try {
+      await blockUser(target.userId, profile?.name || target.userName);
+    } catch (error) {
+      setBlockErrorMessage(
+        error instanceof Error ? error.message : "ブロック登録に失敗しました"
+      );
+    } finally {
+      setIsBlockActionPending(false);
+    }
+  };
+
+  return {
+    activeProfile,
+    blockedUserIds,
+    blockErrorMessage,
+    handleBlockUser,
+    handleProfileOpenChange,
+    isBlockActionPending,
+    isBlockListLoading,
+    isProfileLoading,
+    hasProfileError,
+    openProfile,
+    profileView,
+    selectedProfileTarget,
+    setProfileView,
+  };
+}
+
+function LiveMetricCard({
+  footer,
+  icon: Icon,
+  iconClassName,
+  label,
+  subValue,
+  value,
+  valueTitle,
+}: {
+  footer?: ReactNode;
+  icon: LucideIcon;
+  iconClassName: string;
+  label: string;
+  subValue?: ReactNode;
+  value: ReactNode;
+  valueTitle?: string;
+}) {
+  return (
+    <Card className="rounded-3xl border-0 py-0 shadow-sm">
+      <CardContent className="p-4">
+        <div className="mb-4 flex items-center gap-3">
+          <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl", iconClassName)}>
+            <Icon className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">{label}</p>
+            <p className="text-2xl font-bold text-slate-900" title={valueTitle}>{value}</p>
+            {subValue}
+          </div>
+        </div>
+        {footer}
       </CardContent>
     </Card>
   );
@@ -1844,217 +1978,6 @@ function SocialLinksSection({
     </div>
   );
 }
-
-function UserProfileModalLegacy({
-  hasError,
-  isLoading,
-  onOpenChange,
-  onViewChange,
-  profile,
-  target,
-  view,
-}: {
-  hasError: boolean;
-  isLoading: boolean;
-  onOpenChange: (open: boolean) => void;
-  onViewChange: (view: ProfileView) => void;
-  profile: RoomUserProfile | null;
-  target: ProfileTarget | null;
-  view: ProfileView;
-}) {
-  const isOpen = target !== null;
-  const displayName = profile?.name || target?.userName || "Unknown";
-  const profileImageUrl = profile?.imageUrl || "https://static.showroom-live.com/assets/img/no_profile.jpg";
-  const avatarImageUrl = profile?.avatarUrl ?? null;
-  void onViewChange;
-  void view;
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="h-[50vh] max-h-[50vh] w-[90vw] max-w-[90vw] grid-rows-[minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-3xl p-0 lg:w-[50vw] lg:max-w-[50vw]"
-      >
-        <DialogTitle className="sr-only">
-          {displayName} profile
-        </DialogTitle>
-        <DialogDescription className="sr-only">
-          Show SHOWROOM user profile details.
-        </DialogDescription>
-
-        <div className="min-h-0 overflow-auto p-5 sm:p-6">
-          {isLoading ? (
-            <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
-              <div className="space-y-4">
-                <div className="aspect-square w-full animate-pulse rounded-3xl bg-slate-100" />
-                <div className="h-20 w-20 animate-pulse rounded-full bg-slate-100" />
-                <div className="flex gap-2">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="h-10 w-10 animate-pulse rounded-2xl bg-slate-100"
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="h-20 animate-pulse rounded-2xl bg-slate-100"
-                    />
-                  ))}
-                </div>
-                <div className="h-7 w-40 animate-pulse rounded bg-slate-100" />
-                <div className="space-y-2">
-                  <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                  <div className="h-4 w-[85%] animate-pulse rounded bg-slate-100" />
-                  <div className="h-4 w-[70%] animate-pulse rounded bg-slate-100" />
-                </div>
-              </div>
-            </div>
-          ) : hasError ? (
-            <div className="rounded-3xl border border-rose-100 bg-rose-50 p-6 text-sm text-rose-700">
-              プロフィール情報の取得に失敗しました
-            </div>
-          ) : profile ? (
-            <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
-              <div className="space-y-4">
-                <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={profileImageUrl}
-                    alt={`${displayName} profile image`}
-                    width={480}
-                    height={480}
-                    className="aspect-square h-auto w-full object-cover"
-                  />
-                </div>
-
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-                    利用アバター
-                  </p>
-                  <div className="mt-3">
-                    <AvatarVisual
-                      avatarUrl={avatarImageUrl}
-                      className="h-20 w-20"
-                      name={displayName}
-                      size={80}
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-                    SNS
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {profile.snsList.length > 0 ? (
-                      profile.snsList.map((sns) => (
-                        <a
-                          key={`${sns.icon}-${sns.url}`}
-                          href={sns.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white transition hover:border-sky-300 hover:bg-sky-50"
-                          title="Open social link"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={sns.icon}
-                            alt="SNS"
-                            width={20}
-                            height={20}
-                            className="h-5 w-5 object-contain"
-                          />
-                        </a>
-                      ))
-                    ) : (
-                      <p className="text-sm text-slate-500">SNSは公開されていません</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-5">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-3xl border border-amber-100 bg-amber-50 p-4">
-                    <p className="text-xs font-medium text-amber-700">ファンレベル</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">
-                      {formatProfileLevel(profile.activeFanLevel)}
-                    </p>
-                  </div>
-                  <div className="rounded-3xl border border-sky-100 bg-sky-50 p-4">
-                    <p className="text-xs font-medium text-sky-700">リスナーレベル</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">
-                      {formatProfileLevel(profile.fanLevel)}
-                    </p>
-                  </div>
-                  <div className="rounded-3xl border border-violet-100 bg-violet-50 p-4">
-                    <p className="text-xs font-medium text-violet-700">クラスレベル</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">
-                      {formatProfileLevel(profile.classLevel)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-slate-200 bg-white p-5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-2xl font-semibold text-slate-950">
-                      {displayName}
-                    </h2>
-                    {target?.userId ? (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                        ID: {target.userId}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-700">
-                    {profile.description || ""}
-                  </p>
-                </div>
-
-                {profile.snsList.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {profile.snsList.map((sns) => (
-                      <a
-                        key={`${sns.icon}-link-${sns.url}`}
-                        href={sns.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={sns.icon}
-                          alt=""
-                          width={16}
-                          height={16}
-                          className="h-4 w-4 object-contain"
-                        />
-                        <span>SNS</span>
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        <DialogFooter className="border-t border-slate-200 bg-slate-50/80 px-5 py-4 sm:px-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            閉じる
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-void UserProfileModalLegacy;
 
 export function UserProfileModal({
   blockedUserIds = EMPTY_BLOCKED_USER_IDS,
@@ -3522,10 +3445,20 @@ export function OnliveLogViewerPage({
     [rankings]
   );
   const {
+    activeProfile,
     blockedUserIds,
-    blockUser,
-    isLoading: isBlockListLoading,
-  } = useUserBlocks();
+    blockErrorMessage,
+    handleBlockUser,
+    handleProfileOpenChange,
+    isBlockActionPending,
+    isBlockListLoading,
+    isProfileLoading,
+    hasProfileError,
+    openProfile,
+    profileView,
+    selectedProfileTarget,
+    setProfileView,
+  } = useLiveProfile(roomId);
   const visibleGifts = useMemo(
     () =>
       isBlockListLoading
@@ -3555,215 +3488,58 @@ export function OnliveLogViewerPage({
       ? formatElapsedTime(null, 0)
       : formatElapsedTime(liveStartedAt, liveEndedAt * 1000);
   const liveIdLabel = liveInfo.liveId ?? data.liveId;
-  const [selectedProfileTarget, setSelectedProfileTarget] =
-    useState<ProfileTarget | null>(null);
-  const [profileCache, setProfileCache] = useState<Record<string, RoomUserProfile>>(
-    {}
-  );
-  const [isProfileLoading, setIsProfileLoading] = useState(false);
-  const [hasProfileError, setHasProfileError] = useState(false);
-  const [profileView, setProfileView] = useState<ProfileView>("user");
-  const [isBlockActionPending, setIsBlockActionPending] = useState(false);
-  const [blockErrorMessage, setBlockErrorMessage] = useState<string | null>(
-    null
-  );
-  const activeProfile = selectedProfileTarget
-    ? profileCache[selectedProfileTarget.userId] ?? null
-    : null;
-
-  useEffect(() => {
-    if (!selectedProfileTarget || activeProfile) {
-      return;
-    }
-
-    const currentTarget = selectedProfileTarget;
-    const controller = new AbortController();
-
-    async function loadProfile() {
-      setIsProfileLoading(true);
-      setHasProfileError(false);
-
-      try {
-        const response = await fetch(
-          `/api/room/user-profile?room_id=${roomId}&user_id=${currentTarget.userId}`,
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch user profile");
-        }
-
-        const data = (await response.json()) as UserProfileResponse;
-        setProfileCache((current) => ({
-          ...current,
-          [currentTarget.userId]: data.profile,
-        }));
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          return;
-        }
-
-        setHasProfileError(true);
-      } finally {
-        setIsProfileLoading(false);
-      }
-    }
-
-    void loadProfile();
-
-    return () => controller.abort();
-  }, [activeProfile, roomId, selectedProfileTarget]);
-
-  const openProfile: OpenProfileHandler = (userId, userName) => {
-    setHasProfileError(false);
-    setBlockErrorMessage(null);
-    setProfileView("user");
-    setSelectedProfileTarget({ userId, userName });
-  };
-
-  const handleProfileOpenChange = (open: boolean) => {
-    if (!open) {
-      setSelectedProfileTarget(null);
-      setHasProfileError(false);
-      setIsProfileLoading(false);
-      setBlockErrorMessage(null);
-      setProfileView("user");
-    }
-  };
-
-  const handleBlockUser = async (
-    target: ProfileTarget,
-    profile: RoomUserProfile | null
-  ) => {
-    setIsBlockActionPending(true);
-    setBlockErrorMessage(null);
-
-    try {
-      await blockUser(target.userId, profile?.name || target.userName);
-    } catch (error) {
-      setBlockErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "ブロック登録に失敗しました"
-      );
-    } finally {
-      setIsBlockActionPending(false);
-    }
-  };
-
   return (
     <AppShell activeKey="logs" mainClassName="xl:min-h-0 xl:overflow-hidden">
       <section className="shrink-0 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="rounded-3xl border-0 py-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
-                <Gem className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">獲得ポイント</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {formatMetricValue({
-                    hasError: false,
-                    isLoading: false,
-                    suffix: " pt",
-                    value: giftTotals.totalPoints,
-                  })}
-                </p>
-              </div>
-            </div>
+        <LiveMetricCard
+          icon={Gem}
+          iconClassName="bg-amber-50 text-amber-700"
+          label="獲得ポイント"
+          value={formatMetricValue({ hasError: false, isLoading: false, suffix: " pt", value: giftTotals.totalPoints })}
+          footer={
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-slate-50 p-3">
                 <p className="text-xs text-slate-500">有料</p>
                 <p className="mt-1 font-semibold text-slate-900">
-                  {formatMetricValue({
-                    hasError: false,
-                    isLoading: false,
-                    suffix: " pt",
-                    value: giftTotals.paidPoints,
-                  })}
+                  {formatMetricValue({ hasError: false, isLoading: false, suffix: " pt", value: giftTotals.paidPoints })}
                 </p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-3">
                 <p className="text-xs text-slate-500">無料</p>
                 <p className="mt-1 font-semibold text-slate-900">
-                  {formatMetricValue({
-                    hasError: false,
-                    isLoading: false,
-                    suffix: " pt",
-                    value: giftTotals.freePoints,
-                  })}
+                  {formatMetricValue({ hasError: false, isLoading: false, suffix: " pt", value: giftTotals.freePoints })}
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-3xl border-0 py-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
-                <Users className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">フォロワー数</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {latestFollowerNumText ?? "--"} 人
-                </p>
-              </div>
-            </div>
-            <MetricDeltaBadge delta={followerDelta} />
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-3xl border-0 py-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                <Eye className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">盛り上がり</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {formatMetricValue({
-                    hasError: false,
-                    isLoading: false,
-                    value: latestAudienceNum,
-                  })}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-3xl border-0 py-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-700">
-                <Timer className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">配信開始時間</p>
-                <p
-                  className="text-2xl font-bold text-slate-900"
-                  title={formatCommentTitle(liveStartedAt)}
-                >
-                  {formatLiveStartedClock(liveStartedAt)}
-                </p>
-                <p className="mt-1 text-xs font-medium text-slate-500">
-                  {formatLiveStartedDate(liveStartedAt)}
-                </p>
-              </div>
-            </div>
+          }
+        />
+        <LiveMetricCard
+          icon={Users}
+          iconClassName="bg-sky-50 text-sky-700"
+          label="フォロワー数"
+          value={<>{latestFollowerNumText ?? "--"} 人</>}
+          footer={<MetricDeltaBadge delta={followerDelta} />}
+        />
+        <LiveMetricCard
+          icon={Eye}
+          iconClassName="bg-emerald-50 text-emerald-700"
+          label="盛り上がり"
+          value={formatMetricValue({ hasError: false, isLoading: false, value: latestAudienceNum })}
+        />
+        <LiveMetricCard
+          icon={Timer}
+          iconClassName="bg-violet-50 text-violet-700"
+          label="配信開始時間"
+          value={formatLiveStartedClock(liveStartedAt)}
+          valueTitle={formatCommentTitle(liveStartedAt)}
+          subValue={<p className="mt-1 text-xs font-medium text-slate-500">{formatLiveStartedDate(liveStartedAt)}</p>}
+          footer={
             <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
               <Clock3 className="h-3.5 w-3.5" />
               <span>経過時間 {liveElapsed}</span>
             </div>
-          </CardContent>
-        </Card>
+          }
+        />
       </section>
 
       <LiveBody
@@ -3833,23 +3609,21 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
   } = useOnlivePoll(!isLiveEnded);
   const isLiveRankingLoading = isRoomProfileLoading;
   const isTotalRankingLoading = isRoomProfileLoading;
-  const [selectedProfileTarget, setSelectedProfileTarget] =
-    useState<ProfileTarget | null>(null);
-  const [profileCache, setProfileCache] = useState<Record<string, RoomUserProfile>>(
-    {}
-  );
-  const [isProfileLoading, setIsProfileLoading] = useState(false);
-  const [hasProfileError, setHasProfileError] = useState(false);
-  const [profileView, setProfileView] = useState<ProfileView>("user");
   const {
+    activeProfile,
     blockedUserIds,
-    blockUser,
-    isLoading: isBlockListLoading,
-  } = useUserBlocks();
-  const [isBlockActionPending, setIsBlockActionPending] = useState(false);
-  const [blockErrorMessage, setBlockErrorMessage] = useState<string | null>(
-    null
-  );
+    blockErrorMessage,
+    handleBlockUser,
+    handleProfileOpenChange,
+    isBlockActionPending,
+    isBlockListLoading,
+    isProfileLoading,
+    hasProfileError,
+    openProfile,
+    profileView,
+    selectedProfileTarget,
+    setProfileView,
+  } = useLiveProfile(roomId);
   const [storedMetrics, setStoredMetrics] =
     useState<OnliveStoredMetrics | null>(null);
   const [isLiveEndedDialogOpen, setIsLiveEndedDialogOpen] = useState(false);
@@ -3890,9 +3664,6 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
   const giftTotalFreePoints = giftTotals.freePoints;
   const giftTotalPaidPoints = giftTotals.paidPoints;
   const giftTotalPoints = giftTotals.totalPoints;
-  const activeProfile = selectedProfileTarget
-    ? profileCache[selectedProfileTarget.userId] ?? null
-    : null;
   const liveStartedAt = roomProfile?.currentLiveStartedAt ?? null;
   const liveStartedClock = formatLiveStartedClock(liveStartedAt);
   const liveStartedDate = formatLiveStartedDate(liveStartedAt);
@@ -3943,52 +3714,6 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
     !isLiveEnded &&
     !isLiveEndedDialogOpen &&
     (liveStatus === 1 || initialRoomProfile?.isOnlive === false);
-
-  useEffect(() => {
-    if (!selectedProfileTarget || activeProfile) {
-      return;
-    }
-
-    const currentTarget = selectedProfileTarget;
-    const controller = new AbortController();
-
-    async function loadProfile() {
-      setIsProfileLoading(true);
-      setHasProfileError(false);
-
-      try {
-        const response = await fetch(
-          `/api/room/user-profile?room_id=${roomId}&user_id=${currentTarget.userId}`,
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch user profile");
-        }
-
-        const data = (await response.json()) as UserProfileResponse;
-        setProfileCache((current) => ({
-          ...current,
-          [currentTarget.userId]: data.profile,
-        }));
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          return;
-        }
-
-        setHasProfileError(true);
-      } finally {
-        setIsProfileLoading(false);
-      }
-    }
-
-    void loadProfile();
-
-    return () => controller.abort();
-  }, [activeProfile, roomId, selectedProfileTarget]);
 
   useEffect(() => {
     if (!hasLiveInfo) {
@@ -4264,43 +3989,6 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
     visibleMergedGifts,
   ]);
 
-  const openProfile = (userId: string, userName: string) => {
-    setHasProfileError(false);
-    setBlockErrorMessage(null);
-    setProfileView("user");
-    setSelectedProfileTarget({ userId, userName });
-  };
-
-  const handleProfileOpenChange = (open: boolean) => {
-    if (!open) {
-      setSelectedProfileTarget(null);
-      setHasProfileError(false);
-      setIsProfileLoading(false);
-      setBlockErrorMessage(null);
-      setProfileView("user");
-    }
-  };
-
-  const handleBlockUser = async (
-    target: ProfileTarget,
-    profile: RoomUserProfile | null
-  ) => {
-    setIsBlockActionPending(true);
-    setBlockErrorMessage(null);
-
-    try {
-      await blockUser(target.userId, profile?.name || target.userName);
-    } catch (error) {
-      setBlockErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "ブロック登録に失敗しました"
-      );
-    } finally {
-      setIsBlockActionPending(false);
-    }
-  };
-
   const handleUnavailableConfirm = () => {
     router.replace("/dashboard");
   };
@@ -4321,127 +4009,56 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
       showMenu={false}
     >
       <section className="shrink-0 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="rounded-3xl border-0 py-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
-                <Gem className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">獲得ポイント</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  約{formatMetricValue({
-                    hasError: hasGiftMetricError,
-                    isLoading: isGiftMetricLoading,
-                    suffix: " pt",
-                    value: giftTotalPoints,
-                  })}
-                </p>
-              </div>
-            </div>
+        <LiveMetricCard
+          icon={Gem}
+          iconClassName="bg-amber-50 text-amber-700"
+          label="獲得ポイント"
+          value={<>約{formatMetricValue({ hasError: hasGiftMetricError, isLoading: isGiftMetricLoading, suffix: " pt", value: giftTotalPoints })}</>}
+          footer={
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-slate-50 p-3">
                 <p className="text-xs text-slate-500">有料</p>
                 <p className="mt-1 font-semibold text-slate-900">
-                  約{formatMetricValue({
-                    hasError: hasGiftMetricError,
-                    isLoading: isGiftMetricLoading,
-                    suffix: " pt",
-                    value: giftTotalPaidPoints,
-                  })}
+                  約{formatMetricValue({ hasError: hasGiftMetricError, isLoading: isGiftMetricLoading, suffix: " pt", value: giftTotalPaidPoints })}
                 </p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-3">
                 <p className="text-xs text-slate-500">無料</p>
                 <p className="mt-1 font-semibold text-slate-900">
-                  約{formatMetricValue({
-                    hasError: hasGiftMetricError,
-                    isLoading: isGiftMetricLoading,
-                    suffix: " pt",
-                    value: giftTotalFreePoints,
-                  })}
+                  約{formatMetricValue({ hasError: hasGiftMetricError, isLoading: isGiftMetricLoading, suffix: " pt", value: giftTotalFreePoints })}
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-3xl border-0 py-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
-                <Users className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">フォロワー数</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {formatTextMetricValue({
-                    hasError: hasFollowerMetricError,
-                    isLoading: isFollowerMetricLoading,
-                    value: latestFollowerNumText,
-                  })} 人
-                </p>
-              </div>
-            </div>
-            <MetricDeltaBadge delta={followerDelta} />
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-3xl border-0 py-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                <Eye className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">盛り上がり</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {formatMetricValue({
-                    hasError: hasAudienceMetricError,
-                    isLoading: isAudienceMetricLoading,
-                    value: latestAudienceNum,
-                  })}
-                </p>
-              </div>
-            </div>
-            <MetricDeltaBadge delta={audienceDelta} />
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-3xl border-0 py-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-700">
-                <Timer className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">配信開始時間</p>
-                <p
-                  className="text-2xl font-bold text-slate-900"
-                  title={formatCommentTitle(liveStartedAt)}
-                >
-                  {isRoomProfileLoading ? "..." : liveStartedClock}
-                </p>
-                <p className="mt-1 text-xs font-medium text-slate-500">
-                  {isRoomProfileLoading
-                    ? "読み込み中..."
-                    : liveStartedDate}
-                </p>
-              </div>
-            </div>
+          }
+        />
+        <LiveMetricCard
+          icon={Users}
+          iconClassName="bg-sky-50 text-sky-700"
+          label="フォロワー数"
+          value={<>{formatTextMetricValue({ hasError: hasFollowerMetricError, isLoading: isFollowerMetricLoading, value: latestFollowerNumText })} 人</>}
+          footer={<MetricDeltaBadge delta={followerDelta} />}
+        />
+        <LiveMetricCard
+          icon={Eye}
+          iconClassName="bg-emerald-50 text-emerald-700"
+          label="盛り上がり"
+          value={formatMetricValue({ hasError: hasAudienceMetricError, isLoading: isAudienceMetricLoading, value: latestAudienceNum })}
+          footer={<MetricDeltaBadge delta={audienceDelta} />}
+        />
+        <LiveMetricCard
+          icon={Timer}
+          iconClassName="bg-violet-50 text-violet-700"
+          label="配信開始時間"
+          value={isRoomProfileLoading ? "..." : liveStartedClock}
+          valueTitle={formatCommentTitle(liveStartedAt)}
+          subValue={<p className="mt-1 text-xs font-medium text-slate-500">{isRoomProfileLoading ? "読み込み中..." : liveStartedDate}</p>}
+          footer={
             <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
               <Clock3 className="h-3.5 w-3.5" />
-              <span>
-                経過時間{" "}
-                {isRoomProfileLoading
-                  ? "..."
-                  : hasRoomProfileError
-                    ? "--"
-                    : liveElapsed}
-              </span>
+              <span>経過時間 {isRoomProfileLoading ? "..." : hasRoomProfileError ? "--" : liveElapsed}</span>
             </div>
-          </CardContent>
-        </Card>
+          }
+        />
       </section>
 
       <LiveBody

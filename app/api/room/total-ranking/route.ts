@@ -1,9 +1,8 @@
 import { NextRequest } from "next/server";
 
-import { auth } from "@/auth";
 import { filterBlockedShowroomItems } from "@/lib/showroom-block-filter";
 import { getRoomTotalRanking } from "@/lib/showroom";
-import { listBlockedShowroomUserIds } from "@/lib/user-blocks";
+import { getOptionalBlockedUserIds } from "@/lib/user-blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -15,14 +14,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [ranking, session] = await Promise.all([
+    const [ranking, blockedUserIds] = await Promise.all([
       getRoomTotalRanking(roomId),
-      auth(),
+      getOptionalBlockedUserIds(),
     ]);
-    const userId = session?.user?.id;
-    const blockedUserIds = userId
-      ? new Set(await listBlockedShowroomUserIds(userId))
-      : new Set<string>();
 
     return Response.json({
       ranking: filterBlockedShowroomItems(ranking, blockedUserIds),
