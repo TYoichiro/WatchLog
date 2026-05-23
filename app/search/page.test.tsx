@@ -52,6 +52,7 @@ type RegisteredRoom = {
 type FetchScenario = {
   registeredRoom?: RegisteredRoom | null;
   inviteValid?: boolean;
+  isDuplicate?: boolean;
   registerOk?: boolean;
   rooms?: RoomResult[];
   savedRoom?: RegisteredRoom;
@@ -81,6 +82,7 @@ function getFetchUrl(input: Parameters<typeof fetch>[0]) {
 
 function setupFetchScenario({
   inviteValid = true,
+  isDuplicate = false,
   registerOk = true,
   registeredRoom = null,
   rooms = [],
@@ -94,6 +96,10 @@ function setupFetchScenario({
   fetchMock.mockImplementation(async (input, init) => {
     const url = getFetchUrl(input);
     const method = init?.method ?? "GET";
+
+    if (url.startsWith("/api/registered-room/check")) {
+      return jsonResponse({ isDuplicate });
+    }
 
     if (url === "/api/registered-room" && method === "PUT") {
       if (!registerOk) {
@@ -293,6 +299,28 @@ describe("ShowroomRoomSearchPage", () => {
     expect(
       await screen.findByRole("dialog", { name: "登録できません" }),
     ).toBeDefined();
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("重複ルームの場合はエラーダイアログを表示してダッシュボードには遷移しない", async () => {
+    setupFetchScenario({ rooms: [sampleRoom], isDuplicate: true });
+
+    await renderSearchPage();
+    await verifyInviteCode();
+
+    fireEvent.change(screen.getByPlaceholderText(searchInputPlaceholder), {
+      target: { value: "Alpha" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: searchButtonLabel }));
+    fireEvent.click(await screen.findByRole("button", { name: /Alpha Room/ }));
+
+    expect(screen.getByRole("dialog", { name: registerDialogTitle })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: registerButtonLabel }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "登録できません" }),
+    ).toBeDefined();
+    expect(screen.getByText("既に登録されているため登録できません")).toBeDefined();
     expect(routerReplace).not.toHaveBeenCalled();
   });
 

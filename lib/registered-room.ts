@@ -34,6 +34,23 @@ export async function fetchRegisteredRoom(
   return data.room ?? null;
 }
 
+export async function checkRoomDuplicate(
+  roomId: string,
+  roomUrl: string
+): Promise<boolean> {
+  const params = new URLSearchParams({ roomId, roomUrl });
+  const response = await fetch(`/api/registered-room/check?${params}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to check room duplicate");
+  }
+
+  const data = (await response.json()) as { isDuplicate: boolean };
+  return data.isDuplicate === true;
+}
+
 export async function saveRegisteredRoom(
   room: SaveRegisteredRoomInput
 ): Promise<RegisteredRoom> {
