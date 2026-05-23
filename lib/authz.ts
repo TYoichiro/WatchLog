@@ -38,6 +38,15 @@ export async function requireUser(): Promise<AuthenticatedUser> {
     throw new UnauthorizedError();
   }
 
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { isBanned: true },
+  });
+
+  if (dbUser?.isBanned) {
+    throw new ForbiddenError("Banned");
+  }
+
   return {
     id: user.id,
     name: user.name ?? null,

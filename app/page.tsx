@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { auth, signIn } from "@/auth";
 import { LoginScreen } from "@/components/login/login-screen";
 import { getLoginNotices, type AppNotice } from "@/lib/dashboard-notices";
+import { prisma } from "@/lib/prisma";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
 import { redirect } from "next/navigation";
 
@@ -13,8 +14,17 @@ export default async function WatchLogLoginPage() {
   const session = await auth();
 
   if (session?.user) {
-    const registeredRoom = await getUserRegisteredRoom(session.user.id);
+    const userId = session.user.id;
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isBanned: true },
+    });
 
+    if (dbUser?.isBanned) {
+      redirect("/banned");
+    }
+
+    const registeredRoom = await getUserRegisteredRoom(userId);
     redirect(registeredRoom ? "/dashboard" : "/search");
   }
 
