@@ -8,7 +8,7 @@ export const proxy = auth((request) => {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-watchlog-pathname", pathname);
 
-  if (pathname.startsWith("/api/")) {
+  if (pathname.startsWith("/api/") && pathname !== "/api/onlive/poll") {
     const userId = request.auth?.user?.id;
     const ip =
       request.headers.get("x-forwarded-for") ??
