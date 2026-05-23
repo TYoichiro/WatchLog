@@ -24,7 +24,7 @@ export async function PUT(
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const isFavorite = await toggleOnliveLogFavorite(user.id, logId);
+    const isFavorite = await toggleOnliveLogFavorite(user.id, logId, isAdmin);
     return Response.json({ ok: true, isFavorite });
   } catch (error) {
     const response = authzErrorResponse(error);

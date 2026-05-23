@@ -308,8 +308,20 @@ export async function updateOnliveLogTitle(
 
 export async function toggleOnliveLogFavorite(
   userId: string,
-  logId: string
+  logId: string,
+  isAdmin: boolean
 ): Promise<boolean> {
+  if (!isAdmin) {
+    const registeredRoom = await getUserRegisteredRoom(userId);
+    if (!registeredRoom) return false;
+
+    const log = await prisma.onliveLog.findUnique({
+      where: { id: logId },
+      select: { roomId: true },
+    });
+    if (!log || log.roomId !== registeredRoom.roomId) return false;
+  }
+
   const existing = await prisma.onliveLogFavorite.findUnique({
     where: { userId_logId: { userId, logId } },
     select: { id: true },
