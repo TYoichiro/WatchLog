@@ -2700,7 +2700,7 @@ function GiftLogTable({
   emptyMessage,
   errorMessage,
   hasError,
-  title,
+  // title,
   isLoading,
   items,
   onOpenProfile,
