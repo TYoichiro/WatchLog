@@ -466,4 +466,42 @@ describe("Onlive page", () => {
       expect(blockPostCalls.length).toBeGreaterThan(0);
     });
   });
+
+  it("ブロック済みユーザーのコメントは表示されない", async () => {
+    mockFetch({
+      blocks: [
+        {
+          id: "block-1",
+          blockedUserId: "10",
+          blockedUserName: "Comment User",
+          createdAt: "2026-05-01T00:00:00.000Z",
+          updatedAt: "2026-05-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    render(<Page />);
+
+    await screen.findByTestId("app-shell");
+
+    await waitFor(() => {
+      expect(screen.queryByText("Hello live")).toBeNull();
+    });
+  });
+
+  it("ポーリングが失敗してもページはクラッシュせず表示される", async () => {
+    const fetchMock = mockFetch();
+    const baseImpl = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input, init) => {
+      if (getFetchUrl(input) === "/api/onlive/poll") {
+        return jsonResponse({ message: "error" }, { status: 500 });
+      }
+      return baseImpl(input, init);
+    });
+
+    render(<Page />);
+
+    expect(await screen.findByTestId("app-shell")).toBeDefined();
+    expect(await screen.findByText("Hello live")).toBeDefined();
+  });
 });

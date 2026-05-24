@@ -140,10 +140,12 @@ const onliveLog: OnliveLogListItem = {
   createdAt: new Date(Date.UTC(2026, 4, 9, 12, 1, 0)),
   giftCount: 3,
   id: "log-1",
+  isFavorite: false,
   liveId: "live-1",
   liveRankingCount: 4,
   roomId: "12345",
   roomName: "Alpha Room",
+  title: null,
   totalRankingCount: 5,
   updatedAt: new Date(Date.UTC(2026, 4, 9, 12, 2, 0)),
 };
@@ -154,10 +156,12 @@ const logListItem: LogListItem = {
   createdAt: "2026-05-09T12:01:00.000+09:00",
   giftCount: 3,
   id: "log-1",
+  isFavorite: false,
   liveId: "live-1",
   liveRankingCount: 4,
   roomId: "12345",
   roomName: "Alpha Room",
+  title: null,
   totalRankingCount: 5,
   updatedAt: "2026-05-09T12:02:00.000+09:00",
 };
@@ -475,6 +479,160 @@ describe("LogListPage", () => {
       expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("タイトルが設定されているログはタイトルを表示する", () => {
+    render(<LogListPage initialLogs={[{ ...logListItem, title: "カスタムタイトル" }]} />);
+
+    expect(screen.getByText("カスタムタイトル")).toBeDefined();
+    expect(screen.queryByText(formattedCapturedAt)).toBeNull();
+  });
+
+  it("非プレミアムユーザーにはお気に入りとタイトル編集ボタンが表示されない", () => {
+    const localLog = {
+      capturedAt: "2026-05-09T12:00:00.000+09:00",
+      commentCount: 5,
+      giftCount: 2,
+      liveId: "live-local-1",
+      liveRankingCount: 3,
+      log: {},
+      roomId: "12345",
+      roomName: "Alpha Room",
+      savedAt: "2026-05-09T12:01:00.000+09:00",
+    };
+    window.localStorage.setItem(
+      "watchlog:saved-log:12345",
+      JSON.stringify(localLog),
+    );
+
+    render(<LogListPage initialLogs={[]} isPremium={false} roomId="12345" />);
+
+    expect(screen.queryByRole("button", { name: /お気に入り/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "タイトルを編集" })).toBeNull();
+  });
+
+  it("お気に入りに追加できる", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+
+    render(<LogListPage initialLogs={[logListItem]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "お気に入りに追加" }));
+
+    expect(screen.getByRole("button", { name: "お気に入りを解除" })).toBeDefined();
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/onlive/logs/log-1/favorite",
+        expect.objectContaining({ method: "PUT", cache: "no-store" }),
+      );
+    });
+  });
+
+  it("お気に入り追加に失敗した場合は元の状態に戻す", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ error: "server error" }, { status: 500 }));
+
+    render(<LogListPage initialLogs={[logListItem]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "お気に入りに追加" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "お気に入りに追加" })).toBeDefined();
+    });
+  });
+
+  it("タイトルを編集して保存できる", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+
+    render(<LogListPage initialLogs={[logListItem]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "タイトルを編集" }));
+
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "新しいタイトル" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(screen.getByText("新しいタイトル")).toBeDefined();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/onlive/logs/log-1",
+      expect.objectContaining({
+        method: "PATCH",
+        cache: "no-store",
+      }),
+    );
+  });
+
+  it("Escapeキーでタイトル編集をキャンセルできる", () => {
+    render(<LogListPage initialLogs={[logListItem]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "タイトルを編集" }));
+
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "変更後のタイトル" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByText(formattedCapturedAt)).toBeDefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  const createLogItems = (count: number): LogListItem[] =>
+    Array.from({ length: count }, (_, i) => ({
+      capturedAt: "2026-05-09T12:00:00.000+09:00",
+      commentCount: 0,
+      createdAt: "2026-05-09T12:01:00.000+09:00",
+      giftCount: 0,
+      id: `log-${i + 1}`,
+      isFavorite: false,
+      liveId: `live-${i + 1}`,
+      liveRankingCount: 0,
+      roomId: "12345",
+      roomName: "Alpha Room",
+      title: `ログ${i + 1}`,
+      totalRankingCount: 0,
+      updatedAt: "2026-05-09T12:02:00.000+09:00",
+    }));
+
+  it("21件のログがあるとき次のページへ移動できる", () => {
+    const logs = createLogItems(21);
+    render(<LogListPage initialLogs={logs} />);
+
+    expect(screen.getByText("ログ1")).toBeDefined();
+    expect(screen.queryByText("ログ21")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "次のページ" }));
+
+    expect(screen.getByText("ログ21")).toBeDefined();
+    expect(screen.queryByText("ログ1")).toBeNull();
+  });
+
+  it("21件のログがあるとき前のページへ戻れる", () => {
+    const logs = createLogItems(21);
+    render(<LogListPage initialLogs={logs} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "次のページ" }));
+    expect(screen.getByText("ログ21")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "前のページ" }));
+
+    expect(screen.getByText("ログ1")).toBeDefined();
+    expect(screen.queryByText("ログ21")).toBeNull();
+  });
+
+  it("表示件数を変更するとページが1ページ目にリセットされる", () => {
+    const logs = createLogItems(21);
+    render(<LogListPage initialLogs={logs} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "次のページ" }));
+    expect(screen.getByText("ログ21")).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText("表示件数"), { target: { value: "50" } });
+
+    expect(screen.getByText("ログ1")).toBeDefined();
+    expect(screen.getByText("ログ21")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "次のページ" })).toBeNull();
   });
 });
 

@@ -107,5 +107,27 @@ describe("ShowTubeLivePage", () => {
       expect(hrefs).toContain("/showtube/watch?room_id=111");
       expect(hrefs).toContain("/showtube/watch?room_id=222");
     });
+
+    it("カード画像の src が item.image になる", () => {
+      render(
+        <ShowTubeLivePage
+          items={[makeItem({ image: "https://example.com/thumb.jpg" })]}
+          hasError={false}
+        />,
+      );
+      const img = screen.getByRole("img");
+      expect(img.getAttribute("src")).toBe("https://example.com/thumb.jpg");
+    });
+
+    it("カード画像の alt が item.mainName になる", () => {
+      render(
+        <ShowTubeLivePage
+          items={[makeItem({ mainName: "テストルーム名" })]}
+          hasError={false}
+        />,
+      );
+      const img = screen.getByRole("img");
+      expect(img.getAttribute("alt")).toBe("テストルーム名");
+    });
   });
 });

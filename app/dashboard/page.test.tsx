@@ -10,14 +10,13 @@ import type {
 } from "@/lib/showroom";
 import DashboardPage from "./page";
 
-const { routerReplace } = vi.hoisted(() => ({
-  routerReplace: vi.fn(),
-}));
+const { routerReplace, mockRouter } = vi.hoisted(() => {
+  const routerReplace = vi.fn();
+  return { routerReplace, mockRouter: { replace: routerReplace } };
+});
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    replace: routerReplace,
-  }),
+  useRouter: () => mockRouter,
 }));
 
 vi.mock("@/components/navigation/app-sidebar", () => ({
@@ -190,20 +189,36 @@ class MockWebSocket {
   static readonly CLOSED = 3;
   static instances: MockWebSocket[] = [];
 
+  readonly sent: string[] = [];
   readonly url: string;
   readyState = MockWebSocket.CONNECTING;
+
+  private readonly listeners = new Map<string, Array<(event: unknown) => void>>();
 
   constructor(url: string) {
     this.url = url;
     MockWebSocket.instances.push(this);
   }
 
-  addEventListener() {}
+  addEventListener(type: string, listener: (event: unknown) => void) {
+    const listeners = this.listeners.get(type) ?? [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
 
-  send() {}
+  send(data: string) {
+    this.sent.push(data);
+  }
 
   close() {
     this.readyState = MockWebSocket.CLOSED;
+    this.emit("close", {});
+  }
+
+  emit(type: string, event: unknown) {
+    for (const listener of this.listeners.get(type) ?? []) {
+      listener(event);
+    }
   }
 }
 
@@ -355,5 +370,58 @@ describe("DashboardPage", () => {
       expect(routerReplace).toHaveBeenCalledWith("/onlive");
     });
     expect(screen.queryByRole("heading", { level: 1, name: "Alpha Room" })).toBeNull();
+  });
+
+  it("redirects to /search when the dashboard fetch throws a network error", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("Network error"));
+
+    render(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(routerReplace).toHaveBeenCalledWith("/search");
+    });
+  });
+
+  it("sends a SUB message to WebSocket after the connection opens", async () => {
+    setupFetchScenario({
+      roomStatus: { ...roomStatus, broadcastKey: "bcsvr-key" },
+    });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    ws.readyState = MockWebSocket.OPEN;
+    ws.emit("open", {});
+
+    expect(ws.sent).toContain("SUB\tbcsvr-key");
+  });
+
+  it("redirects to /onlive when WebSocket receives a live-started message", async () => {
+    setupFetchScenario({
+      roomStatus: { ...roomStatus, broadcastKey: "bcsvr-key" },
+    });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    ws.readyState = MockWebSocket.OPEN;
+    ws.emit("open", {});
+    ws.emit("message", { data: `MSG\tbcsvr-key\t{"t":104}` });
+
+    await waitFor(() => {
+      expect(routerReplace).toHaveBeenCalledWith("/onlive");
+    });
   });
 });

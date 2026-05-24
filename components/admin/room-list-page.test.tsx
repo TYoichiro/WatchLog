@@ -77,6 +77,29 @@ describe("RoomListPage", () => {
     expect(screen.getByText("Alpha Room")).toBeDefined();
     expect(screen.getByText("Beta Room")).toBeDefined();
   });
+
+  it("ユーザー名が null の場合は「（名前未設定）」を表示する", () => {
+    render(
+      <RoomListPage
+        rooms={[makeRoom({ user: { id: "u1", name: null, isPremium: false, isAdmin: false } })]}
+      />,
+    );
+    expect(screen.getByText("（名前未設定）")).toBeDefined();
+  });
+
+  it("プロフィールリンクに target=\"_blank\" と rel=\"noopener noreferrer\" がある", () => {
+    render(<RoomListPage rooms={[makeRoom()]} />);
+    const link = screen.getByRole("link", { name: /プロフィール/ });
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("配信ページリンクに target=\"_blank\" と rel=\"noopener noreferrer\" がある", () => {
+    render(<RoomListPage rooms={[makeRoom()]} />);
+    const link = screen.getByRole("link", { name: /配信ページ/ });
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  });
 });
 
 describe("RoleSelect", () => {

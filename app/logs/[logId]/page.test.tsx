@@ -297,6 +297,18 @@ describe("LogDetailPage", () => {
     expect(getAnyOnliveLogMock).not.toHaveBeenCalled();
   });
 
+  it("管理者がログを取得できない場合は notFound を呼ぶ", async () => {
+    setupAuthenticatedUser({ isAdmin: true });
+    getAnyOnliveLogMock.mockResolvedValue(null);
+
+    await expect(
+      LogDetailPage({ params: Promise.resolve({ logId: "missing-log" }) }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
+
+    expect(getAnyOnliveLogMock).toHaveBeenCalledWith("missing-log");
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
+  });
+
   it("対象ログがない場合は notFound を呼ぶ", async () => {
     setupAuthenticatedUser();
     getUserOnliveLogMock.mockResolvedValue(null);

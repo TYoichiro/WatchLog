@@ -313,4 +313,39 @@ describe("SettingsPage", () => {
       screen.getByRole("heading", { level: 2, name: generalInvitationHeading }),
     ).toBeDefined();
   });
+
+  it("shows admin invitation heading when there are no codes at all", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "招待コード（現在0名招待できるコードがあります　未利用：0件　使用済み：0件）",
+      }),
+    ).toBeDefined();
+  });
+
+  it("shows admin invitation heading when all codes are used", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([
+      { code: "AAAA111111", isActive: false },
+      { code: "BBBB222222", isActive: false },
+    ]);
+
+    await renderSettingsPage();
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "招待コード（現在0名招待できるコードがあります　未利用：0件　使用済み：2件）",
+      }),
+    ).toBeDefined();
+  });
 });

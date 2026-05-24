@@ -42,14 +42,17 @@ vi.mock("@/components/navigation/app-sidebar", () => ({
     activeKey,
     children,
     isAdmin,
+    isPremium,
   }: {
     activeKey?: string;
     children: ReactNode;
     isAdmin?: boolean;
+    isPremium?: boolean;
   }) => (
     <div
       data-active-key={activeKey}
       data-is-admin={String(isAdmin ?? false)}
+      data-is-premium={String(isPremium ?? false)}
       data-testid="app-shell"
     >
       {children}
@@ -387,6 +390,24 @@ describe("BlockPage", () => {
       await screen.findByRole("dialog", { name: "Blocked User profile" }),
     ).toBeDefined();
     expect(await screen.findByText("profile error")).toBeDefined();
+  });
+
+  it("passes isPremium=true to AppShell for premium users", async () => {
+    setupAuthenticatedPage({ isPremium: true });
+    setupFetchScenario();
+
+    await renderBlockPage();
+
+    expect(screen.getByTestId("app-shell").getAttribute("data-is-premium")).toBe("true");
+  });
+
+  it("passes isPremium=false to AppShell for non-premium users", async () => {
+    setupAuthenticatedPage({ isPremium: false });
+    setupFetchScenario();
+
+    await renderBlockPage();
+
+    expect(screen.getByTestId("app-shell").getAttribute("data-is-premium")).toBe("false");
   });
 
   it("confirms and deletes a blocked user", async () => {

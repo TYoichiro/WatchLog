@@ -56,6 +56,8 @@ type FetchScenario = {
   registerOk?: boolean;
   rooms?: RoomResult[];
   savedRoom?: RegisteredRoom;
+  searchError?: boolean;
+  duplicateCheckThrows?: boolean;
 };
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
@@ -92,12 +94,17 @@ function setupFetchScenario({
     roomName: sampleRoom.roomName,
     roomUrl: sampleRoom.roomUrl,
   },
+  searchError = false,
+  duplicateCheckThrows = false,
 }: FetchScenario = {}) {
   fetchMock.mockImplementation(async (input, init) => {
     const url = getFetchUrl(input);
     const method = init?.method ?? "GET";
 
     if (url.startsWith("/api/registered-room/check")) {
+      if (duplicateCheckThrows) {
+        throw new Error("Network error");
+      }
       return jsonResponse({ isDuplicate });
     }
 
@@ -117,6 +124,9 @@ function setupFetchScenario({
     }
 
     if (url.startsWith("/api/room/search?")) {
+      if (searchError) {
+        return new Response("Server Error", { status: 500 });
+      }
       return jsonResponse({ rooms });
     }
 
@@ -339,5 +349,124 @@ describe("ShowroomRoomSearchPage", () => {
     expect(await screen.findByText(lockedInviteMessage)).toBeDefined();
     expect((inviteInput as HTMLInputElement).disabled).toBe(true);
     expect(fetchCallsFor("/api/invitations/verify")).toHaveLength(0);
+  });
+
+  it("空のキーワードで検索するとエラーメッセージを表示する", async () => {
+    setupFetchScenario();
+
+    await renderSearchPage();
+    await verifyInviteCode();
+
+    fireEvent.click(screen.getByRole("button", { name: searchButtonLabel }));
+
+    expect(
+      await screen.findByText("検索キーワードを入力してください。"),
+    ).toBeDefined();
+  });
+
+  it("検索APIがエラーを返した場合はエラーメッセージを表示する", async () => {
+    setupFetchScenario({ searchError: true });
+
+    await renderSearchPage();
+    await verifyInviteCode();
+
+    fireEvent.change(screen.getByPlaceholderText(searchInputPlaceholder), {
+      target: { value: "Alpha" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: searchButtonLabel }));
+
+    expect(
+      await screen.findByText("検索結果を取得できませんでした。時間をおいて再試行してください。"),
+    ).toBeDefined();
+  });
+
+  it("招待コード確認APIのネットワークエラー時にエラーメッセージを表示する", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = getFetchUrl(input);
+      if (url === "/api/registered-room") {
+        return jsonResponse({ room: null });
+      }
+      if (url === "/api/invitations/verify") {
+        throw new Error("Network error");
+      }
+      throw new Error(`Unhandled fetch URL: ${url}`);
+    });
+
+    await renderSearchPage();
+
+    const inviteInput = screen.getByPlaceholderText("ABCD123456");
+    fireEvent.change(inviteInput, { target: { value: "ABCD123456" } });
+    fireEvent.click(screen.getByRole("button", { name: confirmButtonLabel }));
+
+    expect(
+      await screen.findByText("招待コードを確認できませんでした。時間をおいて再試行してください。"),
+    ).toBeDefined();
+    expect(screen.getByRole("dialog", { name: inviteDialogTitle })).toBeDefined();
+  });
+
+  it("重複チェックAPIのネットワークエラー時にエラーダイアログを表示する", async () => {
+    setupFetchScenario({ rooms: [sampleRoom], duplicateCheckThrows: true });
+
+    await renderSearchPage();
+    await verifyInviteCode();
+
+    fireEvent.change(screen.getByPlaceholderText(searchInputPlaceholder), {
+      target: { value: "Alpha" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: searchButtonLabel }));
+    fireEvent.click(await screen.findByRole("button", { name: /Alpha Room/ }));
+    fireEvent.click(screen.getByRole("button", { name: registerButtonLabel }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "登録できません" }),
+    ).toBeDefined();
+    expect(
+      screen.getByText("ルームの重複確認ができませんでした。時間をおいて再試行してください。"),
+    ).toBeDefined();
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("ルーム登録確認ダイアログで「いいえ」を押すとダイアログが閉じる", async () => {
+    setupFetchScenario({ rooms: [sampleRoom] });
+
+    await renderSearchPage();
+    await verifyInviteCode();
+
+    fireEvent.change(screen.getByPlaceholderText(searchInputPlaceholder), {
+      target: { value: "Alpha" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: searchButtonLabel }));
+    fireEvent.click(await screen.findByRole("button", { name: /Alpha Room/ }));
+
+    expect(screen.getByRole("dialog", { name: registerDialogTitle })).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "いいえ" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: registerDialogTitle })).toBeNull();
+    });
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("登録エラーダイアログのOKボタンを押すとダイアログが閉じる", async () => {
+    setupFetchScenario({ rooms: [sampleRoom], registerOk: false });
+
+    await renderSearchPage();
+    await verifyInviteCode();
+
+    fireEvent.change(screen.getByPlaceholderText(searchInputPlaceholder), {
+      target: { value: "Alpha" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: searchButtonLabel }));
+    fireEvent.click(await screen.findByRole("button", { name: /Alpha Room/ }));
+    fireEvent.click(screen.getByRole("button", { name: registerButtonLabel }));
+
+    await screen.findByRole("dialog", { name: "登録できません" });
+
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "登録できません" })).toBeNull();
+    });
   });
 });

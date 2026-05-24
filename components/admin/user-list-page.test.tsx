@@ -113,6 +113,20 @@ describe("UserListPage", () => {
     );
     expect(screen.getByText("alpha-room")).toBeDefined();
   });
+
+  it("メールが null の場合「（メール未設定）」を表示する", () => {
+    render(<UserListPage users={[makeUser({ email: null })]} currentUserId="admin-1" />);
+    expect(screen.getByText("（メール未設定）")).toBeDefined();
+  });
+
+  it("BAN ユーザーが複数いると正しい件数を警告に表示する", () => {
+    const users = [
+      makeUser({ id: "user-1", isBanned: true }),
+      makeUser({ id: "user-2", name: "User Two", email: "user2@example.com", isBanned: true }),
+    ];
+    render(<UserListPage users={users} currentUserId="admin-1" />);
+    expect(screen.getByText(/2件のBANユーザーがいます/)).toBeDefined();
+  });
 });
 
 describe("BanSelect", () => {

@@ -41,6 +41,7 @@ vi.mock("@/components/showtube/showtube-shell", () => ({
   ShowTubeShell: ({
     children,
     genres,
+    selectedGenreId,
   }: {
     children?: ReactNode;
     genres: Array<{ genreId: number; genreName: string }>;
@@ -49,6 +50,7 @@ vi.mock("@/components/showtube/showtube-shell", () => ({
     <div
       data-genre-count={String(genres.length)}
       data-genre-names={genres.map((g) => g.genreName).join(",")}
+      data-selected-genre-id={String(selectedGenreId ?? null)}
       data-testid="showtube-shell"
     >
       {children}
@@ -214,5 +216,53 @@ describe("ShowTubePage", () => {
 
     const livePage = screen.getByTestId("showtube-live-page");
     expect(livePage.getAttribute("data-items-count")).toBe("0");
+  });
+
+  it("genre パラメータが数値以外の場合は全ジャンルのルームを渡す", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+
+    render(await ShowTubePage({ searchParams: Promise.resolve({ genre: "abc" }) }));
+
+    const livePage = screen.getByTestId("showtube-live-page");
+    expect(livePage.getAttribute("data-items-count")).toBe("1");
+  });
+
+  it("複数ジャンルに同じ roomId がある場合は重複排除して渡す", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    getOnlivesMock.mockResolvedValue({
+      onlives: [
+        { genreId: 0, genreName: "人気", hasUpcoming: false, lives: [{ roomId: 1 }] },
+        { genreId: 102, genreName: "アイドル", hasUpcoming: false, lives: [{ roomId: 1 }, { roomId: 2 }] },
+      ],
+    });
+
+    render(await ShowTubePage(defaultProps));
+
+    const livePage = screen.getByTestId("showtube-live-page");
+    expect(livePage.getAttribute("data-items-count")).toBe("2");
+  });
+
+  it("genre パラメータがある場合は selectedGenreId を ShowTubeShell に渡す", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+
+    render(await ShowTubePage({ searchParams: Promise.resolve({ genre: "102" }) }));
+
+    expect(
+      screen.getByTestId("showtube-shell").getAttribute("data-selected-genre-id"),
+    ).toBe("102");
+  });
+
+  it("genre パラメータがない場合は selectedGenreId=null を ShowTubeShell に渡す", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+
+    render(await ShowTubePage(defaultProps));
+
+    expect(
+      screen.getByTestId("showtube-shell").getAttribute("data-selected-genre-id"),
+    ).toBe("null");
   });
 });
