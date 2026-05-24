@@ -2060,7 +2060,7 @@ export function UserProfileModal({
 
         <div className="min-h-0 overflow-auto p-5 sm:p-6">
           {isLoading ? (
-            <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
+            <div className="grid gap-6 min-[600px]:grid-cols-[240px_minmax(0,1fr)]">
               <div className="space-y-4">
                 <div className="aspect-square w-full animate-pulse rounded-3xl bg-slate-100" />
                 <div className="h-20 w-20 animate-pulse rounded-full bg-slate-100" />
@@ -2155,7 +2155,7 @@ export function UserProfileModal({
               </div>
 
               {activeView === "user" ? (
-                <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
+                <div className="grid gap-6 min-[600px]:grid-cols-[240px_minmax(0,1fr)]">
                   <div className="space-y-4">
                     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2281,7 +2281,7 @@ export function UserProfileModal({
                   </div>
                 </div>
               ) : roomProfile ? (
-                <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
+                <div className="grid gap-6 min-[600px]:grid-cols-[240px_minmax(0,1fr)]">
                   <div className="space-y-4">
                     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2580,11 +2580,11 @@ function CommentPane({
         <div className="min-h-0 flex-1 overflow-hidden border-t border-slate-100">
           <div className="h-full overflow-auto">
             <table className="w-full table-fixed border-collapse">
-              <thead className="sticky top-0 z-10 bg-slate-50">
+              {/* <thead className="sticky top-0 z-10 bg-slate-50">
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="px-4 py-3 font-medium">コメント</th>
                 </tr>
-              </thead>
+              </thead> */}
               <tbody>
                 {isTableLoading ? (
                   Array.from({ length: 5 }).map((_, index) => (
@@ -2716,11 +2716,11 @@ function GiftLogTable({
   return (
     <div className="h-full overflow-auto">
       <table className="w-full border-collapse">
-        <thead className="sticky top-0 z-10 bg-slate-50">
+        {/* <thead className="sticky top-0 z-10 bg-slate-50">
           <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
             <th className="px-4 py-3 font-medium">{title}</th>
           </tr>
-        </thead>
+        </thead> */}
         <tbody>
           {isLoading ? (
             Array.from({ length: 5 }).map((_, index) => (
@@ -2846,7 +2846,7 @@ function TotalRankingTable({
 }) {
   return (
     <SectionCard
-      className="h-[320px] pt-0 pb-0 sm:h-[340px] xl:h-full"
+      className="h-[320px] pt-0 pb-0 min-[600px]:h-[340px] xl:h-full"
       contentClassName="px-0 pb-0 pt-0"
     >
       <div className="h-full overflow-auto">
@@ -2972,7 +2972,7 @@ function LiveRankingTable({
 }) {
   return (
     <SectionCard
-      className="h-[320px] pt-0 pb-0 sm:h-[340px] xl:h-full"
+      className="h-[320px] pt-0 pb-0 min-[600px]:h-[340px] xl:h-full"
       contentClassName="px-0 pb-0 pt-0"
     >
       <div className="h-full overflow-auto">
@@ -3133,7 +3133,7 @@ function LiveBody({
 
   return (
     <section className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-      <div className="h-svh min-h-0 overflow-hidden md:h-[50vh] xl:h-auto xl:min-h-0">
+      <div className="h-[50svh] min-h-0 overflow-hidden min-[600px]:h-[50vh] xl:h-auto xl:min-h-0">
         <CommentPane
           blockedUserIds={blockedUserIds}
           hasLiveInfo={hasLiveInfo}
@@ -3150,9 +3150,9 @@ function LiveBody({
         />
       </div>
 
-      <div className="grid min-h-[720px] grid-cols-1 gap-4 sm:grid-cols-2 xl:min-h-0 xl:auto-rows-fr xl:grid-rows-2">
+      <div className="grid min-h-[720px] grid-cols-1 gap-4 min-[600px]:grid-cols-2 xl:min-h-0 xl:auto-rows-fr xl:grid-rows-2">
         <SectionCard
-          className="h-[320px] py-0 sm:h-[340px] xl:h-full"
+          className="h-[320px] py-0 min-[600px]:h-[340px] xl:h-full"
           contentClassName="px-0 pb-0 pt-0"
         >
           <GiftLogTable
@@ -3167,7 +3167,7 @@ function LiveBody({
         </SectionCard>
 
         <SectionCard
-          className="h-[320px] py-0 sm:h-[340px] xl:h-full"
+          className="h-[320px] py-0 min-[600px]:h-[340px] xl:h-full"
           contentClassName="px-0 pb-0 pt-0"
         >
           <GiftLogTable
@@ -3490,7 +3490,7 @@ export function OnliveLogViewerPage({
   const liveIdLabel = liveInfo.liveId ?? data.liveId;
   return (
     <AppShell activeKey="logs" mainClassName="xl:min-h-0 xl:overflow-hidden">
-      <section className="shrink-0 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="shrink-0 grid grid-cols-1 gap-4 min-[600px]:grid-cols-2 xl:grid-cols-4">
         <LiveMetricCard
           icon={Gem}
           iconClassName="bg-amber-50 text-amber-700"
@@ -4009,7 +4009,7 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
       mainClassName="xl:min-h-0 xl:overflow-hidden"
       showMenu={false}
     >
-      <section className="shrink-0 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="shrink-0 grid grid-cols-1 gap-4 min-[600px]:grid-cols-2 xl:grid-cols-4">
         <LiveMetricCard
           icon={Gem}
           iconClassName="bg-amber-50 text-amber-700"
