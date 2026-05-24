@@ -15,7 +15,8 @@ const bannedPath = "/banned";
 
 export const metadata: Metadata = {
   title: "WatchLog",
-  description: "SRの配信ログを保存できるツールです",
+  description: "SHOWROOMの配信ログを保存できるツールです",
+  keywords: ["ショールーム", "SHOWROOM", "配信", "コメント", "ウォッチログ", "watchlog", "配信ログ", "コメントビューアー", "コメビュ"],
 };
 
 export default async function RootLayout({
