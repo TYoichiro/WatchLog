@@ -4005,6 +4005,7 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
   return (
     <AppShell
       activeKey="dashboard"
+      headerClassName="h-8"
       mainClassName="xl:min-h-0 xl:overflow-hidden"
       showMenu={false}
     >

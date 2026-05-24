@@ -23,15 +23,18 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/navigation/app-sidebar", () => ({
   AppShell: ({
     activeKey,
+    headerClassName,
     showMenu,
     children,
   }: {
     activeKey: string;
+    headerClassName?: string;
     showMenu?: boolean;
     children: ReactNode;
   }) => (
     <main
       data-active-key={activeKey}
+      data-header-class-name={headerClassName}
       data-show-menu={String(showMenu)}
       data-testid="app-shell"
     >
@@ -372,6 +375,7 @@ describe("Onlive page", () => {
 
     const appShell = await screen.findByTestId("app-shell");
     expect(appShell.getAttribute("data-active-key")).toBe("dashboard");
+    expect(appShell.getAttribute("data-header-class-name")).toBe("h-8");
     expect(appShell.getAttribute("data-show-menu")).toBe("false");
 
     expect(await screen.findByText("Hello live")).not.toBeNull();
