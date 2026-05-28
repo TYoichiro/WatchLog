@@ -43,7 +43,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
-        data: { isBanned: body.banned },
+        data: {
+          isBanned: body.banned,
+          ...(body.banned ? {} : { inviteCodeFailureCount: 0 }),
+        },
       });
 
       if (body.banned) {

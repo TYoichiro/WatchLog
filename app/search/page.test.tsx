@@ -24,8 +24,6 @@ vi.mock("@/components/navigation/app-sidebar", () => ({
 const inviteDialogTitle = "\u62db\u5f85\u30b3\u30fc\u30c9\u3092\u5165\u529b";
 const inviteHelpText =
   "10\u6841\u306e\u82f1\u6570\u5b57\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002";
-const lockedInviteMessage =
-  "\u767b\u9332\u306f\u3067\u304d\u307e\u305b\u3093\u3002\u62db\u5f85\u30b3\u30fc\u30c9\u306e\u5165\u529b\u306b4\u56de\u5931\u6557\u3057\u307e\u3057\u305f\u3002";
 const searchInputPlaceholder =
   "\u30eb\u30fc\u30e0\u540d\u3092\u691c\u7d22";
 const searchButtonLabel = "\u691c\u7d22";
@@ -120,7 +118,10 @@ function setupFetchScenario({
     }
 
     if (url === "/api/invitations/verify") {
-      return jsonResponse({ valid: inviteValid });
+      if (inviteValid) {
+        return jsonResponse({ valid: true });
+      }
+      return jsonResponse({ valid: false, remainingAttempts: 2 });
     }
 
     if (url.startsWith("/api/room/search?")) {
@@ -270,7 +271,7 @@ describe("ShowroomRoomSearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: confirmButtonLabel }));
 
     expect(
-      await screen.findByText("招待コードが正しくありません。残り3回入力できます。"),
+      await screen.findByText("招待コードが正しくありません。残り2回入力できます。"),
     ).toBeDefined();
     expect(screen.getByRole("dialog", { name: inviteDialogTitle })).toBeDefined();
   });
@@ -334,20 +335,19 @@ describe("ShowroomRoomSearchPage", () => {
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
-  it("locks invite-code entry after four invalid submissions", async () => {
+  it("招待コードの形式が不正な場合はエラーメッセージを表示してサーバーを呼ばない", async () => {
     setupFetchScenario();
 
     await renderSearchPage();
 
     const inviteInput = screen.getByPlaceholderText("ABCD123456");
     fireEvent.change(inviteInput, { target: { value: "bad" } });
+    fireEvent.click(screen.getByRole("button", { name: confirmButtonLabel }));
 
-    for (let index = 0; index < 4; index += 1) {
-      fireEvent.click(screen.getByRole("button", { name: confirmButtonLabel }));
-    }
-
-    expect(await screen.findByText(lockedInviteMessage)).toBeDefined();
-    expect((inviteInput as HTMLInputElement).disabled).toBe(true);
+    expect(
+      await screen.findByText("招待コードの形式が正しくありません。"),
+    ).toBeDefined();
+    expect((inviteInput as HTMLInputElement).disabled).toBe(false);
     expect(fetchCallsFor("/api/invitations/verify")).toHaveLength(0);
   });
 

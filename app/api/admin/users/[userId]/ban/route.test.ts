@@ -161,7 +161,7 @@ describe("PATCH /api/admin/users/[userId]/ban", () => {
 
       expect(mocks.userUpdate).toHaveBeenCalledWith({
         where: { id: "user-1" },
-        data: { isBanned: false },
+        data: { isBanned: false, inviteCodeFailureCount: 0 },
       });
     });
 

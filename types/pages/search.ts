@@ -11,4 +11,6 @@ export type SearchResponse = {
 
 export type InvitationVerificationResponse = {
   valid?: boolean;
+  banned?: boolean;
+  remainingAttempts?: number;
 };

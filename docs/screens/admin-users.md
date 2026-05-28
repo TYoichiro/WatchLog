@@ -167,8 +167,9 @@ type UserListItem = {
 2. 自分自身への操作を禁止（400）
 3. 管理者ユーザーへの BAN を禁止（403）
 4. `user.isBanned` を更新
-5. `banned: true` の場合、対象ユーザーの全セッションを削除（即時ログアウト）
-6. 監査ログ記録（`user.ban` または `user.unban`）
+5. `banned: false`（アンバン）の場合、`user.inviteCodeFailureCount` を 0 にリセット
+6. `banned: true` の場合、対象ユーザーの全セッションを削除（即時ログアウト）
+7. 監査ログ記録（`user.ban` または `user.unban`）
 
 **レスポンス（200）**:
 
@@ -192,15 +193,18 @@ type UserListItem = {
 
 ## データモデル
 
-### User.isBanned
+### User.isBanned / User.inviteCodeFailureCount
 
 ```prisma
 model User {
-  id       String  @id @default(cuid())
-  isBanned Boolean @default(false) @map("is_banned")
+  id                     String  @id @default(cuid())
+  isBanned               Boolean @default(false) @map("is_banned")
+  inviteCodeFailureCount Int     @default(0) @map("invite_code_failure_count")
   ...
 }
 ```
+
+`inviteCodeFailureCount` は招待コード検証の失敗回数をサーバー側で管理するフィールドです。3回失敗すると自動 BAN が発動し、管理者によるアンバン時に 0 にリセットされます。
 
 ---
 
