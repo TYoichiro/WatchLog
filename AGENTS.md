@@ -28,11 +28,11 @@ Prefer existing helpers such as `lib/utils.ts` and established component primiti
 
 ## Testing Guidelines
 
-No test framework or `npm test` script is configured. Validate changes with `npm run lint` and `npm run build`; add focused manual checks for affected pages or API routes. If tests are introduced, colocate them near the code or under a clearly named test directory, use `*.test.ts` or `*.test.tsx`, and add the command to `package.json`.
+Vitest is configured as the test framework. Run tests with `npm run test` (single run) or `npm run test:watch` (watch mode). Validate changes with `npm run lint`, `npm run test`, and `npm run build`. Test files are colocated with source files using `*.test.ts` or `*.test.tsx` naming and use Vitest with Testing Library and jsdom.
 
 ## Commit & Pull Request Guidelines
 
-Git history currently contains only the initial Create Next App commit, so use concise imperative commits such as `Add dashboard notice editor` or `Fix room search validation`.
+Use concise imperative commits such as `Add dashboard notice editor` or `Fix room search validation`.
 
 Pull requests should include a short summary, linked issue or task when available, notes on migrations or environment variables, screenshots for UI changes, and validation commands run. Call out Prisma migration files added under `prisma/migrations`.
 
