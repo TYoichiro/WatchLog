@@ -97,7 +97,6 @@ SHOWROOM のルームを検索し、招待コードを使用して自分のル�
 | `errorMessage` | `string \| null` | `null` | 検索エラーメッセージ |
 | `verifiedInviteCode` | `string \| null` | `null` | 検証済みの招待コード |
 | `inviteCodeErrorMessage` | `string \| null` | `null` | 招待コード検証エラーメッセージ |
-| `inviteCodeFailureCount` | `number` | 0 (localStorage より復元) | 招待コード検証失敗回数 |
 | `isInviteCodeSubmitting` | `boolean` | `false` | 招待コード送信中フラグ |
 | `registerErrorMessage` | `string \| null` | `null` | ルーム登録エラーメッセージ |
 
@@ -139,14 +138,14 @@ SHOWROOM のルームを検索し、招待コードを使用して自分のル�
 | コード入力欄 | 英数字10文字（`maxLength={10}`、自動大文字変換、`font-mono`） |
 | ガイドテキスト | 通常時「10桁の英数字を入力してください。」 |
 | エラーメッセージ | 失敗時「招待コードが正しくありません。残りN回入力できます。」 |
-| ロックメッセージ | ロック時「登録はできません。招待コードの入力に4回失敗しました。」 |
+| BAN メッセージ | BAN 時「招待コードの入力に3回失敗したため、アカウントがBANされました。」 |
 | 確認ボタン | コード送信・検証（送信中はスピナー表示） |
-| ロック状態 | 4回失敗で入力欄・ボタンを無効化 |
 
-**失敗カウントの永続化**:
-- `localStorage` のキー: `watchlog:invite-code-failure-count`
-- 4回失敗（`INVITE_CODE_LOCK_FAILURE_COUNT = 4`）でロック
-- 検証成功時は localStorage から削除してカウントリセット
+**失敗カウントの管理**:
+- 失敗回数はサーバー側（DB の `users.invite_code_failure_count`）で管理
+- 3回失敗（`INVITE_CODE_BAN_THRESHOLD = 3`）で自動 BAN
+- 検証成功時はカウントをサーバー側でリセット
+- BAN 発生時は `/banned` へリダイレクト
 
 #### ConfirmRegisterModal
 
@@ -279,11 +278,29 @@ SHOWROOM のルームを検索し、招待コードを使用して自分のル�
 }
 ```
 
-**レスポンス**:
+**レスポンス（検証成功）**:
 
 ```json
 {
   "valid": true
+}
+```
+
+**レスポンス（検証失敗・自動 BAN）**:
+
+```json
+{
+  "valid": false,
+  "banned": true
+}
+```
+
+**レスポンス（検証失敗・BAN 未達）**:
+
+```json
+{
+  "valid": false,
+  "remainingAttempts": 2
 }
 ```
 
@@ -292,6 +309,14 @@ SHOWROOM のルームを検索し、招待コードを使用して自分のル�
 - `isDeleted = false`
 - `usedAt = null`
 - `usedByUserId = null`
+
+**失敗時の処理**:
+- 検証成功: `users.invite_code_failure_count` を 0 にリセット
+- 検証失敗: `users.invite_code_failure_count` をインクリメント
+- 失敗回数が閾値（`INVITE_CODE_BAN_THRESHOLD = 3`）に達した場合:
+  - `users.is_banned = true` に更新
+  - 対象ユーザーの全セッションを削除（即時ログアウト）
+  - 監査ログ記録（`user.ban`、`detail.reason: "invite_code_failure"`）
 
 **エラーレスポンス**:
 
@@ -336,7 +361,8 @@ SHOWROOM のルームを検索し、招待コードを使用して自分のル�
 1. 招待コードを消費（`usedAt`, `usedByUserId` を設定）
 2. ユーザーの登録ルームを保存
 3. ユーザー向け招待コードを自動生成（最大3件: `USER_INVITATION_CODE_LIMIT = 3`）
-4. 監査ログ記録（`room.register`）
+4. 招待コードの発行者が管理者（`admin` ロール）の場合、新規ユーザーに `premiumuser` ロールを付与し、監査ログ記録（`role.assign`、`detail.reason: "admin_invite_code"`）
+5. 監査ログ記録（`room.register`）
 
 **エラーレスポンス**:
 
@@ -358,14 +384,12 @@ SHOWROOM のルームを検索し、招待コードを使用して自分のル�
 ```
 ユーザーが招待コードを入力
   │
-  ▼ [確認する] クリック
+  ▼ [確認] クリック
 POST /api/invitations/verify
   │
-  ├─ valid: true → verifiedInviteCode に保存、モーダルを閉じる
-  └─ valid: false → inviteCodeErrorMessage を表示
-                      inviteCodeFailureCount をインクリメント
-                      localStorage に失敗回数を保存
-                      4回失敗 → ボタンをロック（disabled）
+  ├─ valid: true  → verifiedInviteCode に保存、モーダルを閉じる
+  ├─ banned: true → BAN メッセージを表示 → /banned へリダイレクト
+  └─ valid: false → inviteCodeErrorMessage を表示（残り N 回）
 ```
 
 ### ルーム検索フロー
@@ -407,6 +431,17 @@ type RoomResult = {
   roomId: string;
   roomName: string;
   roomUrl: string;
+};
+```
+
+### InvitationVerificationResponse
+
+```typescript
+// types/pages/search.ts
+type InvitationVerificationResponse = {
+  valid?: boolean;
+  banned?: boolean;
+  remainingAttempts?: number;
 };
 ```
 

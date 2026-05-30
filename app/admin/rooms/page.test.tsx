@@ -226,6 +226,17 @@ describe("AdminRoomsPage", () => {
     expect(screen.queryByRole("combobox", { name: "ロール変更" })).toBeNull();
   });
 
+  it("toJstWallTimeIsoString を room.createdAt で呼び出す", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    listAllRegisteredRoomsMock.mockResolvedValue([room]);
+    toJstWallTimeIsoStringMock.mockReturnValue("2026-05-01T09:00:00.000+09:00");
+
+    await renderPage();
+
+    expect(toJstWallTimeIsoStringMock).toHaveBeenCalledWith(room.createdAt);
+  });
+
   it("renders multiple rooms with correct links", async () => {
     const room2 = {
       id: "reg-2",

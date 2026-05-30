@@ -36,7 +36,7 @@ export function LoginScreen({
 }: LoginScreenProps) {
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8 text-slate-900">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center gap-6">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-lg flex-col justify-center gap-6">
         <section className="w-full rounded-3xl bg-white p-8 text-center shadow-sm sm:p-10">
           <h1 className="text-3xl tracking-tight sm:text-4xl">
             WatchLog

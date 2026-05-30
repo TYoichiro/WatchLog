@@ -23,7 +23,7 @@ export const proxy = auth((request) => {
     });
   }
 
-  if (request.auth || pathname === "/" || pathname === "/maintenance") {
+  if (request.auth || pathname === "/" || pathname === "/maintenance" || pathname === "/banned") {
     return NextResponse.next({
       request: {
         headers: requestHeaders,

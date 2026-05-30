@@ -131,6 +131,35 @@ describe("GET /api/admin/users", () => {
     expect(response.status).toBe(403);
   });
 
+  it("レスポンスに createdAt / updatedAt が文字列で含まれる", async () => {
+    const response = await GET();
+    const body = await expectJson(response) as { users: Record<string, unknown>[] };
+    const user = body.users[0];
+
+    expect(typeof user.createdAt).toBe("string");
+    expect(typeof user.updatedAt).toBe("string");
+  });
+
+  it("レスポンスに image フィールドを含む", async () => {
+    const response = await GET();
+    const body = await expectJson(response) as { users: Record<string, unknown>[] };
+    const user = body.users[0];
+
+    expect("image" in user).toBe(true);
+    expect(user.image).toBeNull();
+  });
+
+  it("roles に id / name / description / assignedAt が含まれる", async () => {
+    const response = await GET();
+    const body = await expectJson(response) as { users: { roles: Record<string, unknown>[] }[] };
+    const role = body.users[0].roles[0];
+
+    expect(role.id).toBe("role-1");
+    expect(role.name).toBe("user");
+    expect(role.description).toBe("Default user");
+    expect(typeof role.assignedAt).toBe("string");
+  });
+
   it("DB エラー時は 500 を返す", async () => {
     mocks.userFindMany.mockRejectedValue(new Error("db error"));
 
@@ -142,5 +171,30 @@ describe("GET /api/admin/users", () => {
       "Admin user list failed",
       { error: "Error: db error" },
     );
+  });
+
+  it("複数ロールを持つユーザーの場合、全ロールが roles 配列に含まれる", async () => {
+    mocks.userFindMany.mockResolvedValue([{
+      ...dbUser,
+      userRoles: [
+        {
+          assignedAt: new Date("2026-05-01T00:00:00Z"),
+          role: { id: "role-1", name: "user", description: "Default user" },
+        },
+        {
+          assignedAt: new Date("2026-05-02T00:00:00Z"),
+          role: { id: "role-2", name: "premiumuser", description: "Premium" },
+        },
+      ],
+    }]);
+
+    const response = await GET();
+    const body = await expectJson(response) as { users: { roles: Record<string, unknown>[] }[] };
+
+    expect(response.status).toBe(200);
+    const roles = body.users[0].roles;
+    expect(roles).toHaveLength(2);
+    expect(roles.map((r) => r.name)).toContain("user");
+    expect(roles.map((r) => r.name)).toContain("premiumuser");
   });
 });

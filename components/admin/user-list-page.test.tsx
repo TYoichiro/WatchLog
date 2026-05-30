@@ -113,6 +113,25 @@ describe("UserListPage", () => {
     );
     expect(screen.getByText("alpha-room")).toBeDefined();
   });
+
+  it("メールが null の場合「（メール未設定）」を表示する", () => {
+    render(<UserListPage users={[makeUser({ email: null })]} currentUserId="admin-1" />);
+    expect(screen.getByText("（メール未設定）")).toBeDefined();
+  });
+
+  it("不正な日付文字列の場合は '--' を表示する", () => {
+    render(<UserListPage users={[makeUser({ createdAt: "invalid-date" })]} currentUserId="admin-1" />);
+    expect(screen.getByText("--")).toBeDefined();
+  });
+
+  it("BAN ユーザーが複数いると正しい件数を警告に表示する", () => {
+    const users = [
+      makeUser({ id: "user-1", isBanned: true }),
+      makeUser({ id: "user-2", name: "User Two", email: "user2@example.com", isBanned: true }),
+    ];
+    render(<UserListPage users={users} currentUserId="admin-1" />);
+    expect(screen.getByText(/2件のBANユーザーがいます/)).toBeDefined();
+  });
 });
 
 describe("BanSelect", () => {
@@ -265,6 +284,41 @@ describe("BanSelect", () => {
     );
     expect(screen.queryByRole("combobox", { name: "ステータス変更" })).toBeNull();
     expect(screen.getByText("操作不可")).toBeDefined();
+  });
+
+  it("fetch が reject した場合にエラーメッセージを表示する", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
+
+    render(<UserListPage users={[makeUser({ id: "user-1", isBanned: false })]} currentUserId="admin-1" />);
+    const select = screen.getByRole("combobox", { name: "ステータス変更" });
+
+    fireEvent.change(select, { target: { value: "banned" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("変更に失敗しました")).toBeDefined();
+    });
+  });
+
+  it("エラー後に再度変更するとエラーがリセットされる", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<UserListPage users={[makeUser({ id: "user-1", isBanned: false })]} currentUserId="admin-1" />);
+    const select = screen.getByRole("combobox", { name: "ステータス変更" }) as HTMLSelectElement;
+
+    fireEvent.change(select, { target: { value: "banned" } });
+    await waitFor(() => {
+      expect(screen.getByText("変更に失敗しました")).toBeDefined();
+    });
+
+    // status は "allowed" のまま → 再度 "banned" に変えると setError(false) が呼ばれる
+    fireEvent.change(select, { target: { value: "banned" } });
+
+    await waitFor(() => {
+      expect(screen.queryByText("変更に失敗しました")).toBeNull();
+    });
   });
 
   it("複数ユーザーがいる場合それぞれのセレクトを表示する", () => {

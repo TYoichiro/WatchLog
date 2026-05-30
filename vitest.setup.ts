@@ -5,3 +5,10 @@ HTMLAnchorElement.prototype.click = function () {};
 // jsdom does not implement scrollIntoView or scrollTo
 Element.prototype.scrollIntoView = function () {};
 Element.prototype.scrollTo = function () {};
+
+// jsdom does not implement ResizeObserver (used by Radix UI primitives such as Switch)
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};

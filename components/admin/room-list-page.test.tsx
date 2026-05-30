@@ -77,6 +77,46 @@ describe("RoomListPage", () => {
     expect(screen.getByText("Alpha Room")).toBeDefined();
     expect(screen.getByText("Beta Room")).toBeDefined();
   });
+
+  it("ユーザー名が null の場合は「（名前未設定）」を表示する", () => {
+    render(
+      <RoomListPage
+        rooms={[makeRoom({ user: { id: "u1", name: null, isPremium: false, isAdmin: false } })]}
+      />,
+    );
+    expect(screen.getByText("（名前未設定）")).toBeDefined();
+  });
+
+  it("プロフィールリンクに target=\"_blank\" と rel=\"noopener noreferrer\" がある", () => {
+    render(<RoomListPage rooms={[makeRoom()]} />);
+    const link = screen.getByRole("link", { name: /プロフィール/ });
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("配信ページリンクに target=\"_blank\" と rel=\"noopener noreferrer\" がある", () => {
+    render(<RoomListPage rooms={[makeRoom()]} />);
+    const link = screen.getByRole("link", { name: /配信ページ/ });
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("無効な createdAt 文字列のとき '--' を表示する", () => {
+    render(<RoomListPage rooms={[makeRoom({ createdAt: "invalid" })]} />);
+    expect(screen.getByText("--")).toBeDefined();
+  });
+
+  it("imageUrl が null 以外のとき img 要素を描画する", () => {
+    render(<RoomListPage rooms={[makeRoom({ imageUrl: "https://example.com/img.jpg" })]} />);
+    const img = screen.getByRole("img");
+    expect(img.getAttribute("src")).toBe("https://example.com/img.jpg");
+    expect(img.getAttribute("alt")).toBe("Alpha Room");
+  });
+
+  it("imageUrl が null のとき img 要素を描画しない", () => {
+    render(<RoomListPage rooms={[makeRoom({ imageUrl: null })]} />);
+    expect(screen.queryByRole("img")).toBeNull();
+  });
 });
 
 describe("RoleSelect", () => {
@@ -193,6 +233,19 @@ describe("RoleSelect", () => {
 
     await waitFor(() => {
       expect(select.disabled).toBe(false);
+    });
+  });
+
+  it("fetch が例外をスローしたときエラーメッセージを表示する", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
+
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false, isAdmin: false } })]} />);
+    const select = screen.getByRole("combobox", { name: "ロール変更" });
+
+    fireEvent.change(select, { target: { value: "premiumuser" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("変更に失敗しました")).toBeDefined();
     });
   });
 

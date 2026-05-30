@@ -4,6 +4,7 @@ import { GET } from "./route";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  getBcsvrKeyFromOnlives: vi.fn(),
   getRoomCommentLog: vi.fn(),
   getRoomGiftDefinitions: vi.fn(),
   getRoomGiftLog: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/lib/showroom", () => ({
+  getBcsvrKeyFromOnlives: mocks.getBcsvrKeyFromOnlives,
   getRoomCommentLog: mocks.getRoomCommentLog,
   getRoomGiftDefinitions: mocks.getRoomGiftDefinitions,
   getRoomGiftLog: mocks.getRoomGiftLog,
@@ -193,6 +195,82 @@ describe("GET /api/onlive/init", () => {
     );
   });
 
+  it("プレミアムライブの場合 getBcsvrKeyFromOnlives を呼び liveInfo の bcsvrKey を更新する", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getRoomLiveInfo.mockResolvedValue({
+      bcsvrKey: null,
+      isPremiumLive: true,
+      liveId: "20260530",
+      liveStatus: null,
+    });
+    mocks.getBcsvrKeyFromOnlives.mockResolvedValue("premium-bcsvr-key");
+    mocks.getRoomGiftDefinitions.mockResolvedValue([]);
+    mocks.getRoomCommentLog.mockResolvedValue([]);
+    mocks.getRoomGiftLog.mockResolvedValue([]);
+    mocks.getRoomTelop.mockResolvedValue(null);
+
+    const response = await GET();
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data.liveInfo).toMatchObject({
+      bcsvrKey: "premium-bcsvr-key",
+      isPremiumLive: true,
+    });
+    expect(mocks.getBcsvrKeyFromOnlives).toHaveBeenCalledWith(123);
+  });
+
+  it("getBcsvrKeyFromOnlives が失敗した場合でも bcsvrKey null のまま liveInfo を返す", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getRoomLiveInfo.mockResolvedValue({
+      bcsvrKey: null,
+      isPremiumLive: true,
+      liveId: "20260530",
+      liveStatus: null,
+    });
+    mocks.getBcsvrKeyFromOnlives.mockRejectedValue(new Error("onlives failed"));
+    mocks.getRoomGiftDefinitions.mockResolvedValue([]);
+    mocks.getRoomCommentLog.mockResolvedValue([]);
+    mocks.getRoomGiftLog.mockResolvedValue([]);
+    mocks.getRoomTelop.mockResolvedValue(null);
+
+    const response = await GET();
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data.liveInfo).toMatchObject({
+      bcsvrKey: null,
+      isPremiumLive: true,
+    });
+  });
+
+  it("未認証の場合は no_room を返す", async () => {
+    mocks.auth.mockResolvedValue(null);
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(await expectJson(response)).toEqual({ status: "no_room" });
+    expect(mocks.getUserRegisteredRoom).not.toHaveBeenCalled();
+    expect(mocks.listBlockedShowroomUserIds).not.toHaveBeenCalled();
+  });
+
+  it("getUserRegisteredRoom が null を返す場合は no_room を返す", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(null);
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(await expectJson(response)).toEqual({ status: "no_room" });
+    expect(mocks.listBlockedShowroomUserIds).not.toHaveBeenCalled();
+    expect(mocks.getRoomLiveInfo).not.toHaveBeenCalled();
+  });
+
   it("uses safe defaults when optional live sources fail", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
@@ -217,5 +295,76 @@ describe("GET /api/onlive/init", () => {
       telop: null,
     });
     expect(mocks.loggerInfo).not.toHaveBeenCalled();
+  });
+
+  it("通常ライブ（isPremiumLive が false）では getBcsvrKeyFromOnlives を呼ばない", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getRoomLiveInfo.mockResolvedValue({
+      bcsvrKey: "bcsvr-key",
+      isPremiumLive: false,
+      liveId: "live-123",
+      liveStatus: 2,
+    });
+    mocks.getRoomGiftDefinitions.mockResolvedValue([]);
+    mocks.getRoomCommentLog.mockResolvedValue([]);
+    mocks.getRoomGiftLog.mockResolvedValue([]);
+    mocks.getRoomTelop.mockResolvedValue(null);
+
+    await GET();
+
+    expect(mocks.getBcsvrKeyFromOnlives).not.toHaveBeenCalled();
+  });
+
+  it("liveStatus が 1 の場合はロガーを呼ばない", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getRoomLiveInfo.mockResolvedValue({
+      bcsvrKey: null,
+      isPremiumLive: false,
+      liveId: null,
+      liveStatus: 1,
+    });
+    mocks.getRoomGiftDefinitions.mockResolvedValue([]);
+    mocks.getRoomCommentLog.mockResolvedValue([]);
+    mocks.getRoomGiftLog.mockResolvedValue([]);
+    mocks.getRoomTelop.mockResolvedValue(null);
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect((await expectJson(response)).status).toBe("ok");
+    expect(mocks.loggerInfo).not.toHaveBeenCalled();
+  });
+
+  it("liveStatus が 0 の場合はロガーを呼び出す", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getRoomLiveInfo.mockResolvedValue({
+      bcsvrKey: null,
+      isPremiumLive: false,
+      liveId: null,
+      liveStatus: 0,
+    });
+    mocks.getRoomGiftDefinitions.mockResolvedValue([]);
+    mocks.getRoomCommentLog.mockResolvedValue([]);
+    mocks.getRoomGiftLog.mockResolvedValue([]);
+    mocks.getRoomTelop.mockResolvedValue(null);
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect((await expectJson(response)).status).toBe("ok");
+    expect(mocks.loggerInfo).toHaveBeenCalledWith(
+      "Onlive screen: room is live",
+      {
+        roomId: "123",
+        roomUrl: "alpha-room",
+        userId: "user-1",
+      },
+    );
   });
 });

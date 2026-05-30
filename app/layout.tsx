@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
 import { cn } from "@/lib/utils";
 import { getActiveMaintenanceWindow } from "@/lib/maintenance";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,14 +8,13 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const maintenancePath = "/maintenance";
 const bannedPath = "/banned";
 
 export const metadata: Metadata = {
   title: "WatchLog",
-  description: "SRの配信ログを保存できるツールです",
+  description: "SHOWROOMの配信ログを保存できるツールです",
+  keywords: ["ショールーム", "SHOWROOM", "配信", "コメント", "ウォッチログ", "watchlog", "配信ログ", "コメントビューアー", "コメビュ"],
 };
 
 export default async function RootLayout({
@@ -46,7 +45,7 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="ja" className={cn("font-sans", geist.variable)}>
+    <html lang="ja" className={cn("font-sans", GeistSans.variable)}>
       <body>
         <TooltipProvider>
           {children}

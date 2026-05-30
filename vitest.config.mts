@@ -8,6 +8,7 @@ export default defineConfig({
     tsconfigPaths: true,
     alias: {
       "next/link": resolve(import.meta.dirname, "./test-utils/mocks/next-link.tsx"),
+      "next/server": resolve(import.meta.dirname, "./node_modules/next/server.js"),
       "hls.js": resolve(import.meta.dirname, "./test-utils/mocks/hls.ts"),
     },
   },
@@ -16,5 +17,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
     include: ["**/*.test.{ts,tsx}"],
+    env: {
+      DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+    },
   },
 });

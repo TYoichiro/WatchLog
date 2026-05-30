@@ -19,6 +19,12 @@ function makeItem(overrides: Partial<OnliveItem> = {}): OnliveItem {
     genreName: "アイドル",
     badgeList: [],
     streamingUrlList: [],
+    bcsvrKey: null,
+    cellType: null,
+    officialLv: null,
+    liveType: null,
+    isFollow: false,
+    tags: [],
     telop: null,
     liverThemeTitle: "",
     everydayLiveLabel: null,
@@ -26,6 +32,7 @@ function makeItem(overrides: Partial<OnliveItem> = {}): OnliveItem {
     isKaraoke: false,
     premiumRoomType: 0,
     frameImageUrl: null,
+    frameLottieUrl: null,
     ...overrides,
   };
 }
@@ -106,6 +113,28 @@ describe("ShowTubeLivePage", () => {
       const hrefs = links.map((l) => l.getAttribute("href"));
       expect(hrefs).toContain("/showtube/watch?room_id=111");
       expect(hrefs).toContain("/showtube/watch?room_id=222");
+    });
+
+    it("カード画像の src が item.image になる", () => {
+      render(
+        <ShowTubeLivePage
+          items={[makeItem({ image: "https://example.com/thumb.jpg" })]}
+          hasError={false}
+        />,
+      );
+      const img = screen.getByRole("img");
+      expect(img.getAttribute("src")).toBe("https://example.com/thumb.jpg");
+    });
+
+    it("カード画像の alt が item.mainName になる", () => {
+      render(
+        <ShowTubeLivePage
+          items={[makeItem({ mainName: "テストルーム名" })]}
+          hasError={false}
+        />,
+      );
+      const img = screen.getByRole("img");
+      expect(img.getAttribute("alt")).toBe("テストルーム名");
     });
   });
 });

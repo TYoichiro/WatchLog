@@ -10,14 +10,13 @@ import type {
 } from "@/lib/showroom";
 import DashboardPage from "./page";
 
-const { routerReplace } = vi.hoisted(() => ({
-  routerReplace: vi.fn(),
-}));
+const { routerReplace, mockRouter } = vi.hoisted(() => {
+  const routerReplace = vi.fn();
+  return { routerReplace, mockRouter: { replace: routerReplace } };
+});
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    replace: routerReplace,
-  }),
+  useRouter: () => mockRouter,
 }));
 
 vi.mock("@/components/navigation/app-sidebar", () => ({
@@ -39,6 +38,7 @@ type DashboardFetchScenario = {
   activeFan?: ActiveFanSummary | null;
   eventAndSupport?: EventAndSupportSummary | null;
   isAdmin?: boolean;
+  isPremium?: boolean;
   noticesOk?: boolean;
   profile?: RoomProfile;
   profileOk?: boolean;
@@ -131,6 +131,7 @@ function setupFetchScenario({
   activeFan: activeFanData = activeFan,
   eventAndSupport: eventAndSupportData = eventAndSupport,
   isAdmin = false,
+  isPremium = false,
   noticesOk = true,
   profile: profileData = profile,
   profileOk = true,
@@ -152,6 +153,7 @@ function setupFetchScenario({
       return jsonResponse({
         status: isLive ? "is_live" : "ok",
         isAdmin,
+        isPremium,
         registeredRoom: {
           roomId: registeredRoomData.roomId,
           roomUrl: registeredRoomData.roomUrl,
@@ -190,20 +192,36 @@ class MockWebSocket {
   static readonly CLOSED = 3;
   static instances: MockWebSocket[] = [];
 
+  readonly sent: string[] = [];
   readonly url: string;
   readyState = MockWebSocket.CONNECTING;
+
+  private readonly listeners = new Map<string, Array<(event: unknown) => void>>();
 
   constructor(url: string) {
     this.url = url;
     MockWebSocket.instances.push(this);
   }
 
-  addEventListener() {}
+  addEventListener(type: string, listener: (event: unknown) => void) {
+    const listeners = this.listeners.get(type) ?? [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
 
-  send() {}
+  send(data: string) {
+    this.sent.push(data);
+  }
 
   close() {
     this.readyState = MockWebSocket.CLOSED;
+    this.emit("close", {});
+  }
+
+  emit(type: string, event: unknown) {
+    for (const listener of this.listeners.get(type) ?? []) {
+      listener(event);
+    }
   }
 }
 
@@ -355,5 +373,119 @@ describe("DashboardPage", () => {
       expect(routerReplace).toHaveBeenCalledWith("/onlive");
     });
     expect(screen.queryByRole("heading", { level: 1, name: "Alpha Room" })).toBeNull();
+  });
+
+  it("redirects to /search when the dashboard fetch throws a network error", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("Network error"));
+
+    render(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(routerReplace).toHaveBeenCalledWith("/search");
+    });
+  });
+
+  it("sends a SUB message to WebSocket after the connection opens", async () => {
+    setupFetchScenario({
+      roomStatus: { ...roomStatus, broadcastKey: "bcsvr-key" },
+    });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    ws.readyState = MockWebSocket.OPEN;
+    ws.emit("open", {});
+
+    expect(ws.sent).toContain("SUB\tbcsvr-key");
+  });
+
+  it("redirects to /onlive when WebSocket receives a live-started message", async () => {
+    setupFetchScenario({
+      roomStatus: { ...roomStatus, broadcastKey: "bcsvr-key" },
+    });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    ws.readyState = MockWebSocket.OPEN;
+    ws.emit("open", {});
+    ws.emit("message", { data: `MSG\tbcsvr-key\t{"t":104}` });
+
+    await waitFor(() => {
+      expect(routerReplace).toHaveBeenCalledWith("/onlive");
+    });
+  });
+
+  it("shows skeleton loading state while fetching", () => {
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+
+    render(<DashboardPage />);
+
+    expect(screen.getByText("読み込み中")).toBeDefined();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+  });
+
+  it("shows notice error UI when the notices fetch fails", async () => {
+    setupFetchScenario({ noticesOk: false });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+    expect(screen.getByText("取得失敗")).toBeDefined();
+    expect(screen.getByText("お知らせを取得できませんでした")).toBeDefined();
+  });
+
+  it("shows フリー枠ルーム badge for non-official rooms", async () => {
+    setupFetchScenario({ profile: { ...profile, isOfficial: false } });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+    expect(screen.getByText("フリー枠ルーム")).toBeDefined();
+    expect(screen.queryByText("公式枠ルーム")).toBeNull();
+  });
+
+  it("shows empty notices message when no public notices are available", async () => {
+    fetchMock.mockImplementationOnce(async () =>
+      jsonResponse({
+        activeFan,
+        eventAndSupport,
+        isAdmin: false,
+        isPremium: false,
+        notices: [],
+        noticesHasError: false,
+        profile,
+        registeredRoom: { roomId: registeredRoom.roomId, roomUrl: registeredRoom.roomUrl },
+        roomStatus,
+        status: "ok",
+      })
+    );
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+    expect(screen.getByText("公開中のお知らせはありません。")).toBeDefined();
+  });
+
+  it("does not start a WebSocket watcher for non-admin users without a broadcast key", async () => {
+    setupFetchScenario(); // default roomStatus has broadcastKey: null
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+
+    expect(MockWebSocket.instances).toHaveLength(0);
   });
 });

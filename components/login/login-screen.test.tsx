@@ -104,4 +104,35 @@ describe("LoginScreen", () => {
     expect(screen.queryByText("Hidden notice")).toBeNull();
     expect(screen.getAllByRole("article")).toHaveLength(1);
   });
+
+  it("shows the error message text in the error state", () => {
+    renderLoginScreen({ hasNoticesError: true });
+
+    expect(screen.getByText("お知らせを取得できませんでした")).toBeDefined();
+    expect(screen.getByText("時間をおいて再読み込みしてください。")).toBeDefined();
+  });
+
+  it("renders the empty-notices state when no notices are available", () => {
+    renderLoginScreen({ loginNotices: [] });
+
+    expect(screen.getByText("公開中のお知らせはありません。")).toBeDefined();
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+  });
+
+  it("renders a notice without a link when linkUrl is null", () => {
+    const notices: AppNotice[] = [
+      {
+        id: 1,
+        title: "No link notice",
+        date: "2026/05/09 21:00",
+        body: "This notice has no external link.",
+        linkUrl: null,
+      },
+    ];
+
+    renderLoginScreen({ loginNotices: notices });
+
+    expect(screen.getByText("This notice has no external link.")).toBeDefined();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
 });

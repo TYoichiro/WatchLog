@@ -27,6 +27,7 @@ type ShowroomLiveInfoResponse = {
   bcsvr_key?: string | null;
   live_id?: number | string | null;
   live_status?: number | string | null;
+  redirect_url?: string | null;
 };
 
 function toCommentCreatedAt(
@@ -48,6 +49,7 @@ export type RoomComment = {
 
 export type RoomLiveInfo = {
   bcsvrKey: string | null;
+  isPremiumLive: boolean;
   liveId: string | null;
   liveStatus: number | null;
 };
@@ -95,14 +97,22 @@ export async function getRoomLiveInfo(
   url.searchParams.set("room_id", String(roomId));
 
   const rawData = await fetchShowroomJson<ShowroomLiveInfoResponse>(url);
-  const bcsvrKey = rawData.bcsvr_key?.trim() || null;
+  const isPremiumLive = !!(rawData.redirect_url?.trim());
+  const bcsvrKey = isPremiumLive ? null : (rawData.bcsvr_key?.trim() || null);
+
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dateFallback = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
 
   return {
     bcsvrKey,
+    isPremiumLive,
     liveId:
-      rawData.live_id === null || rawData.live_id === undefined
-        ? null
-        : String(rawData.live_id),
-    liveStatus: toFiniteNumber(rawData.live_status),
+      rawData.live_id !== null && rawData.live_id !== undefined
+        ? String(rawData.live_id)
+        : isPremiumLive
+        ? dateFallback
+        : null,
+    liveStatus: isPremiumLive ? null : toFiniteNumber(rawData.live_status),
   };
 }

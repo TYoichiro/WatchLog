@@ -64,11 +64,22 @@ beforeEach(() => {
 });
 
 describe("GET /api/onlive/poll", () => {
+  it("未認証の場合は 404 を返す", async () => {
+    mocks.auth.mockResolvedValue(null);
+
+    const response = await GET(new Request("http://localhost/api/onlive/poll"));
+
+    expect(response.status).toBe(404);
+    expect(await expectJson(response)).toEqual({ error: "No registered room" });
+    expect(mocks.getUserRegisteredRoom).not.toHaveBeenCalled();
+    expect(mocks.getRoomProfile).not.toHaveBeenCalled();
+  });
+
   it("returns 404 when the user has no registered room", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/onlive/poll"));
 
     expect(response.status).toBe(404);
     expect(await expectJson(response)).toEqual({ error: "No registered room" });
@@ -135,7 +146,7 @@ describe("GET /api/onlive/poll", () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/onlive/poll"));
     const data = await expectJson(response);
 
     expect(response.status).toBe(200);
@@ -155,6 +166,50 @@ describe("GET /api/onlive/poll", () => {
     expect(mocks.getRoomProfile).toHaveBeenCalledWith("123");
     expect(mocks.getRoomLiveRanking).toHaveBeenCalledWith("123");
     expect(mocks.getRoomTotalRanking).toHaveBeenCalledWith("123");
+  });
+
+  it("skip_ranking=1 のクエリがある場合ランキングをスキップして空配列とエラーフラグを返す", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getRoomProfile.mockResolvedValue(profile);
+
+    const response = await GET(new Request("http://localhost/api/onlive/poll?skip_ranking=1"));
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      profile,
+      profileHasError: false,
+      liveRanking: [],
+      liveRankingHasError: true,
+      totalRanking: [],
+      totalRankingHasError: true,
+    });
+    expect(mocks.getRoomLiveRanking).not.toHaveBeenCalled();
+    expect(mocks.getRoomTotalRanking).not.toHaveBeenCalled();
+  });
+
+  it("全ソースが失敗した場合は全てデフォルト値で返す", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getRoomProfile.mockRejectedValue(new Error("profile failed"));
+    mocks.getRoomLiveRanking.mockRejectedValue(new Error("live ranking failed"));
+    mocks.getRoomTotalRanking.mockRejectedValue(new Error("total ranking failed"));
+
+    const response = await GET(new Request("http://localhost/api/onlive/poll"));
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      profile: null,
+      profileHasError: true,
+      liveRanking: [],
+      liveRankingHasError: true,
+      totalRanking: [],
+      totalRankingHasError: true,
+    });
   });
 
   it("reports per-source errors and keeps successful data", async () => {
@@ -178,7 +233,7 @@ describe("GET /api/onlive/poll", () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/onlive/poll"));
 
     expect(response.status).toBe(200);
     expect(await expectJson(response)).toEqual({

@@ -37,6 +37,12 @@ function makeItem(overrides: Partial<OnliveItem> = {}): OnliveItem {
     genreName: "アイドル",
     badgeList: [],
     streamingUrlList: [],
+    bcsvrKey: null,
+    cellType: null,
+    officialLv: null,
+    liveType: null,
+    isFollow: false,
+    tags: [],
     telop: null,
     liverThemeTitle: "",
     everydayLiveLabel: null,
@@ -44,6 +50,7 @@ function makeItem(overrides: Partial<OnliveItem> = {}): OnliveItem {
     isKaraoke: false,
     premiumRoomType: 0,
     frameImageUrl: null,
+    frameLottieUrl: null,
     ...overrides,
   };
 }
@@ -180,6 +187,13 @@ describe("ShowTubeWatchPage", () => {
         screen.getByText("ストリーム URL が取得できませんでした"),
       ).toBeTruthy();
     });
+
+    it("一覧へ戻るリンクが /showtube を指す", () => {
+      render(<ShowTubeWatchPage {...defaultProps} />);
+      const links = screen.getAllByRole("link", { name: /一覧へ戻る/ });
+      expect(links.length).toBeGreaterThan(0);
+      expect(links[0].getAttribute("href")).toBe("/showtube");
+    });
   });
 
   describe("画質セレクター", () => {
@@ -294,6 +308,43 @@ describe("ShowTubeWatchPage", () => {
       );
       const badges = screen.getAllByText("接続中...");
       expect(badges.length).toBeGreaterThan(0);
+    });
+
+    it("コメントの名前とテキストがともに表示される", () => {
+      const initialComments = [
+        makeComment({ name: "テストユーザー", text: "こんにちは" }),
+      ];
+      render(
+        <ShowTubeWatchPage
+          item={makeItem()}
+          roomId={12345}
+          streamingUrls={[]}
+          initialComments={initialComments}
+          bcsvrKey={null}
+        />,
+      );
+      expect(screen.getAllByText("テストユーザー").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("こんにちは").length).toBeGreaterThan(0);
+    });
+
+    it("複数コメントがすべて表示される", () => {
+      const initialComments = [
+        makeComment({ id: "c1", name: "ユーザーA", text: "コメント1" }),
+        makeComment({ id: "c2", name: "ユーザーB", text: "コメント2" }),
+        makeComment({ id: "c3", name: "ユーザーC", text: "コメント3" }),
+      ];
+      render(
+        <ShowTubeWatchPage
+          item={makeItem()}
+          roomId={12345}
+          streamingUrls={[]}
+          initialComments={initialComments}
+          bcsvrKey={null}
+        />,
+      );
+      expect(screen.getAllByText("コメント1").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("コメント2").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("コメント3").length).toBeGreaterThan(0);
     });
   });
 });

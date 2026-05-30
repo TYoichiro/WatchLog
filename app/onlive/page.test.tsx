@@ -23,15 +23,18 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/navigation/app-sidebar", () => ({
   AppShell: ({
     activeKey,
+    headerClassName,
     showMenu,
     children,
   }: {
     activeKey: string;
+    headerClassName?: string;
     showMenu?: boolean;
     children: ReactNode;
   }) => (
     <main
       data-active-key={activeKey}
+      data-header-class-name={headerClassName}
       data-show-menu={String(showMenu)}
       data-testid="app-shell"
     >
@@ -86,6 +89,7 @@ const baseProfile: RoomProfile = {
 
 const baseLiveInfo: RoomLiveInfo = {
   bcsvrKey: "bcsvr-key",
+  isPremiumLive: false,
   liveId: "live-123",
   liveStatus: 2,
 };
@@ -133,10 +137,10 @@ const baseGifts: RoomGiftLog[] = [
     isFree: true,
     point: 1,
     totalPoint: 2,
-    userId: 11,
+    userId: "11",
     userImageUrl: "https://example.com/free-user.png",
     userName: "Free Giver",
-    userVisitStatus: "初見",
+    userVisitStatus: 2,
   },
   {
     id: "gift-2",
@@ -150,10 +154,10 @@ const baseGifts: RoomGiftLog[] = [
     isFree: false,
     point: 100,
     totalPoint: 100,
-    userId: 12,
+    userId: "12",
     userImageUrl: "https://example.com/paid-user.png",
     userName: "Paid Giver",
-    userVisitStatus: "常連",
+    userVisitStatus: null,
   },
 ];
 
@@ -162,14 +166,14 @@ const baseLiveRanking: RoomLiveRankingUser[] = [
     id: "live-rank-1",
     avatarId: 1,
     avatarUrl: "https://example.com/live-rank-avatar.png",
-    badge: "gold",
+    badge: null,
     badgeType: 1,
     orderNo: 1,
     rank: 1,
-    userId: 13,
+    userId: "13",
     userImageUrl: "https://example.com/live-rank-user.png",
     userName: "Live Ranker",
-    userVisitStatus: "常連",
+    userVisitStatus: null,
   },
 ];
 
@@ -181,9 +185,9 @@ const baseTotalRanking: RoomTotalRankingUser[] = [
     order: 1,
     point: 250,
     rank: 1,
-    userId: 14,
+    userId: "14",
     userName: "Total Ranker",
-    userVisitStatus: "常連",
+    userVisitStatus: null,
     visitCount: 3,
   },
 ];
@@ -238,7 +242,7 @@ const mockFetch = (scenario: FetchScenario = {}) => {
       });
     }
 
-    if (url === "/api/onlive/poll") {
+    if (url.startsWith("/api/onlive/poll")) {
       return jsonResponse({
         profile,
         profileHasError: false,
@@ -372,6 +376,7 @@ describe("Onlive page", () => {
 
     const appShell = await screen.findByTestId("app-shell");
     expect(appShell.getAttribute("data-active-key")).toBe("dashboard");
+    expect(appShell.getAttribute("data-header-class-name")).toBe("h-8");
     expect(appShell.getAttribute("data-show-menu")).toBe("false");
 
     expect(await screen.findByText("Hello live")).not.toBeNull();
@@ -399,6 +404,7 @@ describe("Onlive page", () => {
     mockFetch({
       liveInfo: {
         bcsvrKey: null,
+        isPremiumLive: false,
         liveId: null,
         liveStatus: 1,
       },
@@ -461,5 +467,236 @@ describe("Onlive page", () => {
       );
       expect(blockPostCalls.length).toBeGreaterThan(0);
     });
+  });
+
+  it("ブロック済みユーザーのコメントは表示されない", async () => {
+    mockFetch({
+      blocks: [
+        {
+          id: "block-1",
+          blockedUserId: "10",
+          blockedUserName: "Comment User",
+          createdAt: "2026-05-01T00:00:00.000Z",
+          updatedAt: "2026-05-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    render(<Page />);
+
+    await screen.findByTestId("app-shell");
+
+    await waitFor(() => {
+      expect(screen.queryByText("Hello live")).toBeNull();
+    });
+  });
+
+  it("WebSocketでコメントを受信するとコメントパネルに追加される", async () => {
+    mockFetch();
+
+    render(<Page />);
+
+    await screen.findByText("Hello live");
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBeGreaterThan(0);
+    });
+
+    const ws = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    ws.readyState = MockWebSocket.OPEN;
+    ws.emit("open", {});
+
+    ws.emit("message", {
+      data: 'MSG\tbcsvr-key\t{"t":1,"cm":"WebSocketコメント","u":"99","ac":"WS User","created_at":1760001000}',
+    });
+
+    expect(await screen.findByText("WebSocketコメント")).not.toBeNull();
+  });
+
+  it("WebSocketでギフトを受信するとギフトログに追加される", async () => {
+    mockFetch();
+
+    render(<Page />);
+
+    await screen.findByText("Hello live");
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBeGreaterThan(0);
+    });
+
+    const ws = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    ws.readyState = MockWebSocket.OPEN;
+    ws.emit("open", {});
+
+    ws.emit("message", {
+      data: 'MSG\tbcsvr-key\t{"t":2,"g":1,"n":2,"u":"99","ac":"WS Gifter","created_at":1760001001,"av":5}',
+    });
+
+    expect(await screen.findByText("WS Gifter")).not.toBeNull();
+  });
+
+  it("WebSocketで配信終了メッセージを受信すると配信終了ダイアログが表示される", async () => {
+    mockFetch();
+
+    render(<Page />);
+
+    await screen.findByText("Hello live");
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBeGreaterThan(0);
+    });
+
+    const ws = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    ws.readyState = MockWebSocket.OPEN;
+    ws.emit("open", {});
+
+    ws.emit("message", {
+      data: 'MSG\tbcsvr-key\t{"t":101,"created_at":1760001002}',
+    });
+
+    expect(
+      await screen.findByRole("heading", { name: "配信は終了しました" }),
+    ).not.toBeNull();
+  });
+
+  it("プレミアムライブで bcsvrKey がない場合はプレミアムライブダイアログを表示する", async () => {
+    mockFetch({
+      liveInfo: {
+        bcsvrKey: null,
+        isPremiumLive: true,
+        liveId: "20260530",
+        liveStatus: null,
+      },
+    });
+
+    render(<Page />);
+
+    expect(
+      await screen.findByRole("heading", { name: "プレミアムライブ" }),
+    ).not.toBeNull();
+  });
+
+  it("プレミアムライブの場合はポーリングに skip_ranking=1 を使用する", async () => {
+    const fetchMock = mockFetch({
+      liveInfo: {
+        bcsvrKey: "bcsvr-key",
+        isPremiumLive: true,
+        liveId: "live-123",
+        liveStatus: 2,
+      },
+    });
+
+    render(<Page />);
+
+    await screen.findByTestId("app-shell");
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([input]) =>
+          getFetchUrl(input) === "/api/onlive/poll?skip_ranking=1",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("WebSocketでお知らせメッセージ（フォロー通知）を受信するとコメントパネルに追加される", async () => {
+    mockFetch();
+
+    render(<Page />);
+
+    await screen.findByText("Hello live");
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBeGreaterThan(0);
+    });
+
+    const ws = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    ws.readyState = MockWebSocket.OPEN;
+    ws.emit("open", {});
+
+    ws.emit("message", {
+      data: 'MSG\tbcsvr-key\t{"t":18,"m":"WS Followerさんがフォローしました！❤","u":"99","created_at":1760001000}',
+    });
+
+    expect(await screen.findByText("WS Followerさんがフォローしました！❤")).not.toBeNull();
+  });
+
+  it("init API がエラーレスポンスを返した場合は検索画面へ遷移する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ error: "Internal Server Error" }, { status: 500 })),
+    );
+
+    render(<Page />);
+
+    await waitFor(() => {
+      expect(routerReplace).toHaveBeenCalledWith("/search");
+    });
+    expect(screen.queryByTestId("app-shell")).toBeNull();
+  });
+
+  it("WebSocket エラー発生時に再読み込みダイアログが表示される", async () => {
+    mockFetch();
+
+    render(<Page />);
+
+    await screen.findByText("Hello live");
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBeGreaterThan(0);
+    });
+
+    const ws = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    ws.readyState = MockWebSocket.OPEN;
+    ws.emit("open", {});
+    ws.emit("error", {});
+
+    expect(
+      await screen.findByRole("heading", { name: "エラーが発生しました" }),
+    ).not.toBeNull();
+  });
+
+  it("配信終了ダイアログで OK を押すとダッシュボードへ遷移する", async () => {
+    mockFetch();
+
+    render(<Page />);
+
+    await screen.findByText("Hello live");
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBeGreaterThan(0);
+    });
+
+    const ws = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    ws.readyState = MockWebSocket.OPEN;
+    ws.emit("open", {});
+
+    ws.emit("message", {
+      data: 'MSG\tbcsvr-key\t{"t":101,"created_at":1760001002}',
+    });
+
+    expect(
+      await screen.findByRole("heading", { name: "配信は終了しました" }),
+    ).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(routerReplace).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("ポーリングが失敗してもページはクラッシュせず表示される", async () => {
+    const fetchMock = mockFetch();
+    const baseImpl = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input, init) => {
+      if (getFetchUrl(input) === "/api/onlive/poll") {
+        return jsonResponse({ message: "error" }, { status: 500 });
+      }
+      return baseImpl(input, init);
+    });
+
+    render(<Page />);
+
+    expect(await screen.findByTestId("app-shell")).toBeDefined();
+    expect(await screen.findByText("Hello live")).toBeDefined();
   });
 });

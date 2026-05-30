@@ -1,9 +1,38 @@
 import {
   SHOWROOM_API_URL,
+  SHOWROOM_HEADERS,
   fetchShowroomJson,
   toFiniteNumber,
   toUnixSeconds,
 } from "./core";
+
+const PREMIUM_LIVE_FALLBACK_ROOM_ID = 317313;
+
+async function fetchGiftGroupsJson(roomId: number | string): Promise<ShowroomGiftGroupsResponse> {
+  const url = new URL(SHOWROOM_API_URL.giftGroups);
+  url.searchParams.set("room_id", String(roomId));
+
+  const response = await fetch(url, {
+    method: "GET",
+    cache: "no-store",
+    headers: SHOWROOM_HEADERS,
+  });
+
+  const data = await response.json() as Record<string, unknown>;
+
+  const isPremiumLiveError =
+    !response.ok ||
+    (Array.isArray(data.errors) &&
+      (data.errors as Array<{ code?: number }>).some((e) => e.code === 1002));
+
+  if (isPremiumLiveError) {
+    const fallbackUrl = new URL(SHOWROOM_API_URL.giftGroups);
+    fallbackUrl.searchParams.set("room_id", String(PREMIUM_LIVE_FALLBACK_ROOM_ID));
+    return fetchShowroomJson<ShowroomGiftGroupsResponse>(fallbackUrl);
+  }
+
+  return data as ShowroomGiftGroupsResponse;
+}
 
 type ShowroomGiftLogItem = {
   avatar_id?: number | null;
@@ -220,10 +249,7 @@ export type RoomGiftDefinition = {
 export async function getRoomGiftDefinitions(
   roomId: number | string
 ): Promise<RoomGiftDefinition[]> {
-  const url = new URL(SHOWROOM_API_URL.giftGroups);
-  url.searchParams.set("room_id", String(roomId));
-
-  const rawData = await fetchShowroomJson<ShowroomGiftGroupsResponse>(url);
+  const rawData = await fetchGiftGroupsJson(roomId);
   const giftDefinitions = new Map<number, RoomGiftDefinition>();
 
   FREE_GIFT_DEFINITIONS.forEach((item) => {
@@ -249,12 +275,9 @@ export async function getRoomGiftLog(
   const giftLogUrl = new URL(SHOWROOM_API_URL.giftLog);
   giftLogUrl.searchParams.set("room_id", String(roomId));
 
-  const giftGroupsUrl = new URL(SHOWROOM_API_URL.giftGroups);
-  giftGroupsUrl.searchParams.set("room_id", String(roomId));
-
   const [giftLogData, giftGroupsData] = await Promise.all([
     fetchShowroomJson<ShowroomGiftLogResponse>(giftLogUrl),
-    fetchShowroomJson<ShowroomGiftGroupsResponse>(giftGroupsUrl),
+    fetchGiftGroupsJson(roomId),
   ]);
 
   const giftMap = new Map<number, RoomGiftDefinition>();

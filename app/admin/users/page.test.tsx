@@ -222,6 +222,17 @@ describe("AdminUsersPage", () => {
     expect(screen.getByText("未登録")).toBeDefined();
   });
 
+  it("createdAt を JST 変換して渡す", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    userFindManyMock.mockResolvedValue([dbUser]);
+    toJstWallTimeIsoStringMock.mockReturnValue("2026-05-01T09:00:00.000+09:00");
+
+    await renderPage();
+
+    expect(toJstWallTimeIsoStringMock).toHaveBeenCalledWith(dbUser.createdAt);
+  });
+
   it("ルーム登録済みユーザーはルーム名を表示する", async () => {
     authMock.mockResolvedValue(session);
     hasTopAdminRoleMock.mockResolvedValue(true);

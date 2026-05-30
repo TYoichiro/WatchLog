@@ -382,18 +382,25 @@ function AppSidebar({
 }
 
 function AppHeader({
+  className,
   onToggleMenu,
   showMenu,
   isBrandLinkEnabled,
   title = "WatchLog",
 }: {
+  className?: string;
   onToggleMenu: () => void;
   showMenu: boolean;
   isBrandLinkEnabled: boolean;
   title?: string;
 }) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b bg-white/95 px-4 backdrop-blur">
+    <header
+      className={cn(
+        "sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b bg-white/95 px-4 backdrop-blur",
+        className
+      )}
+    >
       <div className="flex items-center gap-3">
         {showMenu ? (
           <Button
@@ -428,6 +435,7 @@ function AppHeader({
 export function AppShell({
   activeKey,
   children,
+  headerClassName,
   homeLabel,
   isAdmin = false,
   isPremium = false,
@@ -437,6 +445,7 @@ export function AppShell({
 }: {
   activeKey?: NavigationKey;
   children?: ReactNode;
+  headerClassName?: string;
   homeLabel?: string;
   isAdmin?: boolean;
   isPremium?: boolean;
@@ -478,6 +487,7 @@ export function AppShell({
 
         <div className="flex min-w-0 flex-1 flex-col xl:h-screen xl:overflow-hidden">
           <AppHeader
+            className={headerClassName}
             showMenu={showMenu}
             onToggleMenu={handleToggleMenu}
             isBrandLinkEnabled={isBrandLinkEnabled}

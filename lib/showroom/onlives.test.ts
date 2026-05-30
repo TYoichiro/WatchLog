@@ -19,11 +19,12 @@ const rawResponse = {
       genre_id: 102,
       genre_name: "アイドル",
       has_upcoming: false,
+      banners: [{ url: "https://example.com/banner", image: "https://example.com/banner.png" }],
       lives: [
         {
-          room_id: 150710,
-          room_url_key: "JOY_OZAWA_AIMI",
-          main_name: "小澤 愛実（≒JOY）",
+          room_id: 12345,
+          room_url_key: "ROOMNAME",
+          main_name: "ルーム名",
           image: "https://example.com/cover.png",
           image_square: "https://example.com/cover_square.png",
           view_num: 9401,
@@ -44,6 +45,11 @@ const rawResponse = {
             },
           ],
           bcsvr_key: "abc:22925457",
+          cell_type: 100,
+          official_lv: 1,
+          live_type: 0,
+          is_follow: true,
+          tags: ["tag1"],
           telop: "テロップ",
           liver_theme_title: "テーマ",
           everyday_live_label: "まいにち 100 days",
@@ -51,6 +57,7 @@ const rawResponse = {
           is_karaoke: false,
           premium_room_type: 0,
           frame_image_url: "https://example.com/frame.png",
+          frame_lottie_url: "https://example.com/lottie.json",
         },
       ],
     },
@@ -88,22 +95,30 @@ describe("getOnlives", () => {
     expect(idol.genreId).toBe(102);
     expect(idol.genreName).toBe("アイドル");
     expect(idol.hasUpcoming).toBe(false);
+    expect(idol.banners).toEqual([{ url: "https://example.com/banner", image: "https://example.com/banner.png" }]);
     expect(idol.lives).toHaveLength(1);
 
     const live = idol.lives[0];
-    expect(live.roomId).toBe(150710);
-    expect(live.roomUrlKey).toBe("JOY_OZAWA_AIMI");
-    expect(live.mainName).toBe("小澤 愛実（≒JOY）");
+    expect(live.roomId).toBe(12345);
+    expect(live.roomUrlKey).toBe("ROOMNAME");
+    expect(live.mainName).toBe("ルーム名");
     expect(live.imageSquare).toBe("https://example.com/cover_square.png");
     expect(live.viewNum).toBe(9401);
     expect(live.followerNum).toBe(36988);
     expect(live.startedAt).toBe(1779198243);
     expect(live.liveId).toBe(22925457);
+    expect(live.bcsvrKey).toBe("abc:22925457");
+    expect(live.cellType).toBe(100);
+    expect(live.officialLv).toBe(1);
+    expect(live.liveType).toBe(0);
+    expect(live.isFollow).toBe(true);
+    expect(live.tags).toEqual(["tag1"]);
     expect(live.telop).toBe("テロップ");
     expect(live.liverThemeTitle).toBe("テーマ");
     expect(live.everydayLiveLabel).toBe("まいにち 100 days");
     expect(live.isKaraoke).toBe(false);
     expect(live.frameImageUrl).toBe("https://example.com/frame.png");
+    expect(live.frameLottieUrl).toBe("https://example.com/lottie.json");
 
     expect(live.badgeList).toEqual([
       { imageUrl: "https://example.com/badge.png", type: "show_grade", id: 1 },
@@ -151,13 +166,22 @@ describe("getOnlives", () => {
     });
 
     const result = await getOnlives();
-    const live = result.onlives[0].lives[0];
+    const genre = result.onlives[0];
+    const live = genre.lives[0];
 
+    expect(genre.banners).toEqual([]);
     expect(live.imageSquare).toBeNull();
+    expect(live.bcsvrKey).toBe("key:1");
+    expect(live.cellType).toBeNull();
+    expect(live.officialLv).toBeNull();
+    expect(live.liveType).toBeNull();
+    expect(live.isFollow).toBe(false);
+    expect(live.tags).toEqual([]);
     expect(live.telop).toBeNull();
     expect(live.everydayLiveLabel).toBeNull();
     expect(live.isKaraoke).toBe(false);
     expect(live.frameImageUrl).toBeNull();
+    expect(live.frameLottieUrl).toBeNull();
   });
 
   it("API が失敗した場合はエラーをそのまま伝播する", async () => {

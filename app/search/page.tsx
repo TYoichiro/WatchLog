@@ -19,11 +19,6 @@ import type {
   SearchResponse,
 } from "@/types/pages/search";
 
-const INVITE_CODE_FAILURE_STORAGE_KEY =
-  "watchlog:invite-code-failure-count";
-const INVITE_CODE_LOCK_FAILURE_COUNT = 4;
-const INVITE_CODE_LOCKED_MESSAGE =
-  "登録はできません。招待コードの入力に4回失敗しました。";
 
 function hasRoomResults(items: readonly RoomResult[]): boolean {
   return items.length > 0;
@@ -45,36 +40,12 @@ function isInviteCodeFormatValid(value: string): boolean {
   return /^[A-Z0-9]{10}$/.test(value);
 }
 
-function readInviteCodeFailureCount(): number {
-  try {
-    const value = window.localStorage.getItem(INVITE_CODE_FAILURE_STORAGE_KEY);
-    const count = value ? Number(value) : 0;
-    return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
-  } catch {
-    return 0;
-  }
-}
+type VerifyResult =
+  | { valid: true }
+  | { valid: false; banned: true }
+  | { valid: false; banned?: false; remainingAttempts: number };
 
-function writeInviteCodeFailureCount(count: number) {
-  try {
-    window.localStorage.setItem(
-      INVITE_CODE_FAILURE_STORAGE_KEY,
-      String(count)
-    );
-  } catch {
-    // Ignore storage failures; the server still validates invite codes.
-  }
-}
-
-function clearInviteCodeFailureCount() {
-  try {
-    window.localStorage.removeItem(INVITE_CODE_FAILURE_STORAGE_KEY);
-  } catch {
-    // Ignore storage failures; the server still validates invite codes.
-  }
-}
-
-async function verifyInvitationCode(inviteCode: string): Promise<boolean> {
+async function verifyInvitationCode(inviteCode: string): Promise<VerifyResult> {
   const response = await fetch("/api/invitations/verify", {
     body: JSON.stringify({ inviteCode }),
     cache: "no-store",
@@ -89,7 +60,14 @@ async function verifyInvitationCode(inviteCode: string): Promise<boolean> {
   }
 
   const data = (await response.json()) as InvitationVerificationResponse;
-  return data.valid === true;
+
+  if (data.valid === true) {
+    return { valid: true };
+  }
+  if (data.banned === true) {
+    return { valid: false, banned: true };
+  }
+  return { valid: false, remainingAttempts: data.remainingAttempts ?? 0 };
 }
 
 function SearchArea({
@@ -143,12 +121,10 @@ function SearchArea({
 
 function InvitationCodeModal({
   errorMessage,
-  isLocked,
   isSubmitting,
   onSubmit,
 }: {
   errorMessage: string | null;
-  isLocked: boolean;
   isSubmitting: boolean;
   onSubmit: (inviteCode: string) => void;
 }) {
@@ -189,17 +165,13 @@ function InvitationCodeModal({
             }
             placeholder="ABCD123456"
             className="h-12 rounded-xl border-slate-200 font-mono text-base"
-            disabled={isLocked || isSubmitting}
+            disabled={isSubmitting}
             maxLength={10}
             autoFocus
           />
 
           <div className="min-h-10">
-            {isLocked ? (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
-                {INVITE_CODE_LOCKED_MESSAGE}
-              </p>
-            ) : errorMessage ? (
+            {errorMessage ? (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
                 {errorMessage}
               </p>
@@ -213,7 +185,7 @@ function InvitationCodeModal({
           <Button
             type="submit"
             className="h-12 w-full rounded-xl"
-            disabled={isLocked || isSubmitting}
+            disabled={isSubmitting}
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -468,7 +440,6 @@ function RoomSearchBody() {
   const [inviteCodeErrorMessage, setInviteCodeErrorMessage] = useState<
     string | null
   >(null);
-  const [inviteCodeFailureCount, setInviteCodeFailureCount] = useState(0);
   const [isInviteCodeSubmitting, setIsInviteCodeSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [query, setQuery] = useState("");
@@ -481,67 +452,36 @@ function RoomSearchBody() {
   const [verifiedInviteCode, setVerifiedInviteCode] = useState<string | null>(
     null
   );
-  const isInviteCodeLocked =
-    inviteCodeFailureCount >= INVITE_CODE_LOCK_FAILURE_COUNT;
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const failureCount = readInviteCodeFailureCount();
-      setInviteCodeFailureCount(failureCount);
-
-      if (failureCount >= INVITE_CODE_LOCK_FAILURE_COUNT) {
-        setInviteCodeErrorMessage(INVITE_CODE_LOCKED_MESSAGE);
-      }
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, []);
-
-  const addInviteCodeFailure = () => {
-    const nextFailureCount = readInviteCodeFailureCount() + 1;
-    writeInviteCodeFailureCount(nextFailureCount);
-    setInviteCodeFailureCount(nextFailureCount);
-
-    if (nextFailureCount >= INVITE_CODE_LOCK_FAILURE_COUNT) {
-      setInviteCodeErrorMessage(INVITE_CODE_LOCKED_MESSAGE);
-      return;
-    }
-
-    setInviteCodeErrorMessage(
-      `招待コードが正しくありません。残り${INVITE_CODE_LOCK_FAILURE_COUNT - nextFailureCount
-      }回入力できます。`
-    );
-  };
-
   const handleInviteCodeSubmit = async (rawInviteCode: string) => {
-    if (isInviteCodeLocked) {
-      setInviteCodeErrorMessage(INVITE_CODE_LOCKED_MESSAGE);
-      return;
-    }
-
     const inviteCode = normalizeInviteCodeInput(rawInviteCode);
 
     if (!isInviteCodeFormatValid(inviteCode)) {
-      addInviteCodeFailure();
+      setInviteCodeErrorMessage("招待コードの形式が正しくありません。");
       return;
     }
 
     setIsInviteCodeSubmitting(true);
 
     try {
-      const isValid = await verifyInvitationCode(inviteCode);
+      const result = await verifyInvitationCode(inviteCode);
 
-      if (!isValid) {
-        addInviteCodeFailure();
+      if (result.valid) {
+        setInviteCodeErrorMessage(null);
+        setVerifiedInviteCode(inviteCode);
         return;
       }
 
-      clearInviteCodeFailureCount();
-      setInviteCodeFailureCount(0);
-      setInviteCodeErrorMessage(null);
-      setVerifiedInviteCode(inviteCode);
+      if (result.banned) {
+        setInviteCodeErrorMessage(
+          "招待コードの入力に3回失敗したため、アカウントがBANされました。"
+        );
+        router.push("/banned");
+        return;
+      }
+
+      setInviteCodeErrorMessage(
+        `招待コードが正しくありません。残り${result.remainingAttempts}回入力できます。`
+      );
     } catch {
       setInviteCodeErrorMessage(
         "招待コードを確認できませんでした。時間をおいて再試行してください。"
@@ -675,7 +615,6 @@ function RoomSearchBody() {
       {!verifiedInviteCode ? (
         <InvitationCodeModal
           errorMessage={inviteCodeErrorMessage}
-          isLocked={isInviteCodeLocked}
           isSubmitting={isInviteCodeSubmitting}
           onSubmit={handleInviteCodeSubmit}
         />

@@ -252,6 +252,26 @@ describe("PATCH /api/admin/users/[userId]/role", () => {
       expect(mocks.transaction).not.toHaveBeenCalled();
     });
 
+    it("premiumuser ロールが DB に存在しない場合（昇格）は 500 を返す", async () => {
+      mocks.roleFindUnique.mockResolvedValue(null);
+
+      const response = await PATCH(makeRequest({ role: "premiumuser" }), makeContext());
+
+      expect(response.status).toBe(500);
+      expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
+      expect(mocks.loggerError).toHaveBeenCalledWith("Role update failed", expect.anything());
+    });
+
+    it("premiumuser ロールが DB に存在しない場合（降格）は 500 を返す", async () => {
+      mocks.roleFindUnique.mockResolvedValue(null);
+
+      const response = await PATCH(makeRequest({ role: "general" }), makeContext());
+
+      expect(response.status).toBe(500);
+      expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
+      expect(mocks.loggerError).toHaveBeenCalledWith("Role update failed", expect.anything());
+    });
+
     it("トランザクション失敗時は 500 を返す", async () => {
       const error = new Error("database failed");
       mocks.transaction.mockRejectedValue(error);

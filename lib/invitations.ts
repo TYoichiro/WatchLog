@@ -80,7 +80,7 @@ export async function consumeInvitationCode(
   value: unknown,
   userId: string,
   client: InvitationCodeClient
-): Promise<{ code: string; id: string }> {
+): Promise<{ code: string; id: string; inviterUserId: string | null }> {
   const code = normalizeInvitationCode(value);
 
   if (!code || !isInvitationCodeFormatValid(code)) {
@@ -96,6 +96,7 @@ export async function consumeInvitationCode(
       isDeleted: true,
       usedAt: true,
       usedByUserId: true,
+      inviterUserId: true,
     },
   });
 
@@ -129,6 +130,7 @@ export async function consumeInvitationCode(
   return {
     code,
     id: invitationCode.id,
+    inviterUserId: invitationCode.inviterUserId,
   };
 }
 

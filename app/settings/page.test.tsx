@@ -313,4 +313,83 @@ describe("SettingsPage", () => {
       screen.getByRole("heading", { level: 2, name: generalInvitationHeading }),
     ).toBeDefined();
   });
+
+  it("shows admin invitation heading when there are no codes at all", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "招待コード（現在0名招待できるコードがあります　未利用：0件　使用済み：0件）",
+      }),
+    ).toBeDefined();
+  });
+
+  it("shows admin invitation heading when all codes are used", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([
+      { code: "AAAA111111", isActive: false },
+      { code: "BBBB222222", isActive: false },
+    ]);
+
+    await renderSettingsPage();
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "招待コード（現在0名招待できるコードがあります　未利用：0件　使用済み：2件）",
+      }),
+    ).toBeDefined();
+  });
+
+  it("shows admin invitation heading when all codes are active", async () => {
+    authMock.mockResolvedValue(session);
+    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([
+      { code: "AAAA111111", isActive: true },
+      { code: "BBBB222222", isActive: true },
+      { code: "CCCC333333", isActive: true },
+    ]);
+
+    await renderSettingsPage();
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "招待コード（現在3名招待できるコードがあります　未利用：3件　使用済み：0件）",
+      }),
+    ).toBeDefined();
+  });
+
+  it("shows general invitation heading for premium users", async () => {
+    authMock.mockResolvedValue(session);
+    hasPremiumRoleMock.mockResolvedValue(true);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: generalInvitationHeading }),
+    ).toBeDefined();
+  });
+
+  it("calls data fetchers with the correct userId", async () => {
+    authMock.mockResolvedValue(session);
+    getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
+    listUserInvitationCodesMock.mockResolvedValue([]);
+
+    await renderSettingsPage();
+
+    expect(getUserRegisteredRoomMock).toHaveBeenCalledWith("user-1");
+    expect(listUserInvitationCodesMock).toHaveBeenCalledWith("user-1");
+  });
 });

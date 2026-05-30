@@ -60,7 +60,10 @@
 2. `getUserRegisteredRoom`, `listUserInvitationCodes`, `hasTopAdminRole`, `hasPremiumRole` を `Promise.all` で並列取得
 3. 登録ルームがなければ `/search` へリダイレクト
 4. `getRoleLabel(isAdmin, isPremium)` で表示ロールラベルを決定
-5. `<AppShell activeKey="settings">` 内に権限カード・招待コードカードをレンダリング
+5. 招待コードカードの見出し（`invitationHeading`）を生成:
+   - 管理者の場合: `招待コード（現在{activeCount}名招待できるコードがあります　未利用：{activeCount}件　使用済み：{usedCount}件）`
+   - 一般ユーザーの場合: `招待コード（最大3名まで招待することができます）`
+6. `<AppShell activeKey="settings">` 内に権限カード・招待コードカードをレンダリング
 
 **ロールラベル決定ロジック（`getRoleLabel`）**:
 
@@ -112,19 +115,40 @@
 
 ## 招待コードカード
 
+- **ファイル**: [components/settings/invitation-code-card.tsx](../components/settings/invitation-code-card.tsx)
+- **種別**: Server Component
+
 ### カード構成
 
 | 要素 | 説明 |
 |------|------|
-| アイコン + 見出し | KeyRound アイコン + 「招待コード（最大3名まで招待することができます）」の h2 見出し |
+| アイコン + 見出し | KeyRound アイコン + `heading` prop の h2 見出し |
+| 招待コード生成ボタン | 管理者（`isAdmin = true`）の場合のみ、見出し右端に `GenerateInvitationCodeButton` を表示 |
 | コード一覧 | `divide-y` で区切り線付きリスト |
+
+### GenerateInvitationCodeButton
+
+- **ファイル**: [components/settings/generate-invitation-code-button.tsx](../components/settings/generate-invitation-code-button.tsx)
+- **種別**: Client Component (`"use client"`)
+- **表示条件**: 管理者のみ
+
+| 要素 | 説明 |
+|------|------|
+| ボタン | Plus アイコン + 「招待コード生成」ラベル（outline, sm） |
+| 生成中 | `isPending = true` でボタンを `disabled` |
+| エラー時 | 赤文字でエラーメッセージを表示 |
+
+**クリック時の処理**:
+1. `POST /api/invitations` を呼び出す
+2. 成功時: `router.refresh()` でページを再取得
+3. 失敗時: エラーメッセージを表示
 
 ### 各コード行
 
 | 要素 | 説明 |
 |------|------|
 | コード文字列 | `font-mono` で表示（例: `ABCD123456`） |
-| ステータスバッジ | Active / 使用済みを色分け表示 |
+| ステータスバッジ | 有効 / 無効を色分け表示 |
 
 ### ステータスバッジ
 
@@ -192,9 +216,35 @@ SELECT code, isDeleted, usedAt
 
 ---
 
+## API エンドポイント
+
+### POST /api/invitations
+
+- **ファイル**: [app/api/invitations/route.ts](../app/api/invitations/route.ts)
+- **認証**: 必要
+- **利用者**: 管理者のみ（`GenerateInvitationCodeButton` から呼び出し）
+
+招待コードを手動生成します。管理者が追加の招待コードを発行する際に使用します。
+
+**レスポンス（201）**:
+
+```json
+{
+  "code": "XXXXXXXXXX"
+}
+```
+
+**エラーレスポンス**:
+
+| ステータス | 条件 |
+|---------|------|
+| 401 | 未認証 |
+
+---
+
 ## 招待コードの仕組み
 
-招待コードはルーム登録時に自動生成されます（`PUT /api/registered-room` のトランザクション内）。
+招待コードはルーム登録時に自動生成されます（`PUT /api/registered-room` のトランザクション内）。管理者は `POST /api/invitations` を使って追加コードを手動生成することもできます。
 
 | 定数 | 値 | 説明 |
 |------|----|------|
@@ -221,5 +271,9 @@ SELECT code, isDeleted, usedAt
 | [lib/authz.ts](../lib/authz.ts) | 管理者・プレミアム権限判定（`hasTopAdminRole`, `hasPremiumRole`） |
 | [lib/user-registered-room.ts](../lib/user-registered-room.ts) | 登録ルームデータ取得 |
 | [lib/invitations.ts](../lib/invitations.ts) | 招待コード管理ロジック |
+| [components/settings/invitation-code-card.tsx](../components/settings/invitation-code-card.tsx) | 招待コードカード |
+| [components/settings/generate-invitation-code-button.tsx](../components/settings/generate-invitation-code-button.tsx) | 招待コード生成ボタン（管理者専用） |
+| [components/settings/role-card.tsx](../components/settings/role-card.tsx) | 権限カード |
+| [app/api/invitations/route.ts](../app/api/invitations/route.ts) | 招待コード生成 API |
 | [components/ui/card.tsx](../components/ui/card.tsx) | Card UI コンポーネント |
 | [components/ui/badge.tsx](../components/ui/badge.tsx) | Badge UI コンポーネント |

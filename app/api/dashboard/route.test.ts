@@ -213,4 +213,72 @@ describe("GET /api/dashboard", () => {
       roomStatus: null,
     });
   });
+
+  it("marks premium users in the dashboard payload and calls hasPremiumRole", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.hasPremiumRole.mockResolvedValue(true);
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.getRoomProfile.mockResolvedValue(profile);
+    mocks.getRoomActiveFan.mockResolvedValue(null);
+    mocks.getRoomEventAndSupport.mockResolvedValue(null);
+    mocks.getDashboardNotices.mockResolvedValue([]);
+    mocks.getRoomStatus.mockResolvedValue(roomStatus);
+
+    const response = await GET();
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({ status: "ok", isPremium: true });
+    expect(mocks.hasPremiumRole).toHaveBeenCalledWith("user-1");
+  });
+
+  it("returns is_live when profile.isOnlive is true regardless of roomStatus.isLive", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.getRoomProfile.mockResolvedValue({ ...profile, isOnlive: true });
+    mocks.getRoomActiveFan.mockResolvedValue(null);
+    mocks.getRoomEventAndSupport.mockResolvedValue(null);
+    mocks.getDashboardNotices.mockResolvedValue([]);
+    mocks.getRoomStatus.mockResolvedValue({ ...roomStatus, isLive: false });
+
+    const response = await GET();
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({ status: "is_live" });
+  });
+
+  it("isAdmin と isPremium が両方 true の場合、両フラグが true で返る", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "admin-premium-1" } });
+    mocks.hasTopAdminRole.mockResolvedValue(true);
+    mocks.hasPremiumRole.mockResolvedValue(true);
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.getRoomProfile.mockResolvedValue(profile);
+    mocks.getRoomActiveFan.mockResolvedValue(null);
+    mocks.getRoomEventAndSupport.mockResolvedValue(null);
+    mocks.getDashboardNotices.mockResolvedValue([]);
+    mocks.getRoomStatus.mockResolvedValue(roomStatus);
+
+    const response = await GET();
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({ isAdmin: true, isPremium: true });
+  });
+
+  it("profile が失敗しても roomStatus.isLive が true ならば is_live を返す", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.getRoomProfile.mockRejectedValue(new Error("profile failed"));
+    mocks.getRoomActiveFan.mockResolvedValue(null);
+    mocks.getRoomEventAndSupport.mockResolvedValue(null);
+    mocks.getDashboardNotices.mockResolvedValue([]);
+    mocks.getRoomStatus.mockResolvedValue({ ...roomStatus, isLive: true });
+
+    const response = await GET();
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({ status: "is_live", profile: null });
+  });
 });
