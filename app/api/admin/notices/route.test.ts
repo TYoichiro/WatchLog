@@ -53,7 +53,7 @@ function makePostRequest(body: unknown) {
 
 describe("GET /api/admin/notices", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.mocked(requireTopAdminRole).mockResolvedValue(mockActor as never);
   });
 
@@ -88,11 +88,20 @@ describe("GET /api/admin/notices", () => {
     const response = await GET();
     expect(response.status).toBe(401);
   });
+
+  it("returns 500 when database throws", async () => {
+    vi.mocked(prisma.dashboardNotice.findMany).mockRejectedValue(
+      new Error("DB error"),
+    );
+
+    const response = await GET();
+    expect(response.status).toBe(500);
+  });
 });
 
 describe("POST /api/admin/notices", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.mocked(requireTopAdminRole).mockResolvedValue(mockActor as never);
   });
 
@@ -122,6 +131,19 @@ describe("POST /api/admin/notices", () => {
     expect(res.status).toBe(400);
     const data = (await res.json()) as { error: string };
     expect(data.error).toContain("title");
+  });
+
+  it("returns 400 when content is empty string", async () => {
+    const res = await POST(
+      makePostRequest({
+        title: "タイトル",
+        content: "  ",
+        publishedAt: "2024-01-01T10:00",
+      }),
+    );
+    expect(res.status).toBe(400);
+    const data = (await res.json()) as { error: string };
+    expect(data.error).toContain("content");
   });
 
   it("returns 400 when content is missing", async () => {
@@ -166,6 +188,15 @@ describe("POST /api/admin/notices", () => {
         ...validBody,
         expiresAt: "2023-12-31T10:00",
       }),
+    );
+    expect(res.status).toBe(400);
+    const data = (await res.json()) as { error: string };
+    expect(data.error).toContain("expiresAt");
+  });
+
+  it("returns 400 when expiresAt is an invalid date string", async () => {
+    const res = await POST(
+      makePostRequest({ ...validBody, expiresAt: "not-a-date" }),
     );
     expect(res.status).toBe(400);
     const data = (await res.json()) as { error: string };
@@ -250,6 +281,30 @@ describe("POST /api/admin/notices", () => {
     expect(res.status).toBe(201);
   });
 
+  it("creates notice with valid expiresAt after publishedAt", async () => {
+    vi.mocked(prisma.$transaction).mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>) => {
+        return fn({
+          dashboardNotice: {
+            create: vi.fn().mockResolvedValue({
+              ...mockNotice,
+              expiresAt: new Date("2024-01-02T01:00:00.000Z"),
+            }),
+          },
+        });
+      },
+    );
+
+    const res = await POST(
+      makePostRequest({
+        ...validBody,
+        publishedAt: "2024-01-01T10:00",
+        expiresAt: "2024-01-02T10:00",
+      }),
+    );
+    expect(res.status).toBe(201);
+  });
+
   it("returns 401 when not authenticated", async () => {
     vi.mocked(requireTopAdminRole).mockRejectedValue(new Error("Unauthorized"));
     vi.mocked(authzErrorResponse).mockReturnValue(
@@ -258,5 +313,76 @@ describe("POST /api/admin/notices", () => {
 
     const res = await POST(makePostRequest(validBody));
     expect(res.status).toBe(401);
+  });
+
+  it("returns 500 when database transaction throws", async () => {
+    vi.mocked(prisma.$transaction).mockRejectedValue(new Error("DB error"));
+
+    const res = await POST(makePostRequest(validBody));
+    expect(res.status).toBe(500);
+  });
+
+  it("linkUrl が空文字列の場合は null として create に渡す", async () => {
+    const createMock = vi.fn().mockResolvedValue(mockNotice);
+    vi.mocked(prisma.$transaction).mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ dashboardNotice: { create: createMock } }),
+    );
+
+    const res = await POST(makePostRequest({ ...validBody, linkUrl: "" }));
+    expect(res.status).toBe(201);
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ linkUrl: null }),
+      }),
+    );
+  });
+
+  it("linkUrl が有効な URL の場合は trim して create に渡す", async () => {
+    const createMock = vi.fn().mockResolvedValue({ ...mockNotice, linkUrl: "https://example.com" });
+    vi.mocked(prisma.$transaction).mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ dashboardNotice: { create: createMock } }),
+    );
+
+    const res = await POST(makePostRequest({ ...validBody, linkUrl: "  https://example.com  " }));
+    expect(res.status).toBe(201);
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ linkUrl: "https://example.com" }),
+      }),
+    );
+  });
+
+  it("expiresAt が null の場合は expiresAt: null で作成できる", async () => {
+    const createMock = vi.fn().mockResolvedValue(mockNotice);
+    vi.mocked(prisma.$transaction).mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ dashboardNotice: { create: createMock } }),
+    );
+
+    const res = await POST(makePostRequest({ ...validBody, expiresAt: null }));
+    expect(res.status).toBe(201);
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ expiresAt: null }),
+      }),
+    );
+  });
+
+  it("expiresAt が空文字列の場合は expiresAt: null で作成できる", async () => {
+    const createMock = vi.fn().mockResolvedValue(mockNotice);
+    vi.mocked(prisma.$transaction).mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ dashboardNotice: { create: createMock } }),
+    );
+
+    const res = await POST(makePostRequest({ ...validBody, expiresAt: "" }));
+    expect(res.status).toBe(201);
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ expiresAt: null }),
+      }),
+    );
   });
 });

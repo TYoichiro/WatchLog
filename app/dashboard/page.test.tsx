@@ -38,6 +38,7 @@ type DashboardFetchScenario = {
   activeFan?: ActiveFanSummary | null;
   eventAndSupport?: EventAndSupportSummary | null;
   isAdmin?: boolean;
+  isPremium?: boolean;
   noticesOk?: boolean;
   profile?: RoomProfile;
   profileOk?: boolean;
@@ -130,6 +131,7 @@ function setupFetchScenario({
   activeFan: activeFanData = activeFan,
   eventAndSupport: eventAndSupportData = eventAndSupport,
   isAdmin = false,
+  isPremium = false,
   noticesOk = true,
   profile: profileData = profile,
   profileOk = true,
@@ -151,6 +153,7 @@ function setupFetchScenario({
       return jsonResponse({
         status: isLive ? "is_live" : "ok",
         isAdmin,
+        isPremium,
         registeredRoom: {
           roomId: registeredRoomData.roomId,
           roomUrl: registeredRoomData.roomUrl,
@@ -423,5 +426,66 @@ describe("DashboardPage", () => {
     await waitFor(() => {
       expect(routerReplace).toHaveBeenCalledWith("/onlive");
     });
+  });
+
+  it("shows skeleton loading state while fetching", () => {
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+
+    render(<DashboardPage />);
+
+    expect(screen.getByText("読み込み中")).toBeDefined();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+  });
+
+  it("shows notice error UI when the notices fetch fails", async () => {
+    setupFetchScenario({ noticesOk: false });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+    expect(screen.getByText("取得失敗")).toBeDefined();
+    expect(screen.getByText("お知らせを取得できませんでした")).toBeDefined();
+  });
+
+  it("shows フリー枠ルーム badge for non-official rooms", async () => {
+    setupFetchScenario({ profile: { ...profile, isOfficial: false } });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+    expect(screen.getByText("フリー枠ルーム")).toBeDefined();
+    expect(screen.queryByText("公式枠ルーム")).toBeNull();
+  });
+
+  it("shows empty notices message when no public notices are available", async () => {
+    fetchMock.mockImplementationOnce(async () =>
+      jsonResponse({
+        activeFan,
+        eventAndSupport,
+        isAdmin: false,
+        isPremium: false,
+        notices: [],
+        noticesHasError: false,
+        profile,
+        registeredRoom: { roomId: registeredRoom.roomId, roomUrl: registeredRoom.roomUrl },
+        roomStatus,
+        status: "ok",
+      })
+    );
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+    expect(screen.getByText("公開中のお知らせはありません。")).toBeDefined();
+  });
+
+  it("does not start a WebSocket watcher for non-admin users without a broadcast key", async () => {
+    setupFetchScenario(); // default roomStatus has broadcastKey: null
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+
+    expect(MockWebSocket.instances).toHaveLength(0);
   });
 });

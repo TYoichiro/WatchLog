@@ -100,6 +100,23 @@ describe("RoomListPage", () => {
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
   });
+
+  it("無効な createdAt 文字列のとき '--' を表示する", () => {
+    render(<RoomListPage rooms={[makeRoom({ createdAt: "invalid" })]} />);
+    expect(screen.getByText("--")).toBeDefined();
+  });
+
+  it("imageUrl が null 以外のとき img 要素を描画する", () => {
+    render(<RoomListPage rooms={[makeRoom({ imageUrl: "https://example.com/img.jpg" })]} />);
+    const img = screen.getByRole("img");
+    expect(img.getAttribute("src")).toBe("https://example.com/img.jpg");
+    expect(img.getAttribute("alt")).toBe("Alpha Room");
+  });
+
+  it("imageUrl が null のとき img 要素を描画しない", () => {
+    render(<RoomListPage rooms={[makeRoom({ imageUrl: null })]} />);
+    expect(screen.queryByRole("img")).toBeNull();
+  });
 });
 
 describe("RoleSelect", () => {
@@ -216,6 +233,19 @@ describe("RoleSelect", () => {
 
     await waitFor(() => {
       expect(select.disabled).toBe(false);
+    });
+  });
+
+  it("fetch が例外をスローしたときエラーメッセージを表示する", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
+
+    render(<RoomListPage rooms={[makeRoom({ user: { id: "u1", name: "User", isPremium: false, isAdmin: false } })]} />);
+    const select = screen.getByRole("combobox", { name: "ロール変更" });
+
+    fireEvent.change(select, { target: { value: "premiumuser" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("変更に失敗しました")).toBeDefined();
     });
   });
 

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -279,7 +279,7 @@ describe("LogsPage", () => {
 
     const viewLink = screen.getByRole("link", { name: /閲覧/ });
     expect(viewLink.getAttribute("href")).toBe("/logs/log-1");
-    expect(listAllOnliveLogsMock).toHaveBeenCalledTimes(1);
+    expect(listAllOnliveLogsMock).toHaveBeenCalledWith("user-1");
     expect(getUserRegisteredRoomMock).not.toHaveBeenCalled();
     expect(listUserOnliveLogsMock).not.toHaveBeenCalled();
   });
@@ -373,6 +373,15 @@ describe("LogListPage", () => {
     expect(await screen.findByText("ログを削除できません")).toBeDefined();
     expect(screen.getByText(formattedCapturedAt)).toBeDefined();
     expect(routerRefresh).not.toHaveBeenCalled();
+  });
+
+  it("タイトルありのログを削除するとダイアログにタイトルが表示される", () => {
+    const logWithTitle = { ...logListItem, title: "カスタムタイトル" };
+    render(<LogListPage initialLogs={[logWithTitle]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /削除/ }));
+
+    expect(screen.getByText("カスタムタイトル のログを削除します。")).toBeDefined();
   });
 
   it("non-premium users' 閲覧 link navigates to /logs/local/{roomId}", () => {
@@ -481,6 +490,26 @@ describe("LogListPage", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("ダウンロードAPIがエラーを返した場合はサイレントに処理されボタンが再有効化される", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "server error" }, { status: 500 }),
+    );
+
+    render(<LogListPage initialLogs={[logListItem]} />);
+    fireEvent.click(screen.getByRole("button", { name: /ダウンロード/ }));
+
+    await waitFor(() => {
+      const downloadBtn = screen.getByRole("button", {
+        name: /ダウンロード/,
+      }) as HTMLButtonElement;
+      expect(downloadBtn.disabled).toBe(false);
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/onlive/logs/log-1",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
   it("タイトルが設定されているログはタイトルを表示する", () => {
     render(<LogListPage initialLogs={[{ ...logListItem, title: "カスタムタイトル" }]} />);
 
@@ -576,6 +605,45 @@ describe("LogListPage", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.getByText(formattedCapturedAt)).toBeDefined();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("空白のみのタイトルで保存するとnullとして保存される", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+
+    render(<LogListPage initialLogs={[logListItem]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "タイトルを編集" }));
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/onlive/logs/log-1",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ title: null }),
+        }),
+      );
+    });
+  });
+
+  it("タイトル保存APIがエラーを返した場合、タイトルは変わらない", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ error: "server error" }, { status: 500 }),
+    );
+
+    render(<LogListPage initialLogs={[logListItem]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "タイトルを編集" }));
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "新しいタイトル" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(screen.queryByText("新しいタイトル")).toBeNull();
+    });
+    expect(screen.getByText(formattedCapturedAt)).toBeDefined();
   });
 
   const createLogItems = (count: number): LogListItem[] =>
@@ -704,5 +772,84 @@ describe("LogListPage - JSON import", () => {
       await screen.findByText("JSONファイルの読み込みに失敗しました。"),
     ).toBeDefined();
     expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it("有効なJSONファイルを選択するとlocalStorageに保存される", async () => {
+    render(<LogListPage initialLogs={[]} />);
+
+    const validLog = {
+      capturedAt: "2026-05-09T12:00:00.000+09:00",
+      liveId: "live-1",
+      log: { comments: [] },
+      roomId: "12345",
+    };
+    const file = new File(
+      [JSON.stringify(validLog)],
+      "watchlog.json",
+      { type: "application/json" },
+    );
+
+    triggerFileChange(getFileInput(), file);
+
+    await waitFor(() => {
+      const raw = window.localStorage.getItem("watchlog:json-viewer");
+      expect(raw).not.toBeNull();
+      const stored = JSON.parse(raw!);
+      expect(stored).toMatchObject({
+        capturedAt: "2026-05-09T12:00:00.000+09:00",
+        liveId: "live-1",
+        roomId: "12345",
+      });
+    });
+  });
+
+  it("FileReader のエラー時に「ファイルの読み込みに失敗しました。」を表示する", async () => {
+    let capturedInstance: { onerror: (() => void) | null } | null = null;
+
+    class MockFileReader {
+      onload: null = null;
+      onerror: (() => void) | null = null;
+      readAsText = vi.fn();
+      constructor() {
+        capturedInstance = this;
+      }
+    }
+    vi.stubGlobal("FileReader", MockFileReader);
+
+    render(<LogListPage initialLogs={[]} />);
+
+    const file = new File(["content"], "test.json", { type: "application/json" });
+    triggerFileChange(getFileInput(), file);
+
+    act(() => {
+      capturedInstance?.onerror?.();
+    });
+
+    expect(
+      await screen.findByText("ファイルの読み込みに失敗しました。"),
+    ).toBeDefined();
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it("JSONを選択ボタンをクリックすると前回のエラーメッセージがクリアされる", async () => {
+    render(<LogListPage initialLogs={[]} />);
+
+    const invalidLog = { foo: "bar" };
+    const file = new File(
+      [JSON.stringify(invalidLog)],
+      "invalid.json",
+      { type: "application/json" },
+    );
+    triggerFileChange(getFileInput(), file);
+
+    expect(
+      await screen.findByText("正しい形式のWatchLog JSONファイルではありません。"),
+    ).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "JSONを選択" }));
+
+    expect(
+      screen.queryByText("正しい形式のWatchLog JSONファイルではありません。"),
+    ).toBeNull();
   });
 });

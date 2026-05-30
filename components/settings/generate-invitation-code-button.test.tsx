@@ -97,4 +97,46 @@ describe("GenerateInvitationCodeButton", () => {
       expect((button as HTMLButtonElement).disabled).toBe(false);
     });
   });
+
+  it("APIエラー後にボタンが再び有効化される", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: "Forbidden" }, { status: 403 }));
+
+    render(<GenerateInvitationCodeButton />);
+    const button = screen.getByRole("button", { name: /招待コード生成/ });
+
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+    });
+    expect(screen.getByText("招待コードの生成に失敗しました")).toBeDefined();
+  });
+
+  it("エラー発生後に再クリックして成功するとエラーメッセージが消える", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: "Forbidden" }, { status: 403 }));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    render(<GenerateInvitationCodeButton />);
+    const button = screen.getByRole("button", { name: /招待コード生成/ });
+
+    fireEvent.click(button);
+    expect(await screen.findByText("招待コードの生成に失敗しました")).toBeDefined();
+
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.queryByText("招待コードの生成に失敗しました")).toBeNull();
+    });
+    expect(routerRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("Error以外がスローされた場合にデフォルトエラーメッセージを表示する", async () => {
+    fetchMock.mockRejectedValueOnce("unexpected string error");
+
+    render(<GenerateInvitationCodeButton />);
+    fireEvent.click(screen.getByRole("button", { name: /招待コード生成/ }));
+
+    expect(await screen.findByText("招待コードの生成に失敗しました")).toBeDefined();
+    expect(routerRefresh).not.toHaveBeenCalled();
+  });
 });
