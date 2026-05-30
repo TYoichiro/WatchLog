@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { hasPremiumRole } from "@/lib/authz";
 import { logger } from "@/lib/logger";
 import {
+  getBcsvrKeyFromOnlives,
   getRoomCommentLog,
   getRoomGiftDefinitions,
   getRoomGiftLog,
@@ -43,7 +44,16 @@ export async function GET() {
       getRoomTelop(roomId),
     ]);
 
-  const liveInfo = liveInfoResult.status === "fulfilled" ? liveInfoResult.value : null;
+  let liveInfo = liveInfoResult.status === "fulfilled" ? liveInfoResult.value : null;
+
+  if (liveInfo?.isPremiumLive) {
+    try {
+      const bcsvrKey = await getBcsvrKeyFromOnlives(parsedRoomId);
+      liveInfo = { ...liveInfo, bcsvrKey };
+    } catch {
+      // keep bcsvrKey as null; client will show the premium live dialog
+    }
+  }
 
   if (userId && liveInfo && liveInfo.liveStatus !== null && liveInfo.liveStatus !== 1) {
     logger.info("Onlive screen: room is live", { userId, roomId, roomUrl });

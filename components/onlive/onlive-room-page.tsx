@@ -1377,6 +1377,11 @@ function useShowroomRealtimeFeed(
         setLiveId(liveSessionId);
         setLiveStatus(liveInfo.liveStatus);
 
+        if (liveInfo.isPremiumLive && !liveInfo.bcsvrKey?.trim()) {
+          shouldTreatCloseAsError = false;
+          return;
+        }
+
         if (liveInfo.liveStatus === 1) {
           shouldTreatCloseAsError = false;
           removeOnliveStorageSnapshot(roomId);
@@ -1568,7 +1573,7 @@ function useShowroomRealtimeFeed(
   };
 }
 
-function useOnlivePoll(isEnabled = true) {
+function useOnlivePoll(isEnabled = true, skipRanking = false) {
   const [profile, setProfile] = useState<RoomProfile | null>(null);
   const [initialProfile, setInitialProfile] = useState<RoomProfile | null>(null);
   const [previousProfile, setPreviousProfile] = useState<RoomProfile | null>(null);
@@ -1594,7 +1599,10 @@ function useOnlivePoll(isEnabled = true) {
       currentController = controller;
 
       try {
-        const response = await fetch("/api/onlive/poll", {
+        const url = skipRanking
+          ? "/api/onlive/poll?skip_ranking=1"
+          : "/api/onlive/poll";
+        const response = await fetch(url, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -2836,11 +2844,13 @@ function GiftLogTable({
 function TotalRankingTable({
   hasError,
   isLoading,
+  isPremiumLive,
   items,
   onOpenProfile,
 }: {
   hasError: boolean;
   isLoading: boolean;
+  isPremiumLive: boolean;
   items: readonly RoomTotalRankingUser[];
   onOpenProfile: OpenProfileHandler;
 }) {
@@ -2876,7 +2886,9 @@ function TotalRankingTable({
               <tr>
                 <td className="px-4 py-8">
                   <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
-                    累計ランキングの情報を取得できませんでした。エラーが発生しました。
+                    {isPremiumLive
+                      ? "プレミアムライブの時は累計ランキングの情報を取得する事ができません。"
+                      : "累計ランキングの情報を取得できませんでした。エラーが発生しました。"}
                   </div>
                 </td>
               </tr>
@@ -2962,11 +2974,13 @@ function TotalRankingTable({
 function LiveRankingTable({
   hasError,
   isLoading,
+  isPremiumLive,
   items,
   onOpenProfile,
 }: {
   hasError: boolean;
   isLoading: boolean;
+  isPremiumLive: boolean;
   items: readonly RoomLiveRankingUser[];
   onOpenProfile: OpenProfileHandler;
 }) {
@@ -2999,7 +3013,9 @@ function LiveRankingTable({
               <tr>
                 <td className="px-4 py-8">
                   <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
-                    ライブランキングの情報を取得できませんでした。エラーが発生しました。
+                    {isPremiumLive
+                      ? "プレミアムライブの時はライブランキングの情報を取得する事ができません。"
+                      : "ライブランキングの情報を取得できませんでした。エラーが発生しました。"}
                   </div>
                 </td>
               </tr>
@@ -3087,6 +3103,7 @@ function LiveBody({
   isLiveRankingLoading,
   isTotalRankingLoading,
   isGiftLoading,
+  isPremiumLive = false,
   isSnapshot = false,
   liveComments,
   liveId,
@@ -3109,6 +3126,7 @@ function LiveBody({
   isLiveRankingLoading: boolean;
   isTotalRankingLoading: boolean;
   isGiftLoading: boolean;
+  isPremiumLive?: boolean;
   isSnapshot?: boolean;
   liveComments: readonly CommentRow[];
   liveId: string | null;
@@ -3185,12 +3203,14 @@ function LiveBody({
           items={visibleLiveRanking}
           isLoading={isLiveRankingLoading}
           hasError={hasLiveRankingError}
+          isPremiumLive={isPremiumLive}
           onOpenProfile={onOpenProfile}
         />
         <TotalRankingTable
           items={visibleTotalRanking}
           isLoading={isTotalRankingLoading}
           hasError={hasTotalRankingError}
+          isPremiumLive={isPremiumLive}
           onOpenProfile={onOpenProfile}
         />
       </div>
@@ -3606,7 +3626,7 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
     totalRanking,
     liveRankingHasError: hasLiveRankingError,
     totalRankingHasError: hasTotalRankingError,
-  } = useOnlivePoll(!isLiveEnded);
+  } = useOnlivePoll(!isLiveEnded, initData.liveInfo?.isPremiumLive ?? false);
   const isLiveRankingLoading = isRoomProfileLoading;
   const isTotalRankingLoading = isRoomProfileLoading;
   const {
@@ -4086,6 +4106,7 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
           visibleMergedGifts.length === 0
         }
         hasGiftError={hasGiftError && visibleMergedGifts.length === 0}
+        isPremiumLive={initData.liveInfo?.isPremiumLive ?? false}
       />
 
       <UserProfileModal
@@ -4111,6 +4132,19 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
           <DialogDescription>再読み込みを行います。</DialogDescription>
           <DialogFooter>
             <Button type="button" onClick={handleFatalErrorConfirm}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!hasRealtimeFatalError && !!initData.liveInfo?.isPremiumLive && !initData.liveInfo?.bcsvrKey?.trim()}>
+        <DialogContent className="max-w-sm">
+          <DialogTitle>プレミアムライブ</DialogTitle>
+          <DialogDescription className="whitespace-pre-wrap">
+            {"この配信はプレミアムライブです\n接続まで暫くお待ちください"}
+          </DialogDescription>
+          <DialogFooter>
+            <Button type="button" onClick={() => router.replace("/dashboard")}>
               OK
             </Button>
           </DialogFooter>

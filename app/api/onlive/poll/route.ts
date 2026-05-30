@@ -10,7 +10,7 @@ import { listBlockedShowroomUserIds } from "@/lib/user-blocks";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth();
   const userId = session?.user?.id ?? null;
 
@@ -21,6 +21,8 @@ export async function GET() {
   }
 
   const { roomId } = registeredRoom;
+  const { searchParams } = new URL(request.url);
+  const skipRanking = searchParams.get("skip_ranking") === "1";
 
   const blockedUserIds = userId
     ? new Set(await listBlockedShowroomUserIds(userId))
@@ -29,8 +31,8 @@ export async function GET() {
   const [profileResult, liveRankingResult, totalRankingResult] =
     await Promise.allSettled([
       getRoomProfile(roomId),
-      getRoomLiveRanking(roomId),
-      getRoomTotalRanking(roomId),
+      skipRanking ? Promise.resolve([]) : getRoomLiveRanking(roomId),
+      skipRanking ? Promise.resolve([]) : getRoomTotalRanking(roomId),
     ]);
 
   const profile = profileResult.status === "fulfilled" ? profileResult.value : null;
@@ -45,8 +47,8 @@ export async function GET() {
     profile,
     profileHasError: profileResult.status === "rejected",
     liveRanking,
-    liveRankingHasError: liveRankingResult.status === "rejected",
+    liveRankingHasError: skipRanking || liveRankingResult.status === "rejected",
     totalRanking,
-    totalRankingHasError: totalRankingResult.status === "rejected",
+    totalRankingHasError: skipRanking || totalRankingResult.status === "rejected",
   });
 }

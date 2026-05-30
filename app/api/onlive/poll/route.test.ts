@@ -135,7 +135,7 @@ describe("GET /api/onlive/poll", () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/onlive/poll"));
     const data = await expectJson(response);
 
     expect(response.status).toBe(200);
@@ -178,7 +178,7 @@ describe("GET /api/onlive/poll", () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/onlive/poll"));
 
     expect(response.status).toBe(200);
     expect(await expectJson(response)).toEqual({

@@ -37,6 +37,12 @@ function makeItem(overrides: Partial<OnliveItem> = {}): OnliveItem {
     genreName: "アイドル",
     badgeList: [],
     streamingUrlList: [],
+    bcsvrKey: null,
+    cellType: null,
+    officialLv: null,
+    liveType: null,
+    isFollow: false,
+    tags: [],
     telop: null,
     liverThemeTitle: "",
     everydayLiveLabel: null,
@@ -44,6 +50,7 @@ function makeItem(overrides: Partial<OnliveItem> = {}): OnliveItem {
     isKaraoke: false,
     premiumRoomType: 0,
     frameImageUrl: null,
+    frameLottieUrl: null,
     ...overrides,
   };
 }
