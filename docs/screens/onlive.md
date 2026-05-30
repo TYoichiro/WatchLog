@@ -85,11 +85,15 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 
 | 取得内容 | Showroom API | 失敗時 |
 |---|---|---|
-| ライブ情報（bcsvrKey, liveId, liveStatus） | `GET /live_info` | `null` |
+| ライブ情報（bcsvrKey, liveId, liveStatus, isPremiumLive） | `GET /live_info` | `null` |
 | ギフト定義一覧 | `GET /gift_list` | `[]` |
 | コメントログ | `GET /comment_log` | `[]` |
 | ギフトログ | `GET /gift_log` | `[]` |
 | テロップ | `GET /telop` | `null` |
+
+ライブ情報取得後、`isPremiumLive === true` の場合は `getBcsvrKeyFromOnlives(roomId)` を追加呼び出しして `bcsvrKey` を補完します。この呼び出しが失敗した場合は `bcsvrKey` を `null` のままにします（クライアント側でプレミアムライブダイアログを表示します）。
+
+ギフト定義・ギフトログ取得時、プレミアムライブ中は `GET /gift_groups` が error code `1002` を返す場合があります。この場合はフォールバックルーム（ID: `317313`）で再取得します。
 
 ブロックユーザーのコメント・ギフトはレスポンス前にサーバー側でフィルタリングされます。
 
@@ -139,7 +143,8 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 | WebSocket `onerror` | `hasFatalError=true` → エラーダイアログを表示 |
 | 予期しない Socket 切断 | `hasFatalError=true` → エラーダイアログを表示 |
 | PING 送信失敗 | `hasFatalError=true` → エラーダイアログを表示 |
-| `bcsvrKey` 未取得 | `hasFatalError=true` → エラーダイアログを表示 |
+| `bcsvrKey` 未取得（通常ライブ） | `hasFatalError=true` → エラーダイアログを表示 |
+| `isPremiumLive === true` かつ `bcsvrKey` 未取得 | WebSocket 接続をスキップして早期リターン（エラーダイアログなし）。クライアントはプレミアムライブダイアログを表示する |
 
 ---
 
@@ -147,11 +152,13 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 
 配信終了（`isLiveEnded=true`）まで 60 秒間隔で `GET /api/onlive/poll` を呼び出します。
 
+`useOnlivePoll(isEnabled, skipRanking)` の第 2 引数 `skipRanking` に `true` を渡すと `?skip_ranking=1` クエリを付加し、サーバー側でランキング取得をスキップします。プレミアムライブ時（`initData.liveInfo?.isPremiumLive === true`）は `skipRanking=true` で呼び出します。
+
 | 取得内容 | 用途 |
 |---|---|
 | `profile`（`RoomProfile`） | フォロワー数・視聴者数・配信開始時刻の更新 |
-| `liveRanking`（`RoomLiveRankingUser[]`） | ライブランキングの更新 |
-| `totalRanking`（`RoomTotalRankingUser[]`） | 累計ランキングの更新 |
+| `liveRanking`（`RoomLiveRankingUser[]`） | ライブランキングの更新（`skipRanking=true` 時は空配列） |
+| `totalRanking`（`RoomTotalRankingUser[]`） | 累計ランキングの更新（`skipRanking=true` 時は空配列） |
 
 - 初回取得値を `initialProfile` に保存し、フォロワー数の増減比較に使用します。
 - 前回取得値を `previousProfile` に保存し、視聴者数の増減比較に使用します。
@@ -346,6 +353,13 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 | ユーザー名 | — |
 | ユーザー ID | — |
 
+エラー時のメッセージは `isPremiumLive` によって変化します。
+
+| 状態 | メッセージ |
+|---|---|
+| `isPremiumLive === true` | 「プレミアムライブの時はライブランキングの情報を取得する事ができません。」 |
+| 通常エラー | 「ライブランキングの情報を取得できませんでした。エラーが発生しました。」 |
+
 ### 累計ランキング（`TotalRankingTable`）
 
 ルーム全体の累計ランキングです。
@@ -358,6 +372,13 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 | ユーザー名 | — |
 | ユーザー ID | — |
 | サブテキスト | `X,XXX pt / N 回訪問` |
+
+エラー時のメッセージは `isPremiumLive` によって変化します。
+
+| 状態 | メッセージ |
+|---|---|
+| `isPremiumLive === true` | 「プレミアムライブの時は累計ランキングの情報を取得する事ができません。」 |
+| 通常エラー | 「累計ランキングの情報を取得できませんでした。エラーが発生しました。」 |
 
 両テーブルとも行クリックでプロフィールモーダルが開きます。
 
@@ -576,6 +597,7 @@ Next.js の Error Boundary が捕捉した例外が対象です。
   "isPremium": true,
   "liveInfo": {
     "bcsvrKey": "...",
+    "isPremiumLive": false,
     "liveId": "...",
     "liveStatus": 2
   },
@@ -588,6 +610,8 @@ Next.js の Error Boundary が捕捉した例外が対象です。
 
 `isPremium` は `hasPremiumRole(userId)` の結果です。`OnliveRoomPage` がこの値を元にログ保存先（DB / ローカルストレージ）を分岐します。
 
+`liveInfo.isPremiumLive` は Showroom の `/live_info` レスポンスに `redirect_url` が存在する場合に `true` になります。プレミアムライブ時は `liveStatus` が `null`、`bcsvrKey` は `getBcsvrKeyFromOnlives` による補完値（失敗時は `null`）、`liveId` は `live_id` が取得できない場合に `YYYYMMDD` 形式の日付文字列をフォールバックとして設定します。
+
 **レスポンス（登録ルームなし）：**
 
 ```json
@@ -595,6 +619,12 @@ Next.js の Error Boundary が捕捉した例外が対象です。
 ```
 
 ### `GET /api/onlive/poll`
+
+**クエリパラメーター：**
+
+| パラメーター | 値 | 説明 |
+|---|---|---|
+| `skip_ranking` | `1` | ライブランキング・累計ランキングの取得をスキップする。プレミアムライブ時に使用 |
 
 **レスポンス：**
 
@@ -608,6 +638,8 @@ Next.js の Error Boundary が捕捉した例外が対象です。
   "totalRankingHasError": false
 }
 ```
+
+`skip_ranking=1` の場合、`liveRanking` / `totalRanking` は空配列、`liveRankingHasError` / `totalRankingHasError` は `true` になります。
 
 ### `POST /api/onlive/logs`
 
@@ -714,8 +746,9 @@ updatedAt             DateTime
 | [app/api/onlive/logs/route.ts](../../app/api/onlive/logs/route.ts) | ログ保存 API |
 | [app/api/onlive/logs/[logId]/route.ts](../../app/api/onlive/logs/%5BlogId%5D/route.ts) | ログ削除 API |
 | [lib/showroom-realtime.ts](../../lib/showroom-realtime.ts) | WebSocket 定数・ユーティリティ |
-| [lib/showroom/live.ts](../../lib/showroom/live.ts) | コメントログ・ライブ情報・テロップ取得 |
-| [lib/showroom/gifts.ts](../../lib/showroom/gifts.ts) | ギフト定義・ギフトログ取得 |
+| [lib/showroom/live.ts](../../lib/showroom/live.ts) | コメントログ・ライブ情報（`isPremiumLive` 含む）・テロップ取得 |
+| [lib/showroom/gifts.ts](../../lib/showroom/gifts.ts) | ギフト定義・ギフトログ取得（プレミアムライブ時はフォールバックルームで取得） |
+| [lib/showroom/onlives.ts](../../lib/showroom/onlives.ts) | オンライブ一覧取得・`getBcsvrKeyFromOnlives`（プレミアムライブ用 bcsvrKey 補完） |
 | [lib/showroom/ranking.ts](../../lib/showroom/ranking.ts) | ライブ・総合ランキング取得 |
 | [lib/showroom/room.ts](../../lib/showroom/room.ts) | ルームプロフィール取得 |
 | [lib/onlive-log.ts](../../lib/onlive-log.ts) | ログ保存・取得・削除 |
