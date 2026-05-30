@@ -22,9 +22,9 @@ const rawResponse = {
       banners: [{ url: "https://example.com/banner", image: "https://example.com/banner.png" }],
       lives: [
         {
-          room_id: 150710,
-          room_url_key: "JOY_OZAWA_AIMI",
-          main_name: "小澤 愛実（≒JOY）",
+          room_id: 12345,
+          room_url_key: "ROOMNAME",
+          main_name: "ルーム名",
           image: "https://example.com/cover.png",
           image_square: "https://example.com/cover_square.png",
           view_num: 9401,
@@ -99,9 +99,9 @@ describe("getOnlives", () => {
     expect(idol.lives).toHaveLength(1);
 
     const live = idol.lives[0];
-    expect(live.roomId).toBe(150710);
-    expect(live.roomUrlKey).toBe("JOY_OZAWA_AIMI");
-    expect(live.mainName).toBe("小澤 愛実（≒JOY）");
+    expect(live.roomId).toBe(12345);
+    expect(live.roomUrlKey).toBe("ROOMNAME");
+    expect(live.mainName).toBe("ルーム名");
     expect(live.imageSquare).toBe("https://example.com/cover_square.png");
     expect(live.viewNum).toBe(9401);
     expect(live.followerNum).toBe(36988);
