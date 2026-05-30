@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { auth } from "@/auth";
-import { hasTopAdminRole } from "@/lib/authz";
+import { hasTopAdminRole, PREMIUM_ROLE_NAME, TOP_ADMIN_ROLE_NAME } from "@/lib/authz";
 import {
   consumeInvitationCode,
   ensureUserInvitationCodes,
@@ -133,6 +133,55 @@ export async function PUT(request: NextRequest) {
       );
 
       await ensureUserInvitationCodes(userId, tx);
+
+      const inviterAdminRole = consumedInviteCode.inviterUserId
+        ? await tx.userRole.findFirst({
+            where: {
+              userId: consumedInviteCode.inviterUserId,
+              role: { name: TOP_ADMIN_ROLE_NAME },
+            },
+            select: { id: true },
+          })
+        : null;
+
+      if (inviterAdminRole) {
+        const premiumRole = await tx.role.findUnique({
+          where: { name: PREMIUM_ROLE_NAME },
+          select: { id: true },
+        });
+
+        if (premiumRole) {
+          await tx.userRole.upsert({
+            where: { userId_roleId: { userId, roleId: premiumRole.id } },
+            update: { assignedByUserId: consumedInviteCode.inviterUserId },
+            create: {
+              userId,
+              roleId: premiumRole.id,
+              assignedByUserId: consumedInviteCode.inviterUserId,
+            },
+            select: { id: true },
+          });
+
+          await writeAuditLog(
+            {
+              actorUserId: consumedInviteCode.inviterUserId,
+              action: "role.assign",
+              resource: "user",
+              resourceId: userId,
+              detail: {
+                roleName: PREMIUM_ROLE_NAME,
+                reason: "admin_invite_code",
+              },
+            },
+            tx
+          );
+
+          logger.info("Premium role granted via admin invite code", {
+            userId,
+            inviterUserId: consumedInviteCode.inviterUserId,
+          });
+        }
+      }
 
       await writeAuditLog(
         {
