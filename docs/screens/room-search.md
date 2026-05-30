@@ -361,7 +361,8 @@ SHOWROOM のルームを検索し、招待コードを使用して自分のル�
 1. 招待コードを消費（`usedAt`, `usedByUserId` を設定）
 2. ユーザーの登録ルームを保存
 3. ユーザー向け招待コードを自動生成（最大3件: `USER_INVITATION_CODE_LIMIT = 3`）
-4. 監査ログ記録（`room.register`）
+4. 招待コードの発行者が管理者（`admin` ロール）の場合、新規ユーザーに `premiumuser` ロールを付与し、監査ログ記録（`role.assign`、`detail.reason: "admin_invite_code"`）
+5. 監査ログ記録（`room.register`）
 
 **エラーレスポンス**:
 

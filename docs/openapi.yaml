@@ -737,10 +737,19 @@ paths:
         オンライブ画面のポーリング更新用エンドポイント。
         プロフィール・ライブランキング・総合ランキングを返します。
         認証済みの場合はブロック済みユーザーのランキングが除外されます。
+        プレミアムライブ時は `skip_ranking=1` を指定してランキング取得をスキップします。
 
         **認証**: 任意
       security:
         - sessionCookie: []
+      parameters:
+        - name: skip_ranking
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["1"]
+          description: "`1` を指定するとライブランキング・総合ランキングの取得をスキップし、空配列を返します。プレミアムライブ時に使用。"
       responses:
         "200":
           description: ポーリング応答
@@ -1770,20 +1779,23 @@ components:
 
     RoomLiveInfo:
       type: object
-      required: [bcsvrKey, liveId, liveStatus]
+      required: [bcsvrKey, isPremiumLive, liveId, liveStatus]
       properties:
         bcsvrKey:
           type: string
           nullable: true
-          description: 配信サーバーキー
+          description: 配信サーバーキー。プレミアムライブ時は `getBcsvrKeyFromOnlives` による補完値（失敗時は null）。
+        isPremiumLive:
+          type: boolean
+          description: SHOWROOM の `/live_info` レスポンスに `redirect_url` が存在する場合に true。プレミアムライブ中は `liveStatus` が null になる。
         liveId:
           type: string
           nullable: true
-          description: 現在のライブ ID
+          description: 現在のライブ ID。プレミアムライブで `live_id` が取得できない場合は `YYYYMMDD` 形式の日付文字列をフォールバックとして設定。
         liveStatus:
           type: integer
           nullable: true
-          description: "配信ステータス（1 = 停止中、それ以外 = 配信中）"
+          description: "配信ステータス（1 = 停止中、それ以外 = 配信中）。プレミアムライブ時は null。"
 
     EventAndSupportSummary:
       type: object
@@ -2228,13 +2240,16 @@ components:
     # ── Onlive ──
     OnliveInitOkResponse:
       type: object
-      required: [status, roomId, liveInfo, giftDefinitions, comments, gifts, telop]
+      required: [status, roomId, isPremium, liveInfo, giftDefinitions, comments, gifts, telop]
       properties:
         status:
           type: string
           enum: [ok]
         roomId:
           type: integer
+        isPremium:
+          type: boolean
+          description: ログインユーザーが `premiumuser` ロールを持つかどうか。ログ保存先（DB / ローカルストレージ）の分岐に使用。
         liveInfo:
           nullable: true
           allOf:
