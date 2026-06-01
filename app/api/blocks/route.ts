@@ -59,14 +59,14 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireUser();
 
-    logger.info("Block create attempt", { userId: user.id, blockedUserId, blockedUserName });
+    logger.info("ブロック作成を試みています", { userId: user.id, blockedUserId, blockedUserName });
 
     const block = await createUserBlock(user.id, {
       blockedUserId,
       blockedUserName,
     });
 
-    logger.info("Block created", { userId: user.id, blockId: block.id, blockedUserId });
+    logger.info("ブロックを作成しました", { userId: user.id, blockId: block.id, blockedUserId });
     return Response.json({ block: serializeUserBlock(block) });
   } catch (error) {
     const response = authzErrorResponse(error);
@@ -76,14 +76,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (error instanceof DeveloperBlockForbiddenError) {
-      logger.warn("Block rejected: developer user cannot be blocked", { blockedUserId });
+      logger.warn("ブロック拒否: 開発者ユーザーはブロックできません", { blockedUserId });
       return Response.json(
         { error: "開発者はブロックできません" },
         { status: error.status }
       );
     }
 
-    logger.error("Block create failed", { blockedUserId, error: String(error) });
+    logger.error("ブロックの作成に失敗しました", { blockedUserId, error: String(error) });
     return Response.json({ error: "Failed to create block" }, { status: 500 });
   }
 }

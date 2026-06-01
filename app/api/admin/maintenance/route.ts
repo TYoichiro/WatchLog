@@ -55,7 +55,7 @@ export async function GET() {
     const authzResponse = authzErrorResponse(error);
     if (authzResponse) return authzResponse;
 
-    logger.error("Admin maintenance list failed", { error: String(error) });
+    logger.error("管理者: メンテナンス期間一覧の取得に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
       return window;
     });
 
-    logger.info("Maintenance window created", {
+    logger.info("メンテナンス期間を作成しました", {
       actorId: actor.id,
       windowId: created.id,
     });
@@ -159,7 +159,7 @@ export async function POST(request: Request) {
     const authzResponse = authzErrorResponse(error);
     if (authzResponse) return authzResponse;
 
-    logger.error("Admin maintenance create failed", { error: String(error) });
+    logger.error("管理者: メンテナンス期間の作成に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

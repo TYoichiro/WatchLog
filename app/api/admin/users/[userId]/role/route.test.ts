@@ -142,7 +142,7 @@ describe("PATCH /api/admin/users/[userId]/role", () => {
     it("info ログを出力する", async () => {
       await PATCH(makeRequest({ role: "premiumuser" }), makeContext("user-1"));
 
-      expect(mocks.loggerInfo).toHaveBeenCalledWith("Role set to premium", {
+      expect(mocks.loggerInfo).toHaveBeenCalledWith("ロールをプレミアムに設定しました", {
         actorId: "admin-1",
         userId: "user-1",
       });
@@ -195,7 +195,7 @@ describe("PATCH /api/admin/users/[userId]/role", () => {
     it("info ログを出力する", async () => {
       await PATCH(makeRequest({ role: "general" }), makeContext("user-1"));
 
-      expect(mocks.loggerInfo).toHaveBeenCalledWith("Role set to general", {
+      expect(mocks.loggerInfo).toHaveBeenCalledWith("ロールを一般に設定しました", {
         actorId: "admin-1",
         userId: "user-1",
       });
@@ -259,7 +259,7 @@ describe("PATCH /api/admin/users/[userId]/role", () => {
 
       expect(response.status).toBe(500);
       expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
-      expect(mocks.loggerError).toHaveBeenCalledWith("Role update failed", expect.anything());
+      expect(mocks.loggerError).toHaveBeenCalledWith("ロールの更新に失敗しました", expect.anything());
     });
 
     it("premiumuser ロールが DB に存在しない場合（降格）は 500 を返す", async () => {
@@ -269,7 +269,7 @@ describe("PATCH /api/admin/users/[userId]/role", () => {
 
       expect(response.status).toBe(500);
       expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
-      expect(mocks.loggerError).toHaveBeenCalledWith("Role update failed", expect.anything());
+      expect(mocks.loggerError).toHaveBeenCalledWith("ロールの更新に失敗しました", expect.anything());
     });
 
     it("トランザクション失敗時は 500 を返す", async () => {
@@ -280,7 +280,7 @@ describe("PATCH /api/admin/users/[userId]/role", () => {
 
       expect(response.status).toBe(500);
       expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
-      expect(mocks.loggerError).toHaveBeenCalledWith("Role update failed", {
+      expect(mocks.loggerError).toHaveBeenCalledWith("ロールの更新に失敗しました", {
         error: "Error: database failed",
       });
     });

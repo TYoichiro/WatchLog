@@ -46,17 +46,22 @@ export async function GET() {
 
   let liveInfo = liveInfoResult.status === "fulfilled" ? liveInfoResult.value : null;
 
+  if (liveInfoResult.status === "rejected") {
+    logger.warn("オンライブ初期化: liveInfo取得失敗", { userId, roomId, error: String(liveInfoResult.reason) });
+  }
+
   if (liveInfo?.isPremiumLive) {
     try {
       const bcsvrKey = await getBcsvrKeyFromOnlives(parsedRoomId);
       liveInfo = { ...liveInfo, bcsvrKey };
-    } catch {
+    } catch (error) {
+      logger.debug("オンライブ初期化: bcsvrKey取得失敗", { userId, roomId, error: String(error) });
       // keep bcsvrKey as null; client will show the premium live dialog
     }
   }
 
   if (userId && liveInfo && liveInfo.liveStatus !== null && liveInfo.liveStatus !== 1) {
-    logger.info("Onlive screen: room is live", { userId, roomId, roomUrl });
+    logger.info("オンライブ画面: 配信中のルーム", { userId, roomId, roomUrl });
   }
 
   const giftDefinitions = giftDefinitionsResult.status === "fulfilled" ? giftDefinitionsResult.value : [];

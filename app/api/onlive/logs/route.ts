@@ -149,16 +149,16 @@ export async function POST(request: NextRequest) {
   ]);
 
   if (!registeredRoom || registeredRoom.roomId !== roomId) {
-    logger.warn("Onlive log rejected: room not registered for user", { userId, roomId });
+    logger.warn("オンライブログ拒否: ユーザーにルームが登録されていません", { userId, roomId });
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
   if (!isPremium) {
-    logger.warn("Onlive log rejected: user is not premium", { userId, roomId });
+    logger.warn("オンライブログ拒否: ユーザーがプレミアムではありません", { userId, roomId });
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  logger.info("Onlive log save attempt", { userId, roomId, liveId });
+  logger.info("オンライブログの保存を試みています", { userId, roomId, liveId });
 
   let totalRanking: JsonValue = [];
   let totalRankingFetchedAt: string | null = null;
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
     totalRankingFetchedAt = toJstIsoString();
   } catch (error) {
     totalRankingFetchError = "Failed to fetch total ranking";
-    logger.warn("Total ranking fetch failed", { userId, roomId, liveId, error: String(error) });
+    logger.warn("総合ランキングの取得に失敗しました", { userId, roomId, liveId, error: String(error) });
   }
 
   const log = mergeServerRankingSnapshot(
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
       roomId,
     });
 
-    logger.info("Onlive log saved", { userId, roomId, liveId, logId: savedLog.id });
+    logger.info("オンライブログを保存しました", { userId, roomId, liveId, logId: savedLog.id });
 
     return Response.json({
       log: {
@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    logger.error("Onlive log save failed", { userId, roomId, liveId, error: String(error) });
+    logger.error("オンライブログの保存に失敗しました", { userId, roomId, liveId, error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

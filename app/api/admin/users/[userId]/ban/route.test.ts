@@ -132,7 +132,7 @@ describe("PATCH /api/admin/users/[userId]/ban", () => {
       await PATCH(makeRequest({ banned: true }), makeContext("user-1"));
 
       expect(mocks.loggerInfo).toHaveBeenCalledWith(
-        "User ban status updated",
+        "ユーザーのBAN状態を更新しました",
         { actorId: "admin-1", userId: "user-1", banned: true },
       );
     });
@@ -265,7 +265,7 @@ describe("PATCH /api/admin/users/[userId]/ban", () => {
 
       expect(response.status).toBe(500);
       expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
-      expect(mocks.loggerError).toHaveBeenCalledWith("User ban update failed", {
+      expect(mocks.loggerError).toHaveBeenCalledWith("ユーザーのBAN状態更新に失敗しました", {
         error: "Error: database failed",
       });
     });

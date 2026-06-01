@@ -46,7 +46,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return;
       }
 
-      logger.info("User created", { userId, email: user.email, provider: "google" });
+      logger.info("ユーザーが作成されました", { userId, email: user.email, provider: "google" });
 
       await prisma.$transaction(async (tx) => {
         const defaultRole = await tx.role.upsert({
@@ -63,7 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           },
         });
 
-        logger.debug("Default role assigned", { userId, roleId: defaultRole.id });
+        logger.debug("デフォルトロールが割り当てられました", { userId, roleId: defaultRole.id });
 
         await tx.userRole.upsert({
           where: {
@@ -101,7 +101,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return;
       }
 
-      logger.info("User signed in", { userId, provider: account?.provider ?? "unknown" });
+      logger.info("ユーザーがサインインしました", { userId, provider: account?.provider ?? "unknown" });
 
       await writeAuditLog({
         actorUserId: userId,
@@ -119,7 +119,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       const userId = message.session.userId;
-      logger.info("User signed out", { userId });
+      logger.info("ユーザーがサインアウトしました", { userId });
 
       await writeAuditLog({
         actorUserId: userId,

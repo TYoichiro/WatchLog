@@ -1,4 +1,5 @@
 import { authzErrorResponse, hasTopAdminRole, hasPremiumRole, requireUser } from "@/lib/authz";
+import { logger } from "@/lib/logger";
 import { toggleOnliveLogFavorite } from "@/lib/onlive-log";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export async function PUT(
   } catch (error) {
     const response = authzErrorResponse(error);
     if (response) return response;
+    logger.error("オンライブログお気に入り切り替え失敗", { logId, error: String(error) });
     return Response.json({ error: "Failed to toggle favorite" }, { status: 500 });
   }
 }

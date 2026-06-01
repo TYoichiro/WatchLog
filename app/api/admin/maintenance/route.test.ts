@@ -161,7 +161,7 @@ describe("GET /api/admin/maintenance", () => {
 
     expect(response.status).toBe(500);
     expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
-    expect(mocks.loggerError).toHaveBeenCalledWith("Admin maintenance list failed", {
+    expect(mocks.loggerError).toHaveBeenCalledWith("管理者: メンテナンス期間一覧の取得に失敗しました", {
       error: "Error: database failed",
     });
   });
@@ -222,7 +222,7 @@ describe("POST /api/admin/maintenance", () => {
       },
       { maintenanceWindow: { create: mocks.maintenanceWindowCreate } },
     );
-    expect(mocks.loggerInfo).toHaveBeenCalledWith("Maintenance window created", {
+    expect(mocks.loggerInfo).toHaveBeenCalledWith("メンテナンス期間を作成しました", {
       actorId: "admin-1",
       windowId: "window-1",
     });
@@ -372,7 +372,7 @@ describe("POST /api/admin/maintenance", () => {
     expect(response.status).toBe(500);
     expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
     expect(mocks.loggerError).toHaveBeenCalledWith(
-      "Admin maintenance create failed",
+      "管理者: メンテナンス期間の作成に失敗しました",
       { error: "Error: database failed" },
     );
   });

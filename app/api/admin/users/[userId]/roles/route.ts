@@ -13,7 +13,7 @@ export async function POST(request: Request, context: RouteContext) {
     const roleId = await readRoleId(request);
 
     if (roleId) {
-      logger.info("Role assign attempt", { actorId: actor.id, userId, roleId });
+      logger.info("ロール割り当てを試みています", { actorId: actor.id, userId, roleId });
     }
 
     if (!roleId) {
@@ -100,17 +100,17 @@ export async function POST(request: Request, context: RouteContext) {
     });
 
     if (result.status === "target_user_not_found") {
-      logger.warn("Role assign failed: target user not found", { userId });
+      logger.warn("ロール割り当て失敗: 対象ユーザーが見つかりません", { userId });
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
     if (result.status === "role_not_found") {
-      logger.warn("Role assign failed: role not found", { roleId });
+      logger.warn("ロール割り当て失敗: ロールが見つかりません", { roleId });
       return Response.json({ error: "Role not found" }, { status: 404 });
     }
 
     if (result.status === "admin_role_not_assignable") {
-      logger.warn("Role assign rejected: admin role cannot be assigned via API", {
+      logger.warn("ロール割り当て拒否: 管理者ロールはAPIから割り当てできません", {
         actorId: actor.id,
         userId,
         roleId,
@@ -121,7 +121,7 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    logger.info("Role assigned", {
+    logger.info("ロールを割り当てました", {
       actorId: actor.id,
       userId,
       roleId: result.role?.id,
@@ -139,7 +139,7 @@ export async function POST(request: Request, context: RouteContext) {
       return authzResponse;
     }
 
-    logger.error("Role assign failed", { error: String(error) });
+    logger.error("ロールの割り当てに失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

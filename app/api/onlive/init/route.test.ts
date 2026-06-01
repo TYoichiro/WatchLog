@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => ({
   getUserRegisteredRoom: vi.fn(),
   hasPremiumRole: vi.fn(),
   listBlockedShowroomUserIds: vi.fn(),
+  loggerDebug: vi.fn(),
   loggerInfo: vi.fn(),
+  loggerWarn: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({
@@ -26,7 +28,9 @@ vi.mock("@/lib/authz", () => ({
 
 vi.mock("@/lib/logger", () => ({
   logger: {
+    debug: mocks.loggerDebug,
     info: mocks.loggerInfo,
+    warn: mocks.loggerWarn,
   },
 }));
 
@@ -186,7 +190,7 @@ describe("GET /api/onlive/init", () => {
     expect(mocks.getRoomGiftLog).toHaveBeenCalledWith("123");
     expect(mocks.getRoomTelop).toHaveBeenCalledWith("123");
     expect(mocks.loggerInfo).toHaveBeenCalledWith(
-      "Onlive screen: room is live",
+      "オンライブ画面: 配信中のルーム",
       {
         roomId: "123",
         roomUrl: "alpha-room",
@@ -359,7 +363,7 @@ describe("GET /api/onlive/init", () => {
     expect(response.status).toBe(200);
     expect((await expectJson(response)).status).toBe("ok");
     expect(mocks.loggerInfo).toHaveBeenCalledWith(
-      "Onlive screen: room is live",
+      "オンライブ画面: 配信中のルーム",
       {
         roomId: "123",
         roomUrl: "alpha-room",

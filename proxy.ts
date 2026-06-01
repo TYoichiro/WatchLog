@@ -14,7 +14,7 @@ export const proxy = auth((request) => {
       request.headers.get("x-real-ip") ??
       "unknown";
     const ua = request.headers.get("user-agent") ?? undefined;
-    logger.info("API request", {
+    logger.info("APIリクエスト", {
       method: request.method,
       path: pathname,
       userId,

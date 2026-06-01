@@ -166,7 +166,7 @@ describe("PATCH /api/admin/maintenance/[id]", () => {
         updatedAt: true,
       },
     });
-    expect(mocks.loggerInfo).toHaveBeenCalledWith("Maintenance window updated", {
+    expect(mocks.loggerInfo).toHaveBeenCalledWith("メンテナンス期間を更新しました", {
       actorId: "admin-1",
       windowId: "window-1",
     });
@@ -208,7 +208,7 @@ describe("PATCH /api/admin/maintenance/[id]", () => {
       }),
       expect.any(Object),
     );
-    expect(mocks.loggerInfo).toHaveBeenCalledWith("Maintenance window updated", {
+    expect(mocks.loggerInfo).toHaveBeenCalledWith("メンテナンス期間を更新しました", {
       actorId: "admin-1",
       windowId: "window-1",
     });
@@ -302,7 +302,7 @@ describe("PATCH /api/admin/maintenance/[id]", () => {
     expect(response.status).toBe(500);
     expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
     expect(mocks.loggerError).toHaveBeenCalledWith(
-      "Admin maintenance update failed",
+      "管理者: メンテナンス期間の更新に失敗しました",
       { error: "Error: database failed" },
     );
   });
@@ -342,7 +342,7 @@ describe("DELETE /api/admin/maintenance/[id]", () => {
         },
       },
     );
-    expect(mocks.loggerInfo).toHaveBeenCalledWith("Maintenance window deleted", {
+    expect(mocks.loggerInfo).toHaveBeenCalledWith("メンテナンス期間を削除しました", {
       actorId: "admin-1",
       windowId: "window-1",
     });
@@ -394,7 +394,7 @@ describe("DELETE /api/admin/maintenance/[id]", () => {
     expect(response.status).toBe(500);
     expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
     expect(mocks.loggerError).toHaveBeenCalledWith(
-      "Admin maintenance delete failed",
+      "管理者: メンテナンス期間の削除に失敗しました",
       { error: "Error: database failed" },
     );
   });

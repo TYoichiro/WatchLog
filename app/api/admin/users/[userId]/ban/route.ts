@@ -65,7 +65,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     });
 
-    logger.info("User ban status updated", { actorId: actor.id, userId, banned: body.banned });
+    logger.info("ユーザーのBAN状態を更新しました", { actorId: actor.id, userId, banned: body.banned });
     return Response.json({ banned: body.banned });
   } catch (error) {
     const authzResponse = authzErrorResponse(error);
@@ -73,7 +73,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return authzResponse;
     }
 
-    logger.error("User ban update failed", { error: String(error) });
+    logger.error("ユーザーのBAN状態更新に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
