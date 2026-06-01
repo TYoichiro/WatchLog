@@ -21,6 +21,11 @@ export const proxy = auth((request) => {
       ip,
       ua,
     });
+  } else if (!process.env.VERCEL && !pathname.startsWith("/api/")) {
+    logger.info("アクセス", {
+      method: request.method,
+      path: pathname,
+    });
   }
 
   if (request.auth || pathname === "/" || pathname === "/maintenance" || pathname === "/banned") {
