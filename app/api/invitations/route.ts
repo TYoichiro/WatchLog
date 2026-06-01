@@ -8,7 +8,7 @@ export async function POST() {
   try {
     const user = await requireTopAdminRole();
     const invitation = await addInvitationCode(user.id);
-    logger.info("招待コードが作成されました", { actorId: user.id, invitationId: invitation.id });
+    logger.info("招待コードが作成されました", { actorId: user.id, invitationCode: invitation.code });
     return Response.json(invitation, { status: 201 });
   } catch (error) {
     const authzResponse = authzErrorResponse(error);
