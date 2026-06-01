@@ -37,6 +37,7 @@ function getJstDateString(): string {
 }
 
 function appendToFile(line: string): void {
+  if (process.env.VERCEL || process.env.LOG_FLG === "skip") return;
   const filename = path.join(LOG_DIR, `${getJstDateString()}.log`);
   fs.appendFile(filename, line + "\n", "utf-8", () => {
     // best-effort — ignore write errors to avoid crashing the app
