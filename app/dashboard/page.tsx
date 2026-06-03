@@ -21,6 +21,33 @@ import type {
 
 const DASHBOARD_SOCKET_PING_INTERVAL_MS = 60_000;
 
+type DashboardCache = Pick<DashboardData, "profile" | "activeFan" | "notices" | "noticesHasError"> & {
+  cachedAt: number;
+};
+
+const DASHBOARD_CACHE_KEY = "watchlog_dashboard";
+const DASHBOARD_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function readDashboardCache(): DashboardCache | null {
+  try {
+    const raw = localStorage.getItem(DASHBOARD_CACHE_KEY);
+    if (!raw) return null;
+    const cache = JSON.parse(raw) as DashboardCache;
+    if (Date.now() - cache.cachedAt > DASHBOARD_CACHE_TTL_MS) return null;
+    return cache;
+  } catch {
+    return null;
+  }
+}
+
+function writeDashboardCache(data: Omit<DashboardCache, "cachedAt">): void {
+  try {
+    localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({ ...data, cachedAt: Date.now() }));
+  } catch {
+    // localStorage unavailable (private browsing, quota exceeded)
+  }
+}
+
 async function fetchDashboard(signal: AbortSignal): Promise<DashboardBffResponse> {
   const response = await fetch("/api/dashboard", {
     cache: "no-store",
@@ -181,11 +208,24 @@ export default function Page() {
 
       setDashboardData({ isAdmin: bffIsAdmin, isPremium: bffIsPremium, profile, activeFan, eventAndSupport, notices, noticesHasError });
       setCanShowDashboard(true);
+      writeDashboardCache({ profile, activeFan, notices, noticesHasError });
 
       const broadcastKey = roomStatus?.broadcastKey?.trim();
       if (!bffData.isAdmin && broadcastKey) {
         startLiveStartWatcher(broadcastKey);
       }
+    }
+
+    const cache = readDashboardCache();
+    if (cache) {
+      setDashboardData((prev) => ({
+        ...prev,
+        profile: cache.profile,
+        activeFan: cache.activeFan,
+        notices: cache.notices,
+        noticesHasError: cache.noticesHasError,
+      }));
+      setCanShowDashboard(true);
     }
 
     const timeoutId = window.setTimeout(() => {
