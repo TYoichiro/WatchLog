@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { APP_VERSION } from "@/lib/version";
 import { signOut } from "next-auth/react";
 import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
@@ -246,7 +247,7 @@ export function ShowTubeShell({
               </Button>
               <Link href="/showtube" className="text-base text-slate-900 sm:text-lg hover:text-slate-600 transition-colors">ShowTube</Link>
             </div>
-            <div className="shrink-0 text-sm font-medium text-slate-500">v3.0.0-β</div>
+            <div className="shrink-0 text-sm font-medium text-slate-500">{APP_VERSION}</div>
           </header>
 
           <main className="flex w-full flex-1 flex-col gap-4 p-4 xl:h-full xl:overflow-auto">

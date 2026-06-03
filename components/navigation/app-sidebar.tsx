@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { APP_VERSION } from "@/lib/version";
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -430,7 +431,7 @@ function AppHeader({
         </h1>
         {headerActions}
       </div>
-      <div className="shrink-0 text-sm font-medium text-slate-500">v3.0.0-β</div>
+      <div className="shrink-0 text-sm font-medium text-slate-500">{APP_VERSION}</div>
     </header>
   );
 }
