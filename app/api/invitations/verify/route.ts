@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       );
     });
 
-    logger.warn("User auto-banned due to invite code failures", {
+    logger.warn("招待コード失敗により自動BANされました", {
       userId,
       failureCount,
     });

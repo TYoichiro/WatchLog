@@ -64,7 +64,7 @@ export async function GET() {
     const authzResponse = authzErrorResponse(error);
     if (authzResponse) return authzResponse;
 
-    logger.error("Admin notices list failed", { error: String(error) });
+    logger.error("管理者: お知らせ一覧の取得に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
@@ -182,7 +182,7 @@ export async function POST(request: Request) {
       return notice;
     });
 
-    logger.info("Dashboard notice created", {
+    logger.info("ダッシュボードお知らせを作成しました", {
       actorId: actor.id,
       noticeId: created.id,
     });
@@ -192,7 +192,7 @@ export async function POST(request: Request) {
     const authzResponse = authzErrorResponse(error);
     if (authzResponse) return authzResponse;
 
-    logger.error("Admin notice create failed", { error: String(error) });
+    logger.error("管理者: お知らせの作成に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

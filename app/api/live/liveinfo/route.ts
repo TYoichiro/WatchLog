@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     // 初回アクセス かつ 配信中（liveStatus === 1 は配信外）のときだけログ出力
     if (isInitial && userId && liveInfo.liveStatus !== null && liveInfo.liveStatus !== 1) {
       const registeredRoom = await getUserRegisteredRoom(userId);
-      logger.info("Onlive screen: room is live", {
+      logger.info("オンライブ画面: 配信中のルーム", {
         userId,
         roomId,
         roomUrl: registeredRoom?.roomUrl ?? null,

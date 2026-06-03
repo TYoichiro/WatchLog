@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { Logger } from "next-axiom";
+
 import { toJstIsoString } from "@/lib/jst";
 
 type Level = "debug" | "info" | "warn" | "error";
@@ -32,11 +34,17 @@ try {
   // ignore — directory may already exist or be read-only
 }
 
+// Axiom logger — only initialized when NEXT_PUBLIC_AXIOM_TOKEN is set
+const axiomLogger = process.env.NEXT_PUBLIC_AXIOM_TOKEN
+  ? new Logger({ source: "watchlog" })
+  : null;
+
 function getJstDateString(): string {
   return toJstIsoString().slice(0, 10);
 }
 
 function appendToFile(line: string): void {
+  if (process.env.VERCEL || process.env.LOG_FLG === "skip") return;
   const filename = path.join(LOG_DIR, `${getJstDateString()}.log`);
   fs.appendFile(filename, line + "\n", "utf-8", () => {
     // best-effort — ignore write errors to avoid crashing the app
@@ -51,6 +59,11 @@ function emit(level: Level, message: string, context?: LogContext): void {
   const timestamp = toJstIsoString();
   const entry = { time: timestamp, level, msg: message, ...context };
   const jsonLine = JSON.stringify(entry);
+
+  if (axiomLogger) {
+    axiomLogger[level](message, { time: timestamp, ...context });
+    axiomLogger.flush().catch(() => {});
+  }
 
   // File output — always JSON, one line per entry
   appendToFile(jsonLine);

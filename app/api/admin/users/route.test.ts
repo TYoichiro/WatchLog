@@ -168,7 +168,7 @@ describe("GET /api/admin/users", () => {
     expect(response.status).toBe(500);
     expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
     expect(mocks.loggerError).toHaveBeenCalledWith(
-      "Admin user list failed",
+      "管理者: ユーザー一覧の取得に失敗しました",
       { error: "Error: db error" },
     );
   });

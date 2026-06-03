@@ -48,6 +48,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AppShell } from "@/components/navigation/app-sidebar";
+import { LiveSettingsModal } from "@/components/onlive/live-settings-modal";
 import { toJstIsoString } from "@/lib/jst";
 import { writeOnliveLocalLog, type OnliveLocalLog } from "@/lib/onlive-local-log";
 import { useUserBlocks } from "@/hooks/use-user-blocks";
@@ -2518,6 +2519,7 @@ function CommentPane({
   liveTelop,
   onOpenProfile,
   roomId,
+  showNotice = true,
 }: {
   blockedUserIds: ReadonlySet<string>;
   hasLiveInfo: boolean;
@@ -2531,13 +2533,13 @@ function CommentPane({
   liveTelop: string | null;
   onOpenProfile: OpenProfileHandler;
   roomId: number;
+  showNotice?: boolean;
 }) {
   const [comments] = useState<CommentRow[]>(() =>
     isSnapshot ? [] : normalizeComments(initialComments)
   );
   const [isLoading] = useState(false);
   const [hasError] = useState(false);
-  const showNotice = true;
 
   useEffect(() => {
     if (
@@ -3112,6 +3114,7 @@ function LiveBody({
   liveTelop,
   onOpenProfile,
   roomId,
+  showNotice = true,
   totalRanking,
 }: {
   blockedUserIds: ReadonlySet<string>;
@@ -3135,6 +3138,7 @@ function LiveBody({
   liveTelop: string | null;
   onOpenProfile: OpenProfileHandler;
   roomId: number;
+  showNotice?: boolean;
   totalRanking: readonly RoomTotalRankingUser[];
 }) {
   const visibleGifts = filterBlockedShowroomItems(gifts, blockedUserIds);
@@ -3165,6 +3169,7 @@ function LiveBody({
           liveTelop={liveTelop}
           onOpenProfile={onOpenProfile}
           roomId={roomId}
+          showNotice={showNotice}
         />
       </div>
 
@@ -3602,6 +3607,7 @@ export function OnliveLogViewerPage({
 
 function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
   const router = useRouter();
+  const [showNotice, setShowNotice] = useState(true);
   const { roomId, isPremium } = initData;
   const { gifts, isLoading: isGiftLoading, hasError: hasGiftError } =
     useRoomGiftLogs(initData.gifts);
@@ -4025,6 +4031,12 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
   return (
     <AppShell
       activeKey="dashboard"
+      headerActions={
+        <LiveSettingsModal
+          showNotice={showNotice}
+          onShowNoticeChange={setShowNotice}
+        />
+      }
       headerClassName="h-8"
       mainClassName="xl:min-h-0 xl:overflow-hidden"
       showMenu={false}
@@ -4107,6 +4119,7 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
         }
         hasGiftError={hasGiftError && visibleMergedGifts.length === 0}
         isPremiumLive={initData.liveInfo?.isPremiumLive ?? false}
+        showNotice={showNotice}
       />
 
       <UserProfileModal

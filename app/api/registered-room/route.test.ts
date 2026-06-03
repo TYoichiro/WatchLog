@@ -369,7 +369,7 @@ describe("PUT /api/registered-room", () => {
       await PUT(makePutRequest(validBody()));
 
       expect(mocks.loggerInfo).toHaveBeenCalledWith(
-        "Premium role granted via admin invite code",
+        "管理者招待コードによりプレミアムロールが付与されました",
         { userId, inviterUserId: adminUserId },
       );
     });

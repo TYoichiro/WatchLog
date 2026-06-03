@@ -1,5 +1,6 @@
 import { authzErrorResponse, hasTopAdminRole, hasPremiumRole, requireUser } from "@/lib/authz";
 import { toJstWallTimeIsoString } from "@/lib/jst";
+import { logger } from "@/lib/logger";
 import { deleteUserOnliveLog, getAnyOnliveLog, getUserOnliveLog, updateOnliveLogTitle } from "@/lib/onlive-log";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ export async function GET(
   } catch (error) {
     const response = authzErrorResponse(error);
     if (response) return response;
+    logger.error("オンライブログの取得に失敗しました", { logId, error: String(error) });
     return Response.json({ error: "Failed to fetch log" }, { status: 500 });
   }
 }
@@ -71,10 +73,12 @@ export async function PATCH(
       return Response.json({ error: "Log not found" }, { status: 404 });
     }
 
+    logger.info("オンライブログのタイトルを更新しました", { userId: user.id, logId, title });
     return Response.json({ ok: true, title });
   } catch (error) {
     const response = authzErrorResponse(error);
     if (response) return response;
+    logger.error("オンライブログのタイトル更新に失敗しました", { logId, error: String(error) });
     return Response.json({ error: "Failed to update log title" }, { status: 500 });
   }
 }
@@ -97,6 +101,7 @@ export async function DELETE(
       return Response.json({ error: "Log not found" }, { status: 404 });
     }
 
+    logger.info("オンライブログを削除しました", { userId: user.id, logId });
     return Response.json({ ok: true });
   } catch (error) {
     const response = authzErrorResponse(error);
@@ -105,6 +110,7 @@ export async function DELETE(
       return response;
     }
 
+    logger.error("オンライブログの削除に失敗しました", { logId, error: String(error) });
     return Response.json({ error: "Failed to delete log" }, { status: 500 });
   }
 }

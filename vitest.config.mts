@@ -10,6 +10,7 @@ export default defineConfig({
       "next/link": resolve(import.meta.dirname, "./test-utils/mocks/next-link.tsx"),
       "next/server": resolve(import.meta.dirname, "./node_modules/next/server.js"),
       "hls.js": resolve(import.meta.dirname, "./test-utils/mocks/hls.ts"),
+      "@/auth": resolve(import.meta.dirname, "./test-utils/mocks/auth.ts"),
     },
   },
   test: {

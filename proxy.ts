@@ -1,8 +1,10 @@
+import { log } from "next-axiom";
 import { auth } from "@/auth";
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 
 export const proxy = auth((request) => {
+  log.middleware(request);
   const { pathname } = request.nextUrl;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-watchlog-pathname", pathname);
@@ -14,12 +16,17 @@ export const proxy = auth((request) => {
       request.headers.get("x-real-ip") ??
       "unknown";
     const ua = request.headers.get("user-agent") ?? undefined;
-    logger.info("API request", {
+    logger.info("APIリクエスト", {
       method: request.method,
       path: pathname,
       userId,
       ip,
       ua,
+    });
+  } else if (!process.env.VERCEL && !pathname.startsWith("/api/")) {
+    logger.info("アクセス", {
+      method: request.method,
+      path: pathname,
     });
   }
 

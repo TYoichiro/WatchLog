@@ -77,7 +77,7 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  logger.info("Room registration attempt", { userId, roomId });
+  logger.info("ルーム登録を試みています", { userId, roomId });
 
   const [currentUserRoom, isTopAdmin] = await Promise.all([
     getUserRegisteredRoom(userId),
@@ -85,7 +85,7 @@ export async function PUT(request: NextRequest) {
   ]);
 
   if (currentUserRoom) {
-    logger.warn("Room registration rejected: user already has a registered room", {
+    logger.warn("ルーム登録拒否: ユーザーは既にルームを登録済みです", {
       userId,
       existingRoomId: currentUserRoom.roomId,
     });
@@ -99,7 +99,7 @@ export async function PUT(request: NextRequest) {
     const existingOwner = await getRegisteredRoomOwner(userId, roomId, roomUrl);
 
     if (existingOwner) {
-      logger.warn("Room registration rejected: room already registered by another user", {
+      logger.warn("ルーム登録拒否: このルームは既に別のユーザーが登録済みです", {
         userId,
         roomId,
         existingOwnerUserId: existingOwner.userId,
@@ -118,7 +118,7 @@ export async function PUT(request: NextRequest) {
         userId,
         tx
       );
-      logger.debug("Invitation code consumed", { userId, inviteCodeId: consumedInviteCode.id });
+      logger.debug("招待コードが使用されました", { userId, inviteCodeId: consumedInviteCode.id });
 
       const registeredRoom = await saveUserRegisteredRoom(
         userId,
@@ -176,7 +176,7 @@ export async function PUT(request: NextRequest) {
             tx
           );
 
-          logger.info("Premium role granted via admin invite code", {
+          logger.info("管理者招待コードによりプレミアムロールが付与されました", {
             userId,
             inviterUserId: consumedInviteCode.inviterUserId,
           });
@@ -202,15 +202,15 @@ export async function PUT(request: NextRequest) {
       return registeredRoom;
     });
 
-    logger.info("Room registration succeeded", { userId, roomId: room.roomId, roomName: room.roomName });
+    logger.info("ルーム登録が完了しました", { userId, roomId: room.roomId, roomName: room.roomName });
     return Response.json({ room });
   } catch (error) {
     if (error instanceof InvalidInvitationCodeError) {
-      logger.warn("Room registration rejected: invalid invitation code", { userId, roomId });
+      logger.warn("ルーム登録拒否: 無効な招待コードです", { userId, roomId });
       return Response.json({ error: error.message }, { status: error.status });
     }
 
-    logger.error("Room registration failed", { userId, roomId, error: String(error) });
+    logger.error("ルーム登録に失敗しました", { userId, roomId, error: String(error) });
     throw error;
   }
 }

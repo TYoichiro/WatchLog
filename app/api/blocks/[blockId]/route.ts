@@ -19,11 +19,11 @@ export async function DELETE(
     const deleted = await deleteUserBlock(user.id, blockId);
 
     if (!deleted) {
-      logger.warn("Block delete: not found or not owned by user", { userId: user.id, blockId });
+      logger.warn("ブロック削除: 見つからないかユーザーが所有していません", { userId: user.id, blockId });
       return Response.json({ error: "Block not found" }, { status: 404 });
     }
 
-    logger.info("Block deleted", { userId: user.id, blockId });
+    logger.info("ブロックを削除しました", { userId: user.id, blockId });
     return Response.json({ ok: true });
   } catch (error) {
     const response = authzErrorResponse(error);
@@ -32,7 +32,7 @@ export async function DELETE(
       return response;
     }
 
-    logger.error("Block delete failed", { blockId, error: String(error) });
+    logger.error("ブロックの削除に失敗しました", { blockId, error: String(error) });
     return Response.json({ error: "Failed to delete block" }, { status: 500 });
   }
 }

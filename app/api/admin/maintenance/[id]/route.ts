@@ -124,7 +124,7 @@ export async function PATCH(
       return window;
     });
 
-    logger.info("Maintenance window updated", {
+    logger.info("メンテナンス期間を更新しました", {
       actorId: actor.id,
       windowId: id,
     });
@@ -134,7 +134,7 @@ export async function PATCH(
     const authzResponse = authzErrorResponse(error);
     if (authzResponse) return authzResponse;
 
-    logger.error("Admin maintenance update failed", { error: String(error) });
+    logger.error("管理者: メンテナンス期間の更新に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
@@ -171,7 +171,7 @@ export async function DELETE(
       );
     });
 
-    logger.info("Maintenance window deleted", {
+    logger.info("メンテナンス期間を削除しました", {
       actorId: actor.id,
       windowId: id,
     });
@@ -181,7 +181,7 @@ export async function DELETE(
     const authzResponse = authzErrorResponse(error);
     if (authzResponse) return authzResponse;
 
-    logger.error("Admin maintenance delete failed", { error: String(error) });
+    logger.error("管理者: メンテナンス期間の削除に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

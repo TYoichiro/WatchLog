@@ -112,7 +112,7 @@ describe("POST /api/admin/sessions/cleanup", () => {
         },
       },
     );
-    expect(mocks.loggerInfo).toHaveBeenCalledWith("Expired sessions cleaned up", {
+    expect(mocks.loggerInfo).toHaveBeenCalledWith("期限切れセッションを削除しました", {
       actorId: "admin-1",
       deletedCount: 2,
       expiredBefore: "2026-05-11T14:00:00.000+09:00",
@@ -142,7 +142,7 @@ describe("POST /api/admin/sessions/cleanup", () => {
 
     expect(response.status).toBe(500);
     expect(await expectJson(response)).toEqual({ error: "Internal Server Error" });
-    expect(mocks.loggerError).toHaveBeenCalledWith("Expired session cleanup failed", {
+    expect(mocks.loggerError).toHaveBeenCalledWith("期限切れセッションの削除に失敗しました", {
       error: "Error: database failed",
     });
   });

@@ -37,7 +37,7 @@ export async function POST() {
       return result;
     });
 
-    logger.info("Expired sessions cleaned up", {
+    logger.info("期限切れセッションを削除しました", {
       actorId: actor.id,
       deletedCount: deleted.count,
       expiredBefore: expiredBeforeIso,
@@ -53,7 +53,7 @@ export async function POST() {
       return authzResponse;
     }
 
-    logger.error("Expired session cleanup failed", { error: String(error) });
+    logger.error("期限切れセッションの削除に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

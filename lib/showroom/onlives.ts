@@ -32,8 +32,8 @@ type ShowroomOnliveItemRaw = {
   live_id: number;
   genre_id: number;
   genre_name: string;
-  badge_list: ShowroomOnliveBadgeRaw[];
-  streaming_url_list: ShowroomStreamingUrlRaw[];
+  badge_list?: ShowroomOnliveBadgeRaw[];
+  streaming_url_list?: ShowroomStreamingUrlRaw[];
   bcsvr_key?: string;
   cell_type?: number;
   official_lv?: number;
@@ -139,12 +139,12 @@ function mapOnliveItem(raw: ShowroomOnliveItemRaw): OnliveItem {
     liveId: raw.live_id,
     genreId: raw.genre_id,
     genreName: raw.genre_name,
-    badgeList: raw.badge_list.map((b) => ({
+    badgeList: (raw.badge_list ?? []).map((b) => ({
       imageUrl: b.image_url,
       type: b.type,
       id: b.id,
     })),
-    streamingUrlList: raw.streaming_url_list.map((s) => ({
+    streamingUrlList: (raw.streaming_url_list ?? []).map((s) => ({
       isDefault: s.is_default,
       url: s.url,
       label: s.label,

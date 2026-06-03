@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       return authzResponse;
     }
 
-    logger.error("Admin audit-logs fetch failed", { error: String(error) });
+    logger.error("管理者: 監査ログの取得に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

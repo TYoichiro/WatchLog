@@ -164,7 +164,7 @@ export async function PATCH(
       return notice;
     });
 
-    logger.info("Dashboard notice updated", {
+    logger.info("ダッシュボードお知らせを更新しました", {
       actorId: actor.id,
       noticeId: id,
     });
@@ -174,7 +174,7 @@ export async function PATCH(
     const authzResponse = authzErrorResponse(error);
     if (authzResponse) return authzResponse;
 
-    logger.error("Admin notice update failed", { error: String(error) });
+    logger.error("管理者: お知らせの更新に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
@@ -216,7 +216,7 @@ export async function DELETE(
       );
     });
 
-    logger.info("Dashboard notice deleted", {
+    logger.info("ダッシュボードお知らせを削除しました", {
       actorId: actor.id,
       noticeId: id,
     });
@@ -226,7 +226,7 @@ export async function DELETE(
     const authzResponse = authzErrorResponse(error);
     if (authzResponse) return authzResponse;
 
-    logger.error("Admin notice delete failed", { error: String(error) });
+    logger.error("管理者: お知らせの削除に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

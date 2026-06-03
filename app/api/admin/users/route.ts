@@ -60,7 +60,7 @@ export async function GET() {
       return authzResponse;
     }
 
-    logger.error("Admin user list failed", { error: String(error) });
+    logger.error("管理者: ユーザー一覧の取得に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

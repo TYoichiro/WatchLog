@@ -34,12 +34,12 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (body.role === "premiumuser") {
       await setPremiumRole(userId, actor.id);
-      logger.info("Role set to premium", { actorId: actor.id, userId });
+      logger.info("ロールをプレミアムに設定しました", { actorId: actor.id, userId });
       return Response.json({ role: "premiumuser" });
     }
 
     await removePremiumRole(userId, actor.id);
-    logger.info("Role set to general", { actorId: actor.id, userId });
+    logger.info("ロールを一般に設定しました", { actorId: actor.id, userId });
     return Response.json({ role: "general" });
   } catch (error) {
     const authzResponse = authzErrorResponse(error);
@@ -47,7 +47,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return authzResponse;
     }
 
-    logger.error("Role update failed", { error: String(error) });
+    logger.error("ロールの更新に失敗しました", { error: String(error) });
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
