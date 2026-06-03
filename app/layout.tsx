@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import { GeistSans } from "geist/font/sans";
 import { cn } from "@/lib/utils";
 import { getActiveMaintenanceWindow } from "@/lib/maintenance";
@@ -52,6 +53,7 @@ export default async function RootLayout({
           {children}
         </TooltipProvider>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
