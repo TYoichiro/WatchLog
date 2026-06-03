@@ -383,12 +383,14 @@ function AppSidebar({
 
 function AppHeader({
   className,
+  headerActions,
   onToggleMenu,
   showMenu,
   isBrandLinkEnabled,
   title = "WatchLog",
 }: {
   className?: string;
+  headerActions?: ReactNode;
   onToggleMenu: () => void;
   showMenu: boolean;
   isBrandLinkEnabled: boolean;
@@ -426,6 +428,7 @@ function AppHeader({
             title
           )}
         </h1>
+        {headerActions}
       </div>
       <div className="shrink-0 text-sm font-medium text-slate-500">v3.0.0-β</div>
     </header>
@@ -435,6 +438,7 @@ function AppHeader({
 export function AppShell({
   activeKey,
   children,
+  headerActions,
   headerClassName,
   homeLabel,
   isAdmin = false,
@@ -445,6 +449,7 @@ export function AppShell({
 }: {
   activeKey?: NavigationKey;
   children?: ReactNode;
+  headerActions?: ReactNode;
   headerClassName?: string;
   homeLabel?: string;
   isAdmin?: boolean;
@@ -488,6 +493,7 @@ export function AppShell({
         <div className="flex min-w-0 flex-1 flex-col xl:h-screen xl:overflow-hidden">
           <AppHeader
             className={headerClassName}
+            headerActions={headerActions}
             showMenu={showMenu}
             onToggleMenu={handleToggleMenu}
             isBrandLinkEnabled={isBrandLinkEnabled}
