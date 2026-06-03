@@ -1,8 +1,10 @@
+import { log } from "next-axiom";
 import { auth } from "@/auth";
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 
 export const proxy = auth((request) => {
+  log.middleware(request);
   const { pathname } = request.nextUrl;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-watchlog-pathname", pathname);
