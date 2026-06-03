@@ -234,6 +234,7 @@ afterEach(() => {
 
 beforeEach(() => {
   MockWebSocket.instances = [];
+  localStorage.clear();
   vi.stubGlobal("fetch", fetchMock);
   vi.stubGlobal("WebSocket", MockWebSocket);
 });
@@ -487,5 +488,96 @@ describe("DashboardPage", () => {
     await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
 
     expect(MockWebSocket.instances).toHaveLength(0);
+  });
+});
+
+describe("DashboardPage localStorage cache", () => {
+  const CACHE_KEY = "watchlog_dashboard";
+
+  const validCache = {
+    profile,
+    activeFan,
+    notices: [
+      {
+        body: "Cached notice body.",
+        date: "2026/05/09 21:00",
+        id: 1,
+        linkUrl: null,
+        title: "Cached Notice",
+      },
+    ],
+    noticesHasError: false,
+    cachedAt: Date.now(),
+  };
+
+  it("displays cached data immediately without skeleton when a valid cache exists", () => {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(validCache));
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+
+    render(<DashboardPage />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Alpha Room" })).toBeDefined();
+    expect(screen.queryByText("読み込み中")).toBeNull();
+  });
+
+  it("saves profile, activeFan, and notices to localStorage after a successful fetch", async () => {
+    setupFetchScenario();
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+
+    const raw = localStorage.getItem(CACHE_KEY);
+    expect(raw).not.toBeNull();
+    const saved = JSON.parse(raw!);
+    expect(saved.profile.roomName).toBe("Alpha Room");
+    expect(saved.activeFan.totalUserCount).toBe("42");
+    expect(saved.notices).toHaveLength(1);
+    expect(typeof saved.cachedAt).toBe("number");
+  });
+
+  it("does not save isAdmin, isPremium, or eventAndSupport to localStorage", async () => {
+    setupFetchScenario({ isAdmin: true });
+
+    render(<DashboardPage />);
+
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
+
+    const raw = localStorage.getItem(CACHE_KEY);
+    const saved = JSON.parse(raw!);
+    expect(saved.isAdmin).toBeUndefined();
+    expect(saved.isPremium).toBeUndefined();
+    expect(saved.eventAndSupport).toBeUndefined();
+  });
+
+  it("ignores cache older than 24 hours and shows skeleton", () => {
+    const expiredCache = {
+      ...validCache,
+      cachedAt: Date.now() - 25 * 60 * 60 * 1000,
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(expiredCache));
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+
+    render(<DashboardPage />);
+
+    expect(screen.getByText("読み込み中")).toBeDefined();
+    expect(screen.queryByRole("heading", { level: 1, name: "Alpha Room" })).toBeNull();
+  });
+
+  it("updates displayed data with fresh API response after showing cached content", async () => {
+    const staleCache = {
+      ...validCache,
+      profile: { ...profile, roomName: "Stale Room Name" },
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(staleCache));
+    setupFetchScenario();
+
+    render(<DashboardPage />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Stale Room Name" })).toBeDefined();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1, name: "Alpha Room" })).toBeDefined();
+    });
   });
 });
