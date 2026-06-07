@@ -34,7 +34,14 @@ Prisma Client は `prisma/schema.prisma` の generator 設定により `app/gene
 
 ## 必要なもの
 
-- Node.js 24 系を推奨（Dockerfile は `node:24-alpine` を使用）
+### Docker Compose で起動する場合
+
+- Docker & Docker Compose
+- Google OAuth クライアント
+
+### ローカルで直接起動する場合
+
+- Node.js 24 系推奨
 - npm
 - PostgreSQL
 - Google OAuth クライアント
@@ -47,13 +54,37 @@ http://localhost:3000/api/auth/callback/google
 
 ## セットアップ
 
-依存関係をインストールします。
+### Docker Compose（推奨）
 
-```bash
-npm install
+`.env` を作成し、認証情報を設定します。`DATABASE_URL` は compose.yml が自動で上書きするため任意の値で構いません。
+
+```env
+DATABASE_URL="postgresql://watchlog:watchlog@localhost:5432/watchlog"
+AUTH_SECRET="your-long-random-secret"
+AUTH_GOOGLE_ID="Google OAuth Client ID"
+AUTH_GOOGLE_SECRET="Google OAuth Client Secret"
+NEXTAUTH_URL="http://localhost:3000"
 ```
 
-`.env.local` を作成し、必要な環境変数を設定します。
+1 コマンドで PostgreSQL の起動・マイグレーション適用・開発サーバーの起動をすべて行います。
+
+```bash
+docker compose up
+```
+
+初回は `npm ci` が走るため数分かかります。2 回目以降は `node_modules` がキャッシュされるため高速に起動します。
+
+初期データが必要な場合は別ターミナルで実行してください。
+
+```bash
+docker compose exec app npm run prisma:seed
+```
+
+ブラウザで `http://localhost:3000` を開きます。
+
+### ローカル直接起動
+
+`.env` を作成し、環境変数を設定します。
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/watchlog"
@@ -63,10 +94,10 @@ AUTH_GOOGLE_SECRET="Google OAuth Client Secret"
 NEXTAUTH_URL="http://localhost:3000"
 ```
 
-Prisma Client を生成し、既存マイグレーションを適用して初期データを投入します。
+依存関係をインストールし、マイグレーションを適用して初期データを投入します。
 
 ```bash
-npm run prisma:generate
+npm install
 npm run prisma:migrate
 npm run prisma:seed
 ```
@@ -168,9 +199,16 @@ npm run build
 
 Prisma schema を変更した場合は `npm run prisma:generate` を実行し、必要に応じて migration を追加してください。
 
-## Docker
+## Docker Compose 構成
 
-`Dockerfile` は Next.js の `standalone` 出力を使う 3 stage build です。ビルド時は Prisma Client 生成と Next.js ビルドのためにダミー環境変数を使い、実行時の値はコンテナ起動時に注入する前提です。
+`compose.yml` は次の 2 サービスで構成されています。
+
+| サービス | 内容 |
+| --- | --- |
+| `db` | PostgreSQL 16。データは `postgres_data` ボリュームに永続化 |
+| `app` | `node:24-alpine` イメージでソースをマウント。起動時に `npm ci → prisma migrate deploy → npm run dev` を実行 |
+
+`node_modules` は名前付きボリューム（`node_modules`）に格納するため、Windows ホストのバイナリと Linux コンテナのバイナリが混在しません。`DATABASE_URL` は `compose.yml` の `environment:` で上書きされるため、`.env` 内の値は compose 起動時には参照されません。
 
 ## ライセンス
 
