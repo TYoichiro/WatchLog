@@ -95,7 +95,9 @@ Next.js ミドルウェアで認証状態を検査します。`/maintenance` は
 **レンダリングフロー**:
 1. `getActiveMaintenanceWindow()` を呼び出す
 2. 戻り値が `null` の場合は `redirect("/")` でホームへリダイレクト
-3. 取得できた場合はメンテナンス情報を表示する
+3. `auth()` でセッション確認し `userId` を取得
+4. `userId` がある場合は `hasTopAdminRole(userId)` で管理者判定
+5. メンテナンス情報を表示（管理者の場合は `<StopMaintenanceButton>` も表示）
 
 **使用コンポーネント**:
 
@@ -104,6 +106,7 @@ Next.js ミドルウェアで認証状態を検査します。`/maintenance` は
 | `Badge` | 「Maintenance」ラベル（outline、amber） |
 | `Wrench`（lucide-react） | メンテナンスアイコン |
 | `Clock3`（lucide-react） | 期間表示アイコン |
+| `StopMaintenanceButton` | 管理者向けメンテナンス停止ボタン（`isAdmin = true` のときのみ） |
 
 **表示要素**:
 
@@ -114,11 +117,31 @@ Next.js ミドルウェアで認証状態を検査します。`/maintenance` は
 | タイトル | `maintenanceWindow.title` |
 | 期間テキスト | `maintenanceWindow.period` + `" までメンテナンス中です。"` |
 | メッセージ | `maintenanceWindow.message` が存在する場合はその値、`null` の場合はデフォルトメッセージ |
+| 管理者操作セクション | `isAdmin = true` のとき: 区切り線（`border-t`）の下に `<StopMaintenanceButton windowId={maintenanceWindow.id} />` を表示 |
 
 **デフォルトメッセージ**（`message` が `null` のとき）:
 ```
 ただいまシステムメンテナンスを実施しています。終了後に再度アクセスしてください。
 ```
+
+### StopMaintenanceButton
+
+- **ファイル**: [components/maintenance/stop-maintenance-button.tsx](../components/maintenance/stop-maintenance-button.tsx)
+- **種別**: Client Component (`"use client"`)
+
+管理者専用のメンテナンス停止ボタン。`PATCH /api/admin/maintenance/{windowId}` に `{ isEnabled: false }` を送信し、成功後はルーターをリフレッシュして `/` へ遷移します。
+
+**Props**:
+
+| prop | 型 | 説明 |
+|------|----|------|
+| `windowId` | `string` | 停止対象のメンテナンスウィンドウ ID |
+
+**動作**:
+- ボタン押下で `PATCH /api/admin/maintenance/{windowId}` を呼び出し `isEnabled: false` に更新
+- 処理中はボタンを `disabled` にして「停止中...」テキストを表示
+- 成功後: `router.refresh()` → `router.push("/")`
+- 失敗時: エラーメッセージをボタン下に表示（赤文字）
 
 ---
 
@@ -236,8 +259,10 @@ type ActiveMaintenanceWindow = {
 | ファイル | 役割 |
 |----------|------|
 | [app/maintenance/page.tsx](../app/maintenance/page.tsx) | メンテナンスページコンポーネント |
+| [components/maintenance/stop-maintenance-button.tsx](../components/maintenance/stop-maintenance-button.tsx) | 管理者向けメンテナンス停止ボタン |
 | [lib/maintenance.ts](../lib/maintenance.ts) | アクティブウィンドウ取得・期間フォーマット |
 | [lib/jst.ts](../lib/jst.ts) | JST 変換・日時フォーマット |
+| [lib/authz.ts](../lib/authz.ts) | 管理者権限判定（`hasTopAdminRole`） |
 | [app/layout.tsx](../app/layout.tsx) | ルートレイアウト（全ページへのメンテナンスリダイレクト） |
 | [proxy.ts](../../proxy.ts) | Next.js ミドルウェア（未認証アクセス制御・pathname ヘッダー設定） |
 | [prisma/schema.prisma](../../prisma/schema.prisma) | `MaintenanceWindow` モデル定義 |

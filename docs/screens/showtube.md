@@ -10,7 +10,7 @@
 | 権限要否 | `admin` または `premiumuser` ロール（不足時は `/dashboard` へリダイレクト） |
 | ページタイトル | `ShowTube \| WatchLog` |
 | ナビゲーション | `ShowTubeShell`（サイドバー・ヘッダー） |
-| バージョン表記 | `v3.0.0-β`（ヘッダー右端） |
+| バージョン表記 | `APP_VERSION`（`lib/version.ts` から動的生成。`package.json` の `version` フィールドを使用） |
 
 SHOWROOM の現在配信中のルームをジャンル別に一覧表示する画面です。各カードをクリックすると視聴ページへ遷移します。
 

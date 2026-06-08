@@ -134,21 +134,29 @@ type RoomListItem = {
 { "role": "premiumuser" }
 ```
 
-**内部処理（トランザクション）**:
-- `role = "premiumuser"` のとき:
-  1. 対象ユーザーの存在確認（存在しなければ 404）
-  2. `UserRole` に `premiumuser` ロールを upsert
-  3. 監査ログ記録（`role.assign`）
-- `role = "general"` のとき:
-  1. 対象ユーザーの存在確認（存在しなければ 404）
-  2. `UserRole` から `premiumuser` ロールを deleteMany（`admin` ロールは対象外）
-  3. 削除件数 > 0 の場合、監査ログ記録（`role.remove`）
+**内部処理**:
+1. 対象ユーザーの存在確認（存在しなければ 404）— トランザクション外
+2. トランザクション内:
+   - `role = "premiumuser"` のとき:
+     - `UserRole` に `premiumuser` ロールを upsert
+     - 監査ログ記録（`role.assign`）
+   - `role = "general"` のとき:
+     - `UserRole` から `premiumuser` ロールを deleteMany（`admin` ロールは対象外）
+     - 削除件数 > 0 の場合、監査ログ記録（`role.remove`）
 
 **レスポンス（200）**:
 
 ```json
 { "role": "premiumuser" }
 ```
+
+または
+
+```json
+{ "role": "general" }
+```
+
+（リクエストで指定した `role` の値をそのまま返す）
 
 **エラーレスポンス**:
 
@@ -168,15 +176,20 @@ type RoomListItem = {
 
 ```prisma
 model UserRegisteredRoom {
-  id        String   @id @default(cuid())
-  roomId    String
-  roomUrl   String
-  roomName  String?
-  imageUrl  String?  @map("image_url")
-  createdAt DateTime @default(now()) @map("created_at")
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
-  ...
+  id           String          @id @default(cuid())
+  userId       String          @unique @map("user_id")
+  roomId       String          @map("room_id")
+  roomUrl      String          @map("room_url")
+  roomName     String?         @map("room_name")
+  imageUrl     String?         @map("image_url") @db.Text
+  inviteCodeId String?         @unique @map("invite_code_id")
+  createdAt    DateTime        @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt    DateTime        @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inviteCode   InvitationCode? @relation(fields: [inviteCodeId], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+  @@map("user_registered_rooms")
 }
 ```
 

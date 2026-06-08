@@ -103,11 +103,11 @@ type NoticeItem = {
 
 **ステータスバッジ（`getNoticeStatus`）**:
 
-| ステータス | 条件 | バッジ色 |
-|-----------|------|---------|
-| `"scheduled"` | `now < publishedAt` | amber |
-| `"expired"` | `expiresAt` あり かつ `now >= expiresAt` | slate |
-| `"publishing"` | 上記以外 | emerald |
+| ステータス | 条件 | ラベル | バッジ色 |
+|-----------|------|--------|---------|
+| `"scheduled"` | `now < publishedAt` | 公開予定 | amber |
+| `"expired"` | `expiresAt` あり かつ `now >= expiresAt` | 期限切れ | slate |
+| `"publishing"` | 上記以外 | 公開中 | emerald |
 
 **表示対象バッジ（`displayTarget`）**:
 
@@ -210,11 +210,15 @@ type NoticeItem = {
 
 **リクエストボディ**: すべてのフィールドが省略可能（部分更新）
 
-**内部処理（トランザクション）**:
-1. 対象レコードの存在確認（存在しなければ 404）
-2. 日時バリデーション（既存値と合わせて `expiresAt > publishedAt` を確認）
-3. `DashboardNotice` を更新
-4. 監査ログ記録（`dashboard_notice.update`）
+**前処理**:
+1. `id` を `parseInt` でパース（NaN の場合は 400）
+2. フィールドバリデーション（title・content・displayTarget の形式、publishedAt・expiresAt のパース）
+3. 対象レコードの存在確認（存在しなければ 404）
+4. 日時バリデーション（既存値と合わせて `expiresAt > publishedAt` を確認）
+
+**トランザクション**:
+4. `DashboardNotice` を更新
+5. 監査ログ記録（`dashboard_notice.update`）
 
 **レスポンス（200）**:
 
@@ -229,8 +233,11 @@ type NoticeItem = {
 - **ファイル**: [app/api/admin/notices/[id]/route.ts](../app/api/admin/notices/%5Bid%5D/route.ts)
 - **認証・権限**: `requireTopAdminRole()`
 
-**内部処理（トランザクション）**:
-1. 対象レコードの存在確認（存在しなければ 404）
+**前処理**:
+1. `id` を `parseInt` でパース（NaN の場合は 400）
+2. 対象レコードの存在確認（存在しなければ 404）
+
+**トランザクション**:
 2. `DashboardNotice` を削除
 3. 監査ログ記録（`dashboard_notice.delete`）
 
@@ -244,7 +251,7 @@ type NoticeItem = {
 
 | ステータス | 条件 |
 |---------|------|
-| 400 | リクエストボディが無効・バリデーションエラー |
+| 400 | リクエストボディが無効・バリデーションエラー・ID が数値でない（PATCH/DELETE） |
 | 401 | 未認証 |
 | 403 | `admin` ロールなし |
 | 404 | 対象レコードが存在しない |
@@ -260,13 +267,18 @@ type NoticeItem = {
 model DashboardNotice {
   id            Int                   @id @default(autoincrement())
   title         String
-  content       String
+  content       String                @db.Text
   displayTarget DashboardNoticeTarget @default(AUTHENTICATED) @map("display_target")
   publishedAt   DateTime              @map("published_at")
   expiresAt     DateTime?             @map("expires_at")
-  linkUrl       String?               @map("link_url")
-  createdAt     DateTime              @default(now()) @map("created_at")
-  updatedAt     DateTime              @updatedAt @map("updated_at")
+  linkUrl       String?               @map("link_url") @db.Text
+  createdAt     DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt     DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
+
+  @@index([displayTarget, publishedAt])
+  @@index([publishedAt])
+  @@index([expiresAt])
+  @@map("dashboard_notices")
 }
 
 enum DashboardNoticeTarget {

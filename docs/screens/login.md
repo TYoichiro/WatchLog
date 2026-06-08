@@ -17,6 +17,7 @@
 
 | 条件 | 動作 |
 |------|------|
+| セッションあり かつ BAN済み | `/banned` へリダイレクト |
 | セッションあり かつ 登録ルームあり | `/dashboard` へリダイレクト |
 | セッションあり かつ 登録ルームなし | `/search` へリダイレクト |
 | 未ログイン | ログイン画面を表示 |
@@ -59,8 +60,8 @@
 
 **処理フロー**:
 1. `auth()` でセッション確認
-2. ユーザーIDがあれば `getUserRegisteredRoom(userId)` で登録ルームを確認
-3. リダイレクト条件を判定
+2. ユーザーIDがあれば `prisma.user.findUnique` で BAN 状態を確認 → BAN済みなら `/banned` へリダイレクト
+3. `getUserRegisteredRoom(userId)` で登録ルームを確認 → 登録ルーム有無に応じて `/dashboard` または `/search` へリダイレクト
 4. `getLoginNotices()` でログイン画面向けお知らせを取得
 5. `<LoginScreen>` に props を渡してレンダリング
 

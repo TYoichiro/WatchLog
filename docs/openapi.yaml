@@ -632,6 +632,12 @@ paths:
                 properties:
                   block:
                     $ref: "#/components/schemas/BlockEntry"
+        "400":
+          description: リクエストボディが無効、または blockedUserId / blockedUserName が未指定・空文字
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -640,6 +646,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /blocks/{blockId}:
     delete:
@@ -807,6 +815,108 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   /onlive/logs/{logId}:
+    get:
+      tags: [Onlive]
+      summary: オンライブログ取得
+      description: |
+        指定 ID のオンライブログを取得します。
+        admin ロールの場合は任意のログを取得できます。それ以外は自分が保存したログのみ取得できます。
+
+        **認証**: 必須
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: logId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: オンライブログ ID
+      responses:
+        "200":
+          description: ログ取得成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [capturedAt, liveId, log, roomId]
+                properties:
+                  capturedAt:
+                    type: string
+                    format: date-time
+                    description: キャプチャ日時（JST ISO 8601）
+                  liveId:
+                    type: string
+                  log:
+                    type: object
+                    description: 保存されたログデータ（任意の JSON オブジェクト）
+                    additionalProperties: true
+                  roomId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      tags: [Onlive]
+      summary: オンライブログのタイトル更新
+      description: |
+        指定 ID のオンライブログのタイトルを更新します。
+        admin ロールの場合は任意のログを更新できます。それ以外は自分が保存したログのみ更新できます。
+        `title` に空文字または未指定を渡すとタイトルをクリアします。
+
+        **ロール**: `admin` または `premiumuser`
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: logId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: オンライブログ ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: 設定するタイトル。空文字またはスペースのみの場合はタイトルをクリア。
+      responses:
+        "200":
+          description: タイトル更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, title]
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  title:
+                    type: string
+                    nullable: true
+                    description: 更新後のタイトル。クリアされた場合は null。
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
     delete:
       tags: [Onlive]
       summary: オンライブログ削除
@@ -911,6 +1021,7 @@ paths:
       summary: 招待コード検証
       description: |
         招待コードが有効かどうかを検証します。コードは消費されません。
+        失敗が連続 3 回に達すると自動的に BAN され、全セッションが削除されます。
 
         **認証**: 必須
       security:
@@ -932,12 +1043,34 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [valid]
-                properties:
-                  valid:
-                    type: boolean
-                    description: 有効な招待コードの場合 true
+                oneOf:
+                  - type: object
+                    required: [valid]
+                    properties:
+                      valid:
+                        type: boolean
+                        enum: [true]
+                        description: 有効な招待コードの場合 true
+                  - type: object
+                    required: [valid, banned]
+                    properties:
+                      valid:
+                        type: boolean
+                        enum: [false]
+                      banned:
+                        type: boolean
+                        enum: [true]
+                        description: 連続失敗上限に達し自動 BAN された場合 true
+                  - type: object
+                    required: [valid, remainingAttempts]
+                    properties:
+                      valid:
+                        type: boolean
+                        enum: [false]
+                      remainingAttempts:
+                        type: integer
+                        minimum: 0
+                        description: BAN までの残り試行回数
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -1627,12 +1760,14 @@ components:
 
     DashboardIsLiveResponse:
       type: object
-      required: [status, isAdmin, registeredRoom, profile, activeFan, eventAndSupport, notices, noticesHasError, roomStatus]
+      required: [status, isAdmin, isPremium, registeredRoom, profile, activeFan, eventAndSupport, notices, noticesHasError, roomStatus]
       properties:
         status:
           type: string
           enum: [is_live]
         isAdmin:
+          type: boolean
+        isPremium:
           type: boolean
         registeredRoom:
           $ref: "#/components/schemas/UserRegisteredRoom"
@@ -1661,12 +1796,14 @@ components:
 
     DashboardOkResponse:
       type: object
-      required: [status, isAdmin, registeredRoom, profile, activeFan, eventAndSupport, notices, noticesHasError, roomStatus]
+      required: [status, isAdmin, isPremium, registeredRoom, profile, activeFan, eventAndSupport, notices, noticesHasError, roomStatus]
       properties:
         status:
           type: string
           enum: [ok]
         isAdmin:
+          type: boolean
+        isPremium:
           type: boolean
         registeredRoom:
           $ref: "#/components/schemas/UserRegisteredRoom"

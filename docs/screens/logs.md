@@ -9,7 +9,7 @@
 | 認証要否 | 必要 |
 | ページタイトル | 配信ログ \| WatchLog |
 
-配信終了時に自動保存された配信ログを一覧表示する画面です。管理者は全ユーザーのログを閲覧でき、プレミアムユーザーは自分の登録ルームの DB ログを閲覧できます。非プレミアムユーザーはローカルストレージに保存された直近 1 件のログのみを閲覧できます。各ログに対して「閲覧」（詳細ページへ遷移）・「ダウンロード」（JSON ファイル出力）・「削除」が行えます。また、ダウンロードした JSON ファイルをインポートしてログを閲覧する機能（全ユーザー共通）も備えています。
+配信終了時に自動保存された配信ログを一覧表示する画面です。管理者は全ユーザーのログを閲覧でき、プレミアムユーザーは自分の登録ルームの DB ログを閲覧できます。非プレミアムユーザーはローカルストレージに保存された直近 1 件のログのみを閲覧できます。各ログに対して「閲覧」（詳細ページへ遷移）・「ダウンロード」（JSON ファイル出力）・「削除」が行えます。プレミアムユーザー・管理者はさらに「お気に入り登録」（ハートアイコン）および「タイトル編集」（インライン編集）が行えます。また、ダウンロードした JSON ファイルをインポートしてログを閲覧する機能（全ユーザー共通）も備えています。
 
 ---
 
@@ -47,30 +47,33 @@
 └────────────────────────────────────────────────────────┘
 ```
 
-### ログあり
+### ログあり（プレミアム・管理者）
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│ [サイドバー]  ログ一覧 N件                                      │
-│              ┌──────────────────────────────────────────────┐  │
-│              │ 📄 JSONログ閲覧                                │  │
-│              │   ダウンロードしたJSONファイルを選択して       │  │
-│              │   ログを閲覧できます                           │  │
-│              │                           [JSONを選択]        │  │
-│              └──────────────────────────────────────────────┘  │
-│              ┌──────────────────────────────────────────────┐  │
-│              │ 🕐 2026/05/09(土) 12:00:00                   │  │
-│              │   [Live ID: 1234567]                          │  │
-│              │   💬コメント 42  🎁ギフト 10                  │  │
-│              │     [閲覧 >]  [↓ダウンロード]  [🗑️削除]     │  │
-│              ├──────────────────────────────────────────────┤  │
-│              │ 🕐 2026/05/08(金) 20:30:00                   │  │
-│              │   [Live ID: 1234568]                          │  │
-│              │   💬コメント 18  🎁ギフト 5                   │  │
-│              │     [閲覧 >]  [↓ダウンロード]  [🗑️削除]     │  │
-│              └──────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│ [サイドバー]  ログ一覧 N件                        [表示件数: 20件▼] │
+│              ┌────────────────────────────────────────────────┐    │
+│              │ 📄 JSONログ閲覧                                  │    │
+│              │   ダウンロードしたJSONファイルを選択して         │    │
+│              │   ログを閲覧できます                             │    │
+│              │                             [JSONを選択]        │    │
+│              └────────────────────────────────────────────────┘    │
+│              ┌────────────────────────────────────────────────┐    │
+│              │ ♡  🕐 2026/05/09(土) 12:00:00 ✏️              │    │
+│              │     [Live ID: 1234567]                          │    │
+│              │     💬コメント 42  🎁ギフト 10                  │    │
+│              │       [閲覧 >]  [↓ダウンロード]  [🗑️削除]     │    │
+│              ├────────────────────────────────────────────────┤    │
+│              │ ♡  🕐 カスタムタイトル ✏️                       │    │
+│              │     [Live ID: 1234568]                          │    │
+│              │     💬コメント 18  🎁ギフト 5                   │    │
+│              │       [閲覧 >]  [↓ダウンロード]  [🗑️削除]     │    │
+│              └────────────────────────────────────────────────┘    │
+│              [< 前] [1] [2] [3] [...] [10] [次 >]                  │
+└────────────────────────────────────────────────────────────────────┘
 ```
+
+> ♡ = お気に入りボタン（canEdit 時のみ表示）、✏️ = タイトル編集ボタン（canEdit 時のみ表示）
 
 ---
 
@@ -100,7 +103,20 @@
 | `deleteErrorMessage` | `string \| null` | `null` | 削除エラーメッセージ |
 | `downloadingLogId` | `string \| null` | `null` | ダウンロード処理中のログ ID |
 | `jsonImportError` | `string \| null` | `null` | JSONインポートエラーメッセージ |
-| `fileInputRef` | `RefObject<HTMLInputElement \| null>` | — | JSONファイル選択用 `<input type="file">` の ref |
+| `pageSize` | `PageSize`（20 \| 50 \| 100） | `20` | 1ページあたりの表示件数 |
+| `currentPage` | `number` | `1` | 現在のページ番号 |
+
+**派生値（`canEdit`）：**
+
+`canEdit = isPremium !== false` — お気に入り切り替え・タイトル編集はプレミアムユーザー・管理者のみ操作可能。非プレミアムユーザーは表示のみ。
+
+**ページネーション：**
+
+- `totalPages = Math.max(1, Math.ceil(logs.length / pageSize))`
+- `paginatedLogs = logs.slice((page - 1) * pageSize, page * pageSize)`
+- ページサイズ変更時は `currentPage` を 1 にリセット
+
+`JsonImportCard` はサブコンポーネントとして分離されており、ファイル選択用 `<input type="file">` の ref を内部で管理します。
 
 **初期化ロジック（`useState` 遅延初期化）：**
 - `isPremium = false` かつ `roomId` が指定されている場合：`readOnliveLocalLog(roomId)` を呼び出し、ローカルストレージに保存されたログを1件読み込む。存在する場合は `localLogToListItem()` でマッピングして `[localLogToListItem(localLog)]` を初期値とする。データがなければ空配列
@@ -117,10 +133,12 @@
 | `commentCount` | `log.commentCount` |
 | `createdAt` | `log.savedAt` |
 | `giftCount` | `log.giftCount` |
+| `isFavorite` | `false`（ローカルログはお気に入り未対応） |
 | `liveId` | `log.liveId` |
 | `liveRankingCount` | `log.liveRankingCount` |
 | `roomId` | `log.roomId` |
 | `roomName` | `log.roomName` |
+| `title` | `null`（ローカルログはタイトル未対応） |
 | `totalRankingCount` | `0`（ローカルログは累計ランキング未保持） |
 | `updatedAt` | `log.savedAt` |
 
@@ -138,7 +156,7 @@
 **処理フロー（管理者）**:
 1. `auth()` でユーザーID 確認、なければ `/` へリダイレクト
 2. `hasTopAdminRole(userId)` で管理者判定
-3. 管理者なら `listAllOnliveLogs()` で全ログ取得（最大 500 件）
+3. 管理者なら `listAllOnliveLogs(userId)` で全ログ取得（最大 500 件）。`userId` を渡すことで管理者自身のお気に入り状態も取得する
 4. `<LogListPage initialLogs={...}>` をレンダリング
 
 **処理フロー（一般ユーザー）**:
@@ -154,7 +172,7 @@
 
 **データ変換** (`toListItem`):
 - `capturedAt`, `createdAt`, `updatedAt`: `Date` → `toJstWallTimeIsoString()` で JST ISO 文字列に変換
-- その他フィールドはそのまま渡す
+- `isFavorite`, `title` を含む他のフィールドはそのまま渡す
 
 ### LogListPage
 
@@ -200,15 +218,57 @@
 |------|------|
 | 日時（CalendarClock アイコン） | `formatLogDate(log.capturedAt)` |
 | Live ID バッジ | `Live ID: {log.liveId}`（outline バッジ） |
+| タイトル表示・編集（canEdit 時） | `log.title` の表示（Pencil アイコンボタンでインライン編集ダイアログを開く）。`canEdit = false` の場合はタイトルのみ表示 |
+| お気に入りボタン（canEdit 時） | `isFavorite` が `true` の場合はピンク塗りハート（お気に入り解除）、`false` の場合は空ハート（お気に入り追加）。`canEdit = false` の場合は非表示 |
 | コメント数（MessageSquareText アイコン） | `コメント {log.commentCount}` |
 | ギフト数（Gift アイコン） | `ギフト {log.giftCount}` |
 | 「閲覧」ボタン | `log.id.startsWith("local:")` の場合 `/logs/local/{log.roomId}` へ遷移、それ以外は `/logs/{encodeURIComponent(log.id)}` へ遷移（ChevronRight アイコン付き） |
 | 「ダウンロード」ボタン | ログを JSON ファイルとしてダウンロード（Download アイコン付き、ダウンロード中はスピナー表示・`disabled`） |
 | 「削除」ボタン | 削除確認ダイアログを開く（Trash2 アイコン付き、Destructive バリアント） |
 
+**お気に入りトグルフロー（`handleFavoriteToggle`）：**
+
+```
+お気に入りボタンをクリック
+  │
+  ▼ setLogs で isFavorite をオプティミスティックに反転（楽観的 UI 更新）
+  │
+  ▼ PUT /api/onlive/logs/{logId}/favorite
+  │
+  ├─ 成功（200）
+  │   └─ setLogs で isFavorite をレスポンスの値に更新
+  │
+  └─ 失敗
+      └─ setLogs で isFavorite を元の値に巻き戻し
+```
+
+**タイトル編集フロー（`handleTitleSave`）：**
+
+```
+タイトル保存
+  │
+  ▼ PATCH /api/onlive/logs/{logId}  { title: string | null }
+  │
+  ├─ 成功（200）
+  │   └─ setLogs で当該ログの title を更新
+  │
+  └─ 失敗
+      └─ エラーメッセージを表示（ダイアログ内）
+```
+
 **`formatLogDate` フォーマット**: `YYYY/MM/DD(曜日) HH:MM:SS`（JST、秒まで表示）
 
 **行の区切り**: `border-b border-slate-100` / 最終行は `last:border-b-0`
+
+### ページネーション UI
+
+ログ一覧の下部に表示されます。
+
+| 要素 | 内容 |
+|------|------|
+| ページサイズセレクター | `20 / 50 / 100` 件の選択肢（`PAGE_SIZE_OPTIONS`） |
+| ページナビゲーション | 前ページ（ChevronLeft）・ページ番号ボタン・次ページ（ChevronRight）。総ページ数が 1 以下の場合は非表示 |
+| 省略記号 | ページ数が 7 を超える場合に先頭・末尾付近を省略して `...` を表示 |
 
 ---
 
@@ -217,7 +277,7 @@
 | 要素 | 内容 |
 |------|------|
 | タイトル | 「ログを削除しますか？」 |
-| 説明 | `{formatLogDate(capturedAt)} のログを削除します。` |
+| 説明 | `{log.title ?? formatLogDate(log.capturedAt)} のログを削除します。`（タイトルが設定されている場合はタイトルを表示） |
 | エラー表示 | `deleteErrorMessage` があればローズ色で表示 |
 | 「いいえ」ボタン | キャンセル（削除中は `disabled`） |
 | 「はい」ボタン | 削除実行（削除中はスピナー表示・`disabled`） |
@@ -380,7 +440,7 @@ GET /api/onlive/logs/{logId}
 |------|------|
 | プレフィックス | `watchlog` |
 | ライブ ID | `log.liveId` |
-| 日付 | `capturedAt` から `YYYYMMDD` を抽出（UTC 基準） |
+| 日付 | `capturedAt` から `YYYYMMDD` を抽出（JST 基準） |
 | 拡張子 | `.json` |
 
 **例**: `watchlog-live-123-20260509.json`
@@ -501,6 +561,68 @@ DELETE /api/onlive/logs/{logId}
 | 404 | 対象ログが存在しない、または他ルームのログ（一般ユーザー） |
 | 500 | DB エラー |
 
+### PATCH /api/onlive/logs/{logId}
+
+- **ファイル**: [app/api/onlive/logs/[logId]/route.ts](../app/api/onlive/logs/%5BlogId%5D/route.ts)
+- **認証**: 必要（`requireUser()`）
+- **プレミアム制限**: `isAdmin || isPremium` でなければ `403 Forbidden`
+- **キャッシュ制御**: `force-dynamic`
+
+**リクエストボディ**:
+```json
+{ "title": "タイトル文字列（空文字または省略でクリア）" }
+```
+
+`title` が空文字・スペースのみ・未指定の場合は `null`（タイトルなし）として扱います。
+
+**内部処理**（`updateOnliveLogTitle`）:
+- 管理者は任意のログを更新可能
+- 一般ユーザーは自ルームのログのみ更新可能
+
+**レスポンス（200）**:
+
+```json
+{ "ok": true, "title": "更新後タイトル（クリア時は null）" }
+```
+
+**エラーレスポンス**:
+
+| ステータス | 条件 |
+|---------|------|
+| 400 | `logId` が空文字 |
+| 401 | 未認証 |
+| 403 | プレミアムユーザーでも管理者でもない |
+| 404 | 対象ログが存在しない、または他ルームのログ |
+| 500 | DB エラー |
+
+### PUT /api/onlive/logs/{logId}/favorite
+
+- **ファイル**: [app/api/onlive/logs/[logId]/favorite/route.ts](../app/api/onlive/logs/%5BlogId%5D/favorite/route.ts)
+- **認証**: 必要（`requireUser()`）
+- **プレミアム制限**: `isAdmin || isPremium` でなければ `403 Forbidden`
+- **キャッシュ制御**: `force-dynamic`
+
+**内部処理**（`toggleOnliveLogFavorite`）:
+- 現在の `isFavorite` を反転して保存
+- 管理者は任意のログを操作可能
+- 一般ユーザーは自ルームのログのみ操作可能
+
+**レスポンス（200）**:
+
+```json
+{ "ok": true, "isFavorite": true }
+```
+
+**エラーレスポンス**:
+
+| ステータス | 条件 |
+|---------|------|
+| 400 | `logId` が空文字 |
+| 401 | 未認証 |
+| 403 | プレミアムユーザーでも管理者でもない |
+| 404 | 対象ログが存在しない、または他ルームのログ |
+| 500 | DB エラー |
+
 ### DELETE /api/onlive/logs/{logId}
 
 - **ファイル**: [app/api/onlive/logs/[logId]/route.ts](../app/api/onlive/logs/%5BlogId%5D/route.ts)
@@ -545,10 +667,12 @@ DELETE /api/onlive/logs/{logId}
 ### listAllOnliveLogs（管理者）
 
 - **ファイル**: [lib/onlive-log.ts](../lib/onlive-log.ts)
+- **シグネチャ**: `listAllOnliveLogs(userId?: string)`
 - 全ルームのログを `isDeleted = false` で取得
 - ソート: `capturedAt DESC`
 - **最大取得件数: 500 件**
 - `prisma.userRegisteredRoom.findMany()` と `Promise.all` で並行実行し、ルーム名をマッピング
+- `userId` を指定した場合はそのユーザーのお気に入り状態も取得してマッピング
 
 ### ローカルストレージ（非プレミアム一般ユーザー）
 
@@ -597,28 +721,46 @@ DB の `log` JSON カラムから各カウントを取得します。
 
 ```prisma
 model OnliveLog {
-  id         String   @id @default(cuid())
+  id         String              @id @default(cuid())
   roomId     String
   liveId     String
   capturedAt DateTime
   log        Json
   title      String?
-  isDeleted  Boolean  @default(false)
-  createdAt  DateTime @default(dbgenerated(...))
-  updatedAt  DateTime @updatedAt
+  isDeleted  Boolean             @default(false)
+  createdAt  DateTime            @default(dbgenerated(...))
+  updatedAt  DateTime            @updatedAt
+  favorites  OnliveLogFavorite[]
 
   @@unique([roomId, liveId, capturedAt])
   @@index([roomId, liveId])
   @@index([roomId, isDeleted, capturedAt])
   @@map("onlive_logs")
 }
+
+model OnliveLogFavorite {
+  id        String    @id @default(cuid())
+  userId    String
+  logId     String
+  createdAt DateTime  @default(dbgenerated(...))
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  log       OnliveLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, logId])
+  @@index([userId, createdAt])
+  @@map("onlive_log_favorites")
+}
 ```
 
-**ユニーク制約**: `(roomId, liveId, capturedAt)` — 同じ配信・同じキャプチャ時刻のログは 1 件のみ
+**ユニーク制約（OnliveLog）**: `(roomId, liveId, capturedAt)` — 同じ配信・同じキャプチャ時刻のログは 1 件のみ
 
-**インデックス**:
+**インデックス（OnliveLog）**:
 - `(roomId, liveId)` — 配信単位での検索
 - `(roomId, isDeleted, capturedAt)` — 一覧取得クエリの最適化
+
+**ユニーク制約（OnliveLogFavorite）**: `(userId, logId)` — 1ユーザー・1ログに対してお気に入りは 1 件のみ
+
+**インデックス（OnliveLogFavorite）**: `(userId, createdAt)` — ユーザーごとのお気に入り一覧取得
 
 **論理削除**: `isDeleted = true` で論理削除（物理削除は行わない）
 
@@ -636,10 +778,12 @@ type LogListItem = {
   createdAt: string;        // JST ISO文字列
   giftCount: number;
   id: string;
+  isFavorite: boolean;
   liveId: string;
   liveRankingCount: number;
   roomId: string;
   roomName: string | null;
+  title: string | null;
   totalRankingCount: number;
   updatedAt: string;        // JST ISO文字列
 };
@@ -669,10 +813,12 @@ type OnliveLogListItem = {
   createdAt: Date;
   giftCount: number;
   id: string;
+  isFavorite: boolean;
   liveId: string;
   liveRankingCount: number;
   roomId: string;
   roomName: string | null;
+  title: string | null;
   totalRankingCount: number;
   updatedAt: Date;
 };
@@ -719,7 +865,7 @@ type JsonViewerLog = {
 
 | 機能 | 実装状況 |
 |------|---------|
-| ページネーション | なし（固定件数取得） |
+| ページネーション | あり（クライアントサイド。ページサイズ: 20/50/100 件） |
 | 無限スクロール | なし |
 | フィルタリング | なし（取得時に論理削除・ルームID で絞り込み） |
 | ソート変更 | なし（常に `capturedAt DESC`） |
@@ -749,7 +895,8 @@ type JsonViewerLog = {
 | [components/logs/local-log-viewer-page.tsx](../components/logs/local-log-viewer-page.tsx) | ローカルログ閲覧 UI（非プレミアム） |
 | [components/logs/json-import-viewer-page.tsx](../components/logs/json-import-viewer-page.tsx) | JSON インポートログ閲覧 UI（全ユーザー共通） |
 | [app/api/onlive/logs/route.ts](../app/api/onlive/logs/route.ts) | ログ保存 API（プレミアム専用） |
-| [app/api/onlive/logs/[logId]/route.ts](../app/api/onlive/logs/%5BlogId%5D/route.ts) | ログ取得（GET）・削除（DELETE）API |
+| [app/api/onlive/logs/[logId]/route.ts](../app/api/onlive/logs/%5BlogId%5D/route.ts) | ログ取得（GET）・タイトル更新（PATCH）・削除（DELETE）API |
+| [app/api/onlive/logs/[logId]/favorite/route.ts](../app/api/onlive/logs/%5BlogId%5D/favorite/route.ts) | お気に入り切り替え API（PUT） |
 | [lib/onlive-log.ts](../lib/onlive-log.ts) | ログ DB 操作・集計 |
 | [lib/onlive-local-log.ts](../lib/onlive-local-log.ts) | ローカルストレージログ読み書き・JSON インポートログ読み書き |
 | [lib/authz.ts](../lib/authz.ts) | 管理者判定・プレミアム判定（`hasPremiumRole`） |

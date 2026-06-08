@@ -64,7 +64,7 @@
 ### ページコンポーネント（Server Component）
 
 - **ファイル**: [app/block/page.tsx](../app/block/page.tsx)
-- `auth()` → `getUserRegisteredRoom()` → `<BlockListPage roomId={registeredRoom.roomId} />`
+- `auth()` → `Promise.all([getUserRegisteredRoom(), hasTopAdminRole(), hasPremiumRole()])` → `<AppShell isAdmin isPremium><BlockListPage roomId={registeredRoom.roomId} /></AppShell>`
 
 ### BlockListPage（Client Component）
 
@@ -80,16 +80,25 @@
 | `hasError` | `boolean` | 初期取得エラーフラグ |
 | `blockUser` | `Function` | ブロック追加関数 |
 | `deleteBlock` | `Function` | ブロック削除関数 |
+| `refreshBlocks` | `Function` | 一覧再取得関数 |
+
+**useUserProfile フックの戻り値**（`useUserProfile(roomId)` で取得）:
+
+| 変数 | 型 | 説明 |
+|------|----|------|
+| `target` | `ProfileTarget \| null` | プロフィールモーダルで表示中のユーザー |
+| `profile` | `RoomUserProfile \| null` | キャッシュから算出した表示中プロフィール |
+| `isLoading` | `boolean` | プロフィール取得中フラグ |
+| `hasError` | `boolean` | プロフィール取得エラーフラグ |
+| `view` | `ProfileView` | プロフィールモーダルの表示タブ |
+| `openProfile` | `Function` | プロフィール表示を開く関数 |
+| `closeProfile` | `Function` | プロフィール表示を閉じる関数 |
+| `setView` | `Function` | タブ切り替え関数 |
 
 **コンポーネント内ローカル State**:
 
 | state 変数 | 型 | 初期値 | 説明 |
 |------------|----|----|------|
-| `selectedProfileTarget` | `ProfileTarget \| null` | `null` | プロフィールモーダルで表示中のユーザー |
-| `profileCache` | `Record<string, RoomUserProfile>` | `{}` | 取得済みプロフィールのキャッシュ |
-| `isProfileLoading` | `boolean` | `false` | プロフィール取得中フラグ |
-| `hasProfileError` | `boolean` | `false` | プロフィール取得エラーフラグ |
-| `profileView` | `ProfileView` | `"user"` | プロフィールモーダルの表示タブ |
 | `pendingDeleteBlock` | `UserBlockListItem \| null` | `null` | 削除確認中のブロック |
 | `isDeleting` | `boolean` | `false` | 削除処理中フラグ |
 | `deleteErrorMessage` | `string \| null` | `null` | 削除エラーメッセージ |
@@ -109,8 +118,9 @@
 
 **処理フロー**:
 1. `auth()` でユーザーID 確認、なければ `/` へリダイレクト
-2. `getUserRegisteredRoom(userId)` で登録ルームを確認、なければ `/search` へリダイレクト
-3. `<AppShell activeKey="block">` 内に `<BlockListPage roomId={registeredRoom.roomId}>` をレンダリング
+2. `Promise.all()` で `getUserRegisteredRoom(userId)`・`hasTopAdminRole(userId)`・`hasPremiumRole(userId)` を並行取得
+3. `registeredRoom` がなければ `/search` へリダイレクト
+4. `<AppShell activeKey="block" isAdmin={isAdmin} isPremium={isPremium}>` 内に `<BlockListPage roomId={registeredRoom.roomId}>` をレンダリング
 
 ### BlockListPage
 
@@ -123,7 +133,7 @@
 
 ### UserProfileModal
 
-- **インポート元**: `@/components/onlive/onlive-room-page`
+- **インポート元**: `@/components/onlive/onlive-room-page`（コンポーネント本体）、`ProfileTarget` 型は `@/hooks/use-user-profile` から import
 - プロフィール詳細の表示とブロック追加操作を行うモーダル。
 
 **渡す Props**:
@@ -169,7 +179,7 @@
 
 **`formatBlockedAt` フォーマット**: `YYYY/MM/DD HH:MM:SS`（JST、秒まで表示）
 
-**テーブルのスクロール**: `min-w-[720px]` のため、狭い画面では横スクロール可能
+**テーブルのスクロール**: `min-w-180`（720px 相当、Tailwind v4 表記）のため、狭い画面では横スクロール可能
 
 **行ホバー**: `hover:bg-slate-50`
 
@@ -191,23 +201,47 @@
 ```
 ユーザー名をクリック
   │
-  ▼ openProfile(block)
-  selectedProfileTarget = { userId, userName } をセット
-  エラー・ビュー状態をリセット
+  ▼ handleOpenProfile(block)
+  blockErrorMessage をクリア
+  openProfile(block.blockedUserId, block.blockedUserName) を呼び出し
+    └─ target = { userId, userName } をセット・hasError/view をリセット
   │
-  ▼ useEffect 発火（selectedProfileTarget が変わり、cache になければ）
+  ▼ useEffect 発火（target が変わり、profileCache に未キャッシュなら）
 GET /api/room/user-profile?room_id={roomId}&user_id={userId}
   │
   ├─ 成功 → profileCache に保存 → UserProfileModal にプロフィール渡す
-  └─ 失敗 → hasProfileError = true → UserProfileModal でエラー表示
+  └─ 失敗 → hasError = true → UserProfileModal でエラー表示
 
 ユーザーがモーダルを閉じる
   │
   ▼ handleProfileOpenChange(false)
-  selectedProfileTarget, profileView, エラー状態をすべてクリア
+  closeProfile() を呼び出し
+    └─ target / hasError / isLoading / view をすべてリセット
+  blockErrorMessage をクリア
 ```
 
-プロフィールは `profileCache` にキャッシュされるため、同一ユーザーの再表示時は API を呼び出しません。
+プロフィールは `useUserProfile` 内の `profileCache` にキャッシュされるため、同一ユーザーの再表示時は API を呼び出しません。
+
+---
+
+## Custom Hook（useUserProfile）
+
+- **ファイル**: [hooks/use-user-profile.ts](../hooks/use-user-profile.ts)
+- **種別**: `"use client"`
+
+**管理する状態**:
+- `target`（`ProfileTarget | null`）、`profileCache`（`Record<string, RoomUserProfile>`）、`isLoading`、`hasError`、`view`（`ProfileView`）
+
+**内部動作**:
+- `target` が変化し、かつ `profileCache` に未エントリなとき `useEffect` が発火
+- `GET /api/room/user-profile?room_id={roomId}&user_id={userId}` を呼び出し
+- 成功 → `profileCache` に保存（`AbortError` は無視、その他のエラーは `hasError = true`）
+
+**`openProfile(userId, userName)`**:
+- `hasError`・`view` をリセットし `target` をセット
+
+**`closeProfile()`**:
+- `target`・`hasError`・`isLoading`・`view` をすべてリセット
 
 ---
 
@@ -347,7 +381,7 @@ model UserBlock {
   blockedShowroomUserId   String
   blockedShowroomUserName String
   createdAt               DateTime @default(dbgenerated(...))
-  updatedAt               DateTime @updatedAt
+  updatedAt               DateTime @default(dbgenerated(...))
   blocker                 User     @relation("UserBlocks", fields: [blockerUserId], ...)
 
   @@unique([blockerUserId, blockedShowroomUserId])
@@ -380,14 +414,16 @@ type UserBlockListItem = {
 };
 ```
 
-### ProfileTarget
+### ProfileTarget / ProfileView
 
 ```typescript
-// components/onlive/onlive-room-page.tsx から import
+// hooks/use-user-profile.ts から export
 type ProfileTarget = {
   userId: string;
   userName: string;
 };
+
+type ProfileView = "user" | "room";
 ```
 
 ---
@@ -416,4 +452,5 @@ type ProfileTarget = {
 | [app/api/blocks/[blockId]/route.ts](../app/api/blocks/%5BblockId%5D/route.ts) | DELETE API |
 | [lib/user-blocks.ts](../lib/user-blocks.ts) | ブロック DB 操作・ビジネスロジック |
 | [lib/showroom-block-filter.ts](../lib/showroom-block-filter.ts) | ブロックフィルター関数（他画面でも使用） |
-| [components/onlive/onlive-room-page.tsx](../components/onlive/onlive-room-page.tsx) | UserProfileModal・ProfileTarget 型定義 |
+| [hooks/use-user-profile.ts](../hooks/use-user-profile.ts) | プロフィール状態管理カスタムフック（ProfileTarget・ProfileView 型定義） |
+| [components/onlive/onlive-room-page.tsx](../components/onlive/onlive-room-page.tsx) | UserProfileModal コンポーネント |

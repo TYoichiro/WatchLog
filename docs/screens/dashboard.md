@@ -91,6 +91,8 @@
 | state 変数 | 型 | 初期値 | 説明 |
 |------------|----|----|------|
 | `canShowDashboard` | `boolean` | `false` | スケルトンから本体への切り替えフラグ |
+| `dashboardData.isAdmin` | `boolean` | `false` | 管理者フラグ（AppShell・WebSocket 制御に使用） |
+| `dashboardData.isPremium` | `boolean` | `false` | プレミアムユーザーフラグ（AppShell に渡す） |
 | `dashboardData.profile` | `RoomProfile \| null` | `null` | ルームプロフィール |
 | `dashboardData.activeFan` | `ActiveFanSummary \| null` | `null` | アクティブファン情報 |
 | `dashboardData.eventAndSupport` | `EventAndSupportSummary \| null` | `null` | イベント・サポート情報 |
@@ -108,11 +110,31 @@
 
 **初期化フロー**（`useEffect` 内）:
 1. `AbortController` をセットアップ
-2. `setTimeout(0)` で非同期初期化を遅延キック
-3. `GET /api/dashboard` を呼び出し
-4. レスポンスの `status` に応じてリダイレクト or データセット
-5. `status: "ok"` の場合、`setDashboardData` → `setCanShowDashboard(true)`
-6. 管理者でなく `broadcastKey` があれば WebSocket 接続開始
+2. localStorage キャッシュを確認し、有効なキャッシュがあれば即座に `setDashboardData`（部分更新）と `setCanShowDashboard(true)` を呼び出して先行表示
+3. `setTimeout(0)` で非同期初期化を遅延キック（キャッシュの有無に関わらず必ず `GET /api/dashboard` を呼び出す）
+4. `GET /api/dashboard` を呼び出し
+5. レスポンスの `status` に応じてリダイレクト or データセット
+6. `status: "ok"` の場合、`setDashboardData` → `setCanShowDashboard(true)` → `profile`・`activeFan`・`notices`・`noticesHasError` を localStorage にキャッシュ
+7. 管理者でなく `broadcastKey` があれば WebSocket 接続開始
+
+**localStorage キャッシュ**:
+
+| 定数 | 値 | 説明 |
+|------|----|------|
+| `DASHBOARD_CACHE_KEY` | `"watchlog_dashboard"` | キャッシュキー |
+| `DASHBOARD_CACHE_TTL_MS` | `24 * 60 * 60 * 1000`（24時間） | キャッシュ有効期間 |
+
+キャッシュに保存されるフィールドは `profile`・`activeFan`・`notices`・`noticesHasError` のみです（`eventAndSupport` はキャッシュしません）。
+
+```typescript
+type DashboardCache = Pick<DashboardData, "profile" | "activeFan" | "notices" | "noticesHasError"> & {
+  cachedAt: number;
+};
+```
+
+- `readDashboardCache()`: localStorage から `DashboardCache` を読み込み、TTL 超過の場合は `null` を返す
+- `writeDashboardCache(data)`: `profile`・`activeFan`・`notices`・`noticesHasError` を `cachedAt: Date.now()` と共に localStorage に保存（書き込みエラーは無視）
+- プライベートブラウジング・容量超過時は書き込みを無視して通常動作を継続
 
 **クリーンアップ**（`useEffect` 返り値）:
 - `isActive = false` でコールバックを無効化
@@ -179,12 +201,12 @@
 
 ---
 
-### NoticesCard / NoticeListCard
+### NoticeListCard
 
 ダッシュボード向けのお知らせカード。
 
-- **ファイル**: [components/dashboard/notices-card.tsx](../components/dashboard/notices-card.tsx) → [components/notices/notice-list-card.tsx](../components/notices/notice-list-card.tsx)
-- `NoticesCard` は `NoticeListCard` への薄いラッパー
+- **ファイル**: [components/notices/notice-list-card.tsx](../components/notices/notice-list-card.tsx)
+- ページからは直接 `NoticeListCard` をインポートして使用する
 
 **Props**:
 
@@ -239,6 +261,7 @@
 {
   "status": "ok",
   "isAdmin": false,
+  "isPremium": true,
   "registeredRoom": { "roomId": "123456", "roomUrl": "room_key" },
   "profile": { ... },
   "activeFan": { ... },
@@ -358,6 +381,8 @@
 ```typescript
 // types/pages/dashboard.ts
 type DashboardData = {
+  isAdmin: boolean;
+  isPremium: boolean;
   profile: RoomProfile | null;
   activeFan: ActiveFanSummary | null;
   eventAndSupport: EventAndSupportSummary | null;
@@ -369,19 +394,22 @@ type DashboardData = {
 ### DashboardBffResponse
 
 ```typescript
+type DashboardBffOkPayload = {
+  status: "ok" | "is_live";
+  isAdmin: boolean;
+  isPremium: boolean;
+  registeredRoom: { roomId: string; roomUrl: string };
+  profile: RoomProfile | null;
+  activeFan: ActiveFanSummary | null;
+  eventAndSupport: EventAndSupportSummary | null;
+  notices: AppNotice[];
+  noticesHasError: boolean;
+  roomStatus: RoomStatus | null;
+};
+
 type DashboardBffResponse =
   | { status: "no_room" }
-  | {
-      status: "ok" | "is_live";
-      isAdmin: boolean;
-      registeredRoom: { roomId: string; roomUrl: string };
-      profile: RoomProfile | null;
-      activeFan: ActiveFanSummary | null;
-      eventAndSupport: EventAndSupportSummary | null;
-      notices: AppNotice[];
-      noticesHasError: boolean;
-      roomStatus: RoomStatus | null;
-    };
+  | DashboardBffOkPayload;
 ```
 
 ### RoomProfile
@@ -501,7 +529,6 @@ type DashboardStat = {
 | [app/dashboard/page.tsx](../app/dashboard/page.tsx) | ページコンポーネント・全サブコンポーネント・WebSocket 制御 |
 | [app/api/dashboard/route.ts](../app/api/dashboard/route.ts) | ダッシュボード BFF API |
 | [app/layout.tsx](../app/layout.tsx) | ルートレイアウト（メンテナンスチェック・デフォルトメタデータ） |
-| [components/dashboard/notices-card.tsx](../components/dashboard/notices-card.tsx) | お知らせカードラッパー |
 | [components/notices/notice-list-card.tsx](../components/notices/notice-list-card.tsx) | お知らせ表示・スケルトン |
 | [components/navigation/app-sidebar.tsx](../components/navigation/app-sidebar.tsx) | AppShell・ナビゲーション |
 | [lib/showroom/room.ts](../lib/showroom/room.ts) | SHOWROOM API クライアント（profile/activeFan/event/status） |

@@ -5,7 +5,7 @@
 | 項目 | 内容 |
 |------|------|
 | URL | `/banned` |
-| レンダリング | Client Component |
+| レンダリング | Server Component |
 | 認証要否 | 不要（認証済みユーザーがリダイレクトされる） |
 | ページタイトル | WatchLog（ルートレイアウトのデフォルト） |
 
@@ -46,7 +46,7 @@ BAN 済みユーザーが任意のページ（`/banned` および API パス以�
 ### ページ
 
 - **ファイル**: [app/banned/page.tsx](../app/banned/page.tsx)
-- **種別**: Client Component（`"use client"` なし、デフォルト）
+- **種別**: Server Component（`"use client"` なし）
 
 **実装**:
 
