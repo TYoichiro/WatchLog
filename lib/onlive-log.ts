@@ -282,6 +282,39 @@ export async function getUserOnliveLog(
   };
 }
 
+export type PreviousOnliveLog = {
+  capturedAt: Date;
+  log: Record<string, unknown>;
+};
+
+/**
+ * 同じルームで、指定した配信ログより1つ前（capturedAtが直前）の配信ログを返す。
+ * 振り返りの「前回配信との比較」に使う。
+ */
+export async function getPreviousOnliveLog(
+  roomId: string,
+  capturedAt: Date
+): Promise<PreviousOnliveLog | null> {
+  const log = await prisma.onliveLog.findFirst({
+    where: {
+      roomId,
+      isDeleted: false,
+      capturedAt: { lt: capturedAt },
+    },
+    orderBy: { capturedAt: "desc" },
+    select: { capturedAt: true, log: true },
+  });
+
+  if (!log) {
+    return null;
+  }
+
+  return {
+    capturedAt: log.capturedAt,
+    log: getJsonRecord(log.log),
+  };
+}
+
 export async function updateOnliveLogTitle(
   userId: string,
   logId: string,

@@ -283,6 +283,20 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 
 ---
 
+## 設定モーダル（`LiveSettingsModal`）
+
+`AppShell` の `headerActions` に歯車アイコンボタン（`Settings`）として配置されます。クリックすると設定ダイアログが開きます。
+
+### 設定項目
+
+| セクション | 設定名 | 内容 |
+|---|---|---|
+| コメント設定 | お知らせ系通知 | ON のとき通知行（`notice=true`）をコメント一覧に表示する。OFF のとき非表示。デフォルト ON |
+
+`showNotice` ステートは `OnliveRoomPage` が管理し、`CommentPane` に props として渡されます。`filterComments()` 関数が `showNotice=false` のとき `notice=true` のコメント行を除外します。
+
+---
+
 ## コメントパネル（`CommentPane`）
 
 ### テロップ欄
@@ -543,7 +557,7 @@ Next.js の Error Boundary が捕捉した例外が対象です。
 
 ### ブロック
 
-プロフィールモーダルのブロックボタンをクリックすると `POST /api/user-blocks` を呼び出します。  
+プロフィールモーダルのブロックボタンをクリックすると `POST /api/blocks` を呼び出します。  
 ブロック後はリアルタイムでコメント・ギフト・ランキングからそのユーザーが除外されます（フィルタリングは `filterBlockedShowroomItems()` がクライアント側で実施）。
 
 ### ブロックの適用範囲
@@ -582,8 +596,11 @@ Next.js の Error Boundary が捕捉した例外が対象です。
 |---|---|---|
 | `GET` | `/api/onlive/init` | 初期データ取得（ライブ情報・コメント・ギフト等） |
 | `GET` | `/api/onlive/poll` | 定期ポーリング（プロフィール・ランキング） |
-| `POST` | `/api/onlive/logs` | 配信終了ログ保存 |
+| `POST` | `/api/onlive/logs` | 配信終了ログ保存（プレミアムユーザー専用） |
+| `GET` | `/api/onlive/logs/:logId` | ログ取得（ユーザー本人または管理者） |
+| `PATCH` | `/api/onlive/logs/:logId` | ログタイトル更新（プレミアムユーザーまたは管理者） |
 | `DELETE` | `/api/onlive/logs/:logId` | ログ削除（ソフトデリート） |
+| `PUT` | `/api/onlive/logs/:logId/favorite` | ログお気に入りトグル（プレミアムユーザーまたは管理者） |
 | `GET` | `/api/room/user-profile` | ユーザープロフィール取得（モーダル用） |
 
 ### `GET /api/onlive/init`
@@ -641,6 +658,51 @@ Next.js の Error Boundary が捕捉した例外が対象です。
 
 `skip_ranking=1` の場合、`liveRanking` / `totalRanking` は空配列、`liveRankingHasError` / `totalRankingHasError` は `true` になります。
 
+### `GET /api/onlive/logs/:logId`
+
+**ユーザー本人または管理者のみ取得可能。** 管理者は全ログを取得できます。
+
+**レスポンス：**
+
+```json
+{
+  "capturedAt": "2024-01-01T12:00:00+09:00",
+  "liveId": "...",
+  "log": { ... },
+  "roomId": "123456"
+}
+```
+
+### `PATCH /api/onlive/logs/:logId`
+
+**プレミアムユーザーまたは管理者専用。**
+
+**リクエスト：**
+
+```json
+{ "title": "配信タイトル" }
+```
+
+`title` が空または省略された場合は `null` としてタイトルをクリアします。
+
+**レスポンス：**
+
+```json
+{ "ok": true, "title": "配信タイトル" }
+```
+
+### `PUT /api/onlive/logs/:logId/favorite`
+
+**プレミアムユーザーまたは管理者専用。**
+
+リクエストボディなし。お気に入り状態をトグルします（既にお気に入りなら解除、未登録なら追加）。
+
+**レスポンス：**
+
+```json
+{ "ok": true, "isFavorite": true }
+```
+
 ### `POST /api/onlive/logs`
 
 **プレミアムユーザー専用。** 非プレミアムユーザーが呼び出した場合は `403 Forbidden` を返します。
@@ -686,22 +748,41 @@ Next.js の Error Boundary が捕捉した例外が対象です。
 ### `OnliveLog`
 
 ```
-id          String   @id @default(cuid())
-roomId      String
-liveId      String
-capturedAt  DateTime
-log         Json
-title       String?
-isDeleted   Boolean  @default(false)
-createdAt   DateTime @default(dbgenerated(...))
-updatedAt   DateTime @updatedAt
+id         String              @id @default(cuid())
+roomId     String              @map("room_id")
+liveId     String              @map("live_id")
+capturedAt DateTime            @map("captured_at")
+log        Json
+title      String?
+isDeleted  Boolean             @default(false) @map("is_deleted")
+createdAt  DateTime            @default(dbgenerated(...)) @map("created_at")
+updatedAt  DateTime            @default(dbgenerated(...)) @map("updated_at")
+favorites  OnliveLogFavorite[]
 
 @@unique([roomId, liveId, capturedAt])
 @@index([roomId, liveId])
 @@index([roomId, isDeleted, capturedAt])
+@@map("onlive_logs")
 ```
 
 `(roomId, liveId, capturedAt)` の複合ユニーク制約により、同一配信・同一時刻のログ重複保存を防止します（upsert で更新）。
+
+### `OnliveLogFavorite`
+
+```
+id        String    @id @default(cuid())
+userId    String    @map("user_id")
+logId     String    @map("log_id")
+createdAt DateTime  @default(dbgenerated(...)) @map("created_at")
+user      User      @relation(...)
+log       OnliveLog @relation(..., onDelete: Cascade)
+
+@@unique([userId, logId])
+@@index([userId, createdAt])
+@@map("onlive_log_favorites")
+```
+
+ユーザーがログをお気に入り登録するための中間テーブルです。`(userId, logId)` のユニーク制約により 1 ユーザーにつき 1 件のみ登録できます。`PUT /api/onlive/logs/:logId/favorite` でトグル操作します。
 
 ### `UserBlock`
 
@@ -741,10 +822,12 @@ updatedAt             DateTime
 | [app/onlive/page.tsx](../../app/onlive/page.tsx) | ページエントリーポイント・メタデータ |
 | [app/onlive/error.tsx](../../app/onlive/error.tsx) | Next.js エラーバウンダリー |
 | [components/onlive/onlive-room-page.tsx](../../components/onlive/onlive-room-page.tsx) | 画面メインコンポーネント（全機能） |
+| [components/onlive/live-settings-modal.tsx](../../components/onlive/live-settings-modal.tsx) | 設定モーダル（お知らせ通知トグル） |
 | [app/api/onlive/init/route.ts](../../app/api/onlive/init/route.ts) | 初期化 API |
 | [app/api/onlive/poll/route.ts](../../app/api/onlive/poll/route.ts) | ポーリング API |
 | [app/api/onlive/logs/route.ts](../../app/api/onlive/logs/route.ts) | ログ保存 API |
-| [app/api/onlive/logs/[logId]/route.ts](../../app/api/onlive/logs/%5BlogId%5D/route.ts) | ログ削除 API |
+| [app/api/onlive/logs/[logId]/route.ts](../../app/api/onlive/logs/%5BlogId%5D/route.ts) | ログ取得・タイトル更新・削除 API |
+| [app/api/onlive/logs/[logId]/favorite/route.ts](../../app/api/onlive/logs/%5BlogId%5D/favorite/route.ts) | ログお気に入りトグル API |
 | [lib/showroom-realtime.ts](../../lib/showroom-realtime.ts) | WebSocket 定数・ユーティリティ |
 | [lib/showroom/live.ts](../../lib/showroom/live.ts) | コメントログ・ライブ情報（`isPremiumLive` 含む）・テロップ取得 |
 | [lib/showroom/gifts.ts](../../lib/showroom/gifts.ts) | ギフト定義・ギフトログ取得（プレミアムライブ時はフォールバックルームで取得） |
@@ -753,6 +836,7 @@ updatedAt             DateTime
 | [lib/showroom/room.ts](../../lib/showroom/room.ts) | ルームプロフィール取得 |
 | [lib/onlive-log.ts](../../lib/onlive-log.ts) | ログ保存・取得・削除 |
 | [lib/onlive-local-log.ts](../../lib/onlive-local-log.ts) | 非プレミアム用ローカルストレージログ読み書き |
+| [lib/showroom-users.ts](../../lib/showroom-users.ts) | `DEVELOPER_USER_ID` 定数 |
 | [lib/showroom-block-filter.ts](../../lib/showroom-block-filter.ts) | ブロックユーザーフィルタリング |
 | [hooks/use-user-blocks.ts](../../hooks/use-user-blocks.ts) | ブロック一覧管理フック |
 | [prisma/schema.prisma](../../prisma/schema.prisma) | `OnliveLog` / `UserBlock` モデル |

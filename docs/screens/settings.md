@@ -63,7 +63,7 @@
 5. 招待コードカードの見出し（`invitationHeading`）を生成:
    - 管理者の場合: `招待コード（現在{activeCount}名招待できるコードがあります　未利用：{activeCount}件　使用済み：{usedCount}件）`
    - 一般ユーザーの場合: `招待コード（最大3名まで招待することができます）`
-6. `<AppShell activeKey="settings">` 内に権限カード・招待コードカードをレンダリング
+6. `<AppShell activeKey="settings" isAdmin={isAdmin} isPremium={isPremium}>` 内に権限カード・招待コードカードをレンダリング
 
 **ロールラベル決定ロジック（`getRoleLabel`）**:
 

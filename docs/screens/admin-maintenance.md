@@ -36,6 +36,8 @@
 │              ├──────────────────────────────────────────────┤  │
 │              │ [予定]  タイトル                [編集] [削除]   │  │
 │              ├──────────────────────────────────────────────┤  │
+│              │ [終了済み]  タイトル            [編集] [削除]   │  │
+│              ├──────────────────────────────────────────────┤  │
 │              │ [無効]  タイトル                [編集] [削除]   │  │
 │              └──────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────┘
@@ -101,12 +103,12 @@ type MaintenanceItem = {
 
 **ステータスバッジ（`getWindowStatus`）**:
 
-| ステータス | 条件 | バッジ色 |
-|-----------|------|---------|
-| `"disabled"` | `isEnabled = false` | amber |
-| `"expired"` | `now >= endsAt` | slate |
-| `"upcoming"` | `now < startsAt` | blue |
-| `"active"` | 上記以外（期間内かつ有効） | emerald |
+| ステータス | 日本語ラベル | 条件 | バッジ色 |
+|-----------|------------|------|---------|
+| `"disabled"` | 無効 | `isEnabled = false` | amber |
+| `"expired"` | 終了済み | `now >= endsAt` | slate |
+| `"upcoming"` | 予定 | `now < startsAt` | blue |
+| `"active"` | アクティブ | 上記以外（期間内かつ有効） | emerald |
 
 ---
 
@@ -199,11 +201,14 @@ type MaintenanceItem = {
 
 **リクエストボディ**: すべてのフィールドが省略可能（部分更新）
 
-**内部処理（トランザクション）**:
-1. 対象レコードの存在確認（存在しなければ 404）
-2. 日時バリデーション（既存値と合わせて `endsAt > startsAt` を確認）
-3. `MaintenanceWindow` を更新
-4. 監査ログ記録（`maintenance_window.update`）
+**前処理**:
+1. 入力バリデーション（title が空文字でないこと、startsAt/endsAt のパース成否、両方指定時の `endsAt > startsAt`）
+2. 対象レコードの存在確認（存在しなければ 404）
+3. 既存値と組み合わせた日時バリデーション（片方のみ更新時も `endsAt > startsAt` を確認）
+
+**トランザクション**:
+4. `MaintenanceWindow` を更新
+5. 監査ログ記録（`maintenance_window.update`）
 
 **レスポンス（200）**:
 
@@ -218,8 +223,10 @@ type MaintenanceItem = {
 - **ファイル**: [app/api/admin/maintenance/[id]/route.ts](../app/api/admin/maintenance/%5Bid%5D/route.ts)
 - **認証・権限**: `requireTopAdminRole()`
 
-**内部処理（トランザクション）**:
+**前処理**:
 1. 対象レコードの存在確認（存在しなければ 404）
+
+**トランザクション**:
 2. `MaintenanceWindow` を削除
 3. 監査ログ記録（`maintenance_window.delete`）
 
@@ -248,13 +255,16 @@ type MaintenanceItem = {
 ```prisma
 model MaintenanceWindow {
   id        String   @id @default(cuid())
-  title     String
-  message   String?
+  title     String   @default("システムメンテナンス")
+  message   String?  @db.Text
   startsAt  DateTime @map("starts_at")
   endsAt    DateTime @map("ends_at")
   isEnabled Boolean  @default(true) @map("is_enabled")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
+  updatedAt DateTime @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
+
+  @@index([isEnabled, startsAt, endsAt])
+  @@map("maintenance_windows")
 }
 ```
 

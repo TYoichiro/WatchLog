@@ -9,6 +9,7 @@ const {
   authMock,
   blockUserMock,
   getAnyOnliveLogMock,
+  getPreviousOnliveLogMock,
   getUserOnliveLogMock,
   hasTopAdminRoleMock,
   notFoundMock,
@@ -17,6 +18,7 @@ const {
   authMock: vi.fn(),
   blockUserMock: vi.fn(),
   getAnyOnliveLogMock: vi.fn(),
+  getPreviousOnliveLogMock: vi.fn(),
   getUserOnliveLogMock: vi.fn(),
   hasTopAdminRoleMock: vi.fn(),
   notFoundMock: vi.fn(() => {
@@ -45,6 +47,7 @@ vi.mock("@/lib/authz", () => ({
 
 vi.mock("@/lib/onlive-log", () => ({
   getAnyOnliveLog: getAnyOnliveLogMock,
+  getPreviousOnliveLog: getPreviousOnliveLogMock,
   getUserOnliveLog: getUserOnliveLogMock,
 }));
 
@@ -238,6 +241,7 @@ async function renderResolvedLogDetailPage(logId = "log-1") {
 function setupAuthenticatedUser({ isAdmin = false }: { isAdmin?: boolean } = {}) {
   authMock.mockResolvedValue(session);
   hasTopAdminRoleMock.mockResolvedValue(isAdmin);
+  getPreviousOnliveLogMock.mockResolvedValue(null);
 }
 
 afterEach(() => {
@@ -247,6 +251,7 @@ afterEach(() => {
   authMock.mockReset();
   blockUserMock.mockReset();
   getAnyOnliveLogMock.mockReset();
+  getPreviousOnliveLogMock.mockReset();
   getUserOnliveLogMock.mockReset();
   hasTopAdminRoleMock.mockReset();
   notFoundMock.mockClear();
@@ -295,6 +300,23 @@ describe("LogDetailPage", () => {
     expect(screen.getByText("Archived hello")).toBeDefined();
     expect(getUserOnliveLogMock).toHaveBeenCalledWith("user-1", "log-1");
     expect(getAnyOnliveLogMock).not.toHaveBeenCalled();
+  });
+
+  it("前回配信ログを直前のcapturedAtで取得する", async () => {
+    setupAuthenticatedUser();
+    getUserOnliveLogMock.mockResolvedValue(logDetail);
+    getPreviousOnliveLogMock.mockResolvedValue({
+      capturedAt: new Date(Date.UTC(2026, 4, 2, 12, 0, 0)),
+      log: archivedLog,
+    });
+
+    await renderResolvedLogDetailPage();
+
+    expect(screen.getByText("Archived hello")).toBeDefined();
+    expect(getPreviousOnliveLogMock).toHaveBeenCalledWith(
+      "12345",
+      logDetail.capturedAt,
+    );
   });
 
   it("管理者がログを取得できない場合は notFound を呼ぶ", async () => {

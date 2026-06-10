@@ -8,7 +8,13 @@ import {
 } from "@/components/onlive/onlive-room-page";
 import { hasTopAdminRole } from "@/lib/authz";
 import { toJstWallTimeIsoString } from "@/lib/jst";
-import { getAnyOnliveLog, getUserOnliveLog, type OnliveLogDetail } from "@/lib/onlive-log";
+import {
+  getAnyOnliveLog,
+  getPreviousOnliveLog,
+  getUserOnliveLog,
+  type OnliveLogDetail,
+  type PreviousOnliveLog,
+} from "@/lib/onlive-log";
 
 export const metadata: Metadata = {
   title: "配信ログ詳細 | WatchLog",
@@ -16,7 +22,10 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-function toViewerData(log: OnliveLogDetail): OnliveLogViewerData {
+function toViewerData(
+  log: OnliveLogDetail,
+  previous: PreviousOnliveLog | null
+): OnliveLogViewerData {
   return {
     capturedAt: toJstWallTimeIsoString(log.capturedAt),
     createdAt: toJstWallTimeIsoString(log.createdAt),
@@ -24,6 +33,10 @@ function toViewerData(log: OnliveLogDetail): OnliveLogViewerData {
     liveId: log.liveId,
     liveStartedAt: log.liveStartedAt,
     log: log.log,
+    previousLog: previous?.log ?? null,
+    previousCapturedAt: previous
+      ? toJstWallTimeIsoString(previous.capturedAt)
+      : null,
     room: log.room,
     roomId: log.roomId,
     updatedAt: toJstWallTimeIsoString(log.updatedAt),
@@ -53,5 +66,7 @@ export default async function Page({
     notFound();
   }
 
-  return <OnliveLogViewerPage data={toViewerData(log)} />;
+  const previousLog = await getPreviousOnliveLog(log.roomId, log.capturedAt);
+
+  return <OnliveLogViewerPage data={toViewerData(log, previousLog)} />;
 }

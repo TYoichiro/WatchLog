@@ -107,20 +107,28 @@ type UserListItem = {
 | 管理者バッジ | `roles` に `admin` が含まれるとき amber の「管理者」バッジ |
 | BANバッジ | `isBanned = true` のとき赤の「BAN」バッジ |
 | メールアドレス | `email ?? "（メール未設定）"` |
-| 登録ルーム | `Tv` アイコン + ルーム名（未登録なら「未登録」をグレー表示） |
+| 登録ルーム | `Tv` アイコン + `roomName ?? roomUrl`（`roomName` が null の場合 `roomUrl` にフォールバック）。未登録なら「未登録」をグレー表示 |
 | 作成日時 | `formatDate(createdAt)` — `YYYY/MM/DD HH:mm` 形式（JST） |
 
 ### BANステータスセレクト（`BanSelect`）
 
-各ユーザー行の右端に表示するドロップダウン。
+各ユーザー行の右端に表示するドロップダウン。`isSelf = true` の場合は `UserListPage` 内で `BanSelect` を非表示にし、代わりに「操作不可」テキストを表示する。`BanSelect` 自体は `isSelf` を受け取らない。
 
-**表示条件**:
+**ユーザー行右端の表示条件**:
 
 | 条件 | 表示 |
 |------|------|
-| `isSelf = true`（自分） | 「操作不可」のテキスト（セレクトなし） |
-| `isAdmin = true`（管理者ユーザー） | 「管理者」のテキスト（セレクトなし） |
-| 上記以外 | `<select>` で BAN / 許可 を切り替え |
+| `isSelf = true`（自分） | 「操作不可」のテキスト（`UserListPage` が直接レンダリング、`BanSelect` は非表示） |
+| `isAdmin = true`（管理者ユーザー） | 「管理者」のテキスト（`BanSelect` が返す） |
+| 上記以外 | `<select>` で BAN / 許可 を切り替え（`BanSelect` が返す） |
+
+**`BanSelect` の Props**:
+
+| prop | 型 | 説明 |
+|------|----|------|
+| `userId` | `string` | 対象ユーザーID |
+| `initialIsBanned` | `boolean` | 初期 BAN 状態 |
+| `isAdmin` | `boolean` | 管理者ユーザーかどうか |
 
 **セレクト状態**:
 
@@ -162,12 +170,16 @@ type UserListItem = {
 { "banned": true }
 ```
 
-**内部処理（トランザクション）**:
+**内部処理**:
+
+トランザクション前のバリデーション:
 1. 対象ユーザーの存在確認（存在しなければ 404）
 2. 自分自身への操作を禁止（400）
 3. 管理者ユーザーへの BAN を禁止（403）
+
+トランザクション内の処理:
 4. `user.isBanned` を更新
-5. `banned: false`（アンバン）の場合、`user.inviteCodeFailureCount` を 0 にリセット
+5. `banned: false`（アンバン）の場合、`user.inviteCodeFailureCount` を 0 にリセット（4と同一 `user.update` 内）
 6. `banned: true` の場合、対象ユーザーの全セッションを削除（即時ログアウト）
 7. 監査ログ記録（`user.ban` または `user.unban`）
 

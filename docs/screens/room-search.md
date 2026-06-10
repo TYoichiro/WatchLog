@@ -165,6 +165,8 @@ SHOWROOM のルームを検索し、招待コードを使用して自分のル�
 
 ルーム登録失敗時のエラー表示ダイアログ。タイトル「登録できません」とエラーメッセージを表示し、「OK」ボタンで閉じる（Escape キーも対応）。
 
+エラーメッセージの下には補足テキストとサポートリンクを表示する。「配信者本人ですが、他人に取られている場合は[こちら](https://x.com/yoichiro_sub)」という文言で、ルームが他ユーザーに登録済みの場合の問い合わせ先を案内する。
+
 #### RoomCard
 
 検索結果の各ルームを表示するカード。
@@ -326,7 +328,37 @@ SHOWROOM のルームを検索し、招待コードを使用して自分のル�
 
 ---
 
-### 3. ルーム登録
+### 3. ルーム重複確認
+
+- **エンドポイント**: `GET /api/registered-room/check`
+- **ファイル**: [app/api/registered-room/check/route.ts](../app/api/registered-room/check/route.ts)
+- **認証**: 必要
+
+ルーム登録前に呼び出し、同じ `roomId` / `roomUrl` を持つ登録が既に存在するか確認します。自分自身の登録は除外します（`getRegisteredRoomOwner(userId, roomId, roomUrl)` で判定）。
+
+**クエリパラメータ**:
+
+| パラメータ | 型 | 必須 | 説明 |
+|------------|----|----|------|
+| `roomId` | string | ○ | ルーム ID |
+| `roomUrl` | string | ○ | ルーム URL キー |
+
+**レスポンス**:
+
+```json
+{ "isDuplicate": false }
+```
+
+**エラーレスポンス**:
+
+| ステータス | 条件 |
+|---------|------|
+| 400 | `roomId` または `roomUrl` が未指定 |
+| 401 | 未認証 |
+
+---
+
+### 4. ルーム登録
 
 - **エンドポイント**: `PUT /api/registered-room`
 - **ファイル**: [app/api/registered-room/route.ts](../app/api/registered-room/route.ts)
@@ -412,10 +444,18 @@ GET /api/room/search?keyword=...
   ▼ selectedRoom に設定 → ConfirmRegisterModal 表示
   │
   ▼ [はい] クリック
+GET /api/registered-room/check?roomId=...&roomUrl=...
+  │
+  ├─ isDuplicate: true  → registerErrorMessage を設定 → RegisterErrorModal 表示
+  ├─ エラー            → registerErrorMessage を設定 → RegisterErrorModal 表示
+  └─ isDuplicate: false → 続行
+      │
+      ▼
 PUT /api/registered-room
   │
   ├─ 成功 → router.replace("/dashboard") でダッシュボードへ
-  └─ エラー → registerErrorMessage を設定 → RegisterErrorModal 表示
+  ├─ エラー（"招待コード" を含む） → inviteCodeErrorMessage を設定・verifiedInviteCode をクリア → InvitationCodeModal 表示
+  └─ その他エラー → registerErrorMessage を設定 → RegisterErrorModal 表示
 ```
 
 ---
@@ -454,7 +494,8 @@ type InvitationVerificationResponse = {
 | [app/search/page.tsx](../app/search/page.tsx) | ページコンポーネント・全サブコンポーネント |
 | [app/api/room/search/route.ts](../app/api/room/search/route.ts) | ルーム検索 API |
 | [app/api/invitations/verify/route.ts](../app/api/invitations/verify/route.ts) | 招待コード検証 API |
-| [app/api/registered-room/route.ts](../app/api/registered-room/route.ts) | ルーム登録 API |
+| [app/api/registered-room/route.ts](../app/api/registered-room/route.ts) | ルーム登録 API（GET・PUT） |
+| [app/api/registered-room/check/route.ts](../app/api/registered-room/check/route.ts) | ルーム重複確認 API |
 | [lib/showroom/search.ts](../lib/showroom/search.ts) | SHOWROOM スクレイピング |
 | [lib/invitations.ts](../lib/invitations.ts) | 招待コード管理ロジック |
 | [lib/registered-room.ts](../lib/registered-room.ts) | ルーム登録クライアント関数 |

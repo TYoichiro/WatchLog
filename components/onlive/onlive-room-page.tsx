@@ -49,6 +49,13 @@ import {
 } from "@/components/ui/dialog";
 import { AppShell } from "@/components/navigation/app-sidebar";
 import { LiveSettingsModal } from "@/components/onlive/live-settings-modal";
+import { LiveSummaryDialog } from "@/components/onlive/live-summary-dialog";
+import {
+  compareOnliveSummaries,
+  computeOnliveSummary,
+  type OnliveSummary,
+  type OnliveSummaryInput,
+} from "@/lib/onlive-summary";
 import { toJstIsoString } from "@/lib/jst";
 import { writeOnliveLocalLog, type OnliveLocalLog } from "@/lib/onlive-local-log";
 import { useUserBlocks } from "@/hooks/use-user-blocks";
@@ -159,6 +166,8 @@ export type OnliveLogViewerData = {
   liveId: string;
   liveStartedAt: number | null;
   log: Record<string, unknown>;
+  previousLog?: Record<string, unknown> | null;
+  previousCapturedAt?: string | null;
   room: {
     imageUrl: string | null;
     roomId: string;
@@ -3428,6 +3437,88 @@ function getLiveEndedAtFromComments(
   return null;
 }
 
+function buildSummaryInput(
+  comments: readonly CommentRow[],
+  gifts: readonly RoomGiftLog[],
+  metrics: OnliveStoredMetrics,
+  roomProfile: RoomProfile | null,
+  startedAt: number | null,
+  endedAt: number | null
+): OnliveSummaryInput {
+  const giftTotals =
+    gifts.length > 0 ? summarizeGiftTotals(gifts) : metrics.giftTotals;
+
+  return {
+    comments,
+    gifts,
+    giftTotals,
+    followerStart: parseMetricNumber(metrics.initialFollowerNum),
+    followerEnd: parseMetricNumber(
+      roomProfile?.followerNum ?? metrics.latestFollowerNum
+    ),
+    startedAt,
+    endedAt,
+  };
+}
+
+function buildSummaryFromLog(
+  log: Record<string, unknown>,
+  blockedUserIds: ReadonlySet<string>
+): OnliveSummary {
+  const snapshot = getLoggedSnapshot(log);
+  const comments = filterBlockedShowroomItems(
+    mergeCommentRows(
+      reviveStoredCommentRows(getStoredArray(log.comments)),
+      reviveStoredCommentRows(getStoredArray(snapshot?.comments))
+    ),
+    blockedUserIds
+  );
+  const gifts = filterBlockedShowroomItems(
+    mergeGiftLogs(
+      reviveStoredGiftLogs(getStoredArray(log.gifts)),
+      reviveStoredGiftLogs(getStoredArray(snapshot?.gifts))
+    ),
+    blockedUserIds
+  );
+  const metrics = normalizeStoredMetrics(log.metrics);
+  const roomProfile = reviveLoggedRoomProfile(log.roomProfile);
+  const liveInfo = getLoggedLiveInfo(log);
+  const endedAt = liveInfo.endedAt ?? getLiveEndedAtFromComments(comments);
+
+  return computeOnliveSummary(
+    buildSummaryInput(
+      comments,
+      gifts,
+      metrics,
+      roomProfile,
+      liveInfo.startedAt,
+      endedAt
+    )
+  );
+}
+
+function formatPreviousLogLabel(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 export function OnliveLogViewerPage({
   data,
 }: {
@@ -3491,6 +3582,23 @@ export function OnliveLogViewerPage({
         : filterBlockedShowroomItems(gifts, blockedUserIds),
     [blockedUserIds, gifts, isBlockListLoading]
   );
+  const summary = useMemo(
+    () =>
+      isBlockListLoading ? null : buildSummaryFromLog(log, blockedUserIds),
+    [blockedUserIds, isBlockListLoading, log]
+  );
+  const previousSummary = useMemo(
+    () =>
+      isBlockListLoading || !data.previousLog
+        ? null
+        : buildSummaryFromLog(data.previousLog, blockedUserIds),
+    [blockedUserIds, data.previousLog, isBlockListLoading]
+  );
+  const summaryComparison =
+    summary && previousSummary
+      ? compareOnliveSummaries(summary, previousSummary)
+      : null;
+  const previousLogLabel = formatPreviousLogLabel(data.previousCapturedAt);
   const storedMetrics = normalizeStoredMetrics(log.metrics);
   const giftTotalsFromLogs = summarizeGiftTotals(visibleGifts);
   const giftTotals =
@@ -3514,7 +3622,19 @@ export function OnliveLogViewerPage({
       : formatElapsedTime(liveStartedAt, liveEndedAt * 1000);
   const liveIdLabel = liveInfo.liveId ?? data.liveId;
   return (
-    <AppShell activeKey="logs" mainClassName="xl:min-h-0 xl:overflow-hidden">
+    <AppShell
+      activeKey="logs"
+      mainClassName="xl:min-h-0 xl:overflow-hidden"
+      headerActions={
+        summary ? (
+          <LiveSummaryDialog
+            summary={summary}
+            comparison={summaryComparison}
+            previousLabel={previousLogLabel}
+          />
+        ) : null
+      }
+    >
       <section className="shrink-0 grid grid-cols-1 gap-4 min-[600px]:grid-cols-2 xl:grid-cols-4">
         <LiveMetricCard
           icon={Gem}
