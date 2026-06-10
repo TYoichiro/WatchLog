@@ -9,7 +9,7 @@
 | 認証要否 | 必要 |
 | ページタイトル | 配信ログ \| WatchLog |
 
-配信終了時に自動保存された配信ログを一覧表示する画面です。管理者は全ユーザーのログを閲覧でき、プレミアムユーザーは自分の登録ルームの DB ログを閲覧できます。非プレミアムユーザーはローカルストレージに保存された直近 1 件のログのみを閲覧できます。各ログに対して「閲覧」（詳細ページへ遷移）・「ダウンロード」（JSON ファイル出力）・「削除」が行えます。プレミアムユーザー・管理者はさらに「お気に入り登録」（ハートアイコン）および「タイトル編集」（インライン編集）が行えます。また、ダウンロードした JSON ファイルをインポートしてログを閲覧する機能（全ユーザー共通）も備えています。
+配信終了時に自動保存された配信ログを一覧表示する画面です。管理者は全ユーザーのログを閲覧でき、プレミアムユーザーは自分の登録ルームの DB ログを閲覧できます。非プレミアムユーザーはローカルストレージに保存された直近 1 件のログのみを閲覧できます。各ログに対して「閲覧」（詳細ページへ遷移）・「ダウンロード」（JSON ファイル出力）・「削除」が行えます。プレミアムユーザー・管理者はさらに「お気に入り登録」（ハートアイコン）および「タイトル編集」（インライン編集）が行えます。また、ダウンロードした JSON ファイルをインポートしてログを閲覧する機能（全ユーザー共通）も備えています。各ログの詳細閲覧画面では、配信後の振り返りとして「配信サマリー」（獲得ポイント・新規フォロー・トップギフター/コメンター等の集計、および前回配信との比較）を表示できます。
 
 ---
 
@@ -297,7 +297,8 @@
 2. `hasTopAdminRole(userId)` で管理者判定
 3. 管理者なら `getAnyOnliveLog(logId)`、一般ユーザーなら `getUserOnliveLog(userId, logId)` でログ取得
 4. ログが存在しない場合は `notFound()`
-5. `toViewerData()` で `OnliveLogViewerData` に変換して `OnliveLogViewerPage` をレンダリング
+5. `getPreviousOnliveLog(log.roomId, log.capturedAt)` で**前回配信ログ**（同一ルームで `capturedAt` が直前のログ）を取得（存在しなければ `null`）。「配信サマリー」の前回比較に使用する
+6. `toViewerData(log, previousLog)` で `OnliveLogViewerData` に変換して `OnliveLogViewerPage` をレンダリング
 
 **`toViewerData` 変換：**
 
@@ -309,9 +310,13 @@
 | `liveId` | `log.liveId` |
 | `liveStartedAt` | `log.liveStartedAt` |
 | `log` | `log.log` |
+| `previousLog` | `previous?.log ?? null`（前回配信ログの完全ペイロード。なければ `null`） |
+| `previousCapturedAt` | `previous ? toJstWallTimeIsoString(previous.capturedAt) : null` |
 | `room` | `log.room` |
 | `roomId` | `log.roomId` |
 | `updatedAt` | `toJstWallTimeIsoString(log.updatedAt)` |
+
+> `previousLog`／`previousCapturedAt` を設定するのは DB ログ詳細ページ（`/logs/{logId}`）のみ。ローカルログ・JSON インポートビューアは前回ログを持たないため未設定（`null`）となり、配信サマリーの前回比較は表示されない。
 
 ### ローカルログ詳細ページ
 
@@ -376,6 +381,49 @@
 | `room` | `null` |
 | `roomId` | `stored.roomId` |
 | `updatedAt` | `stored.capturedAt` |
+
+---
+
+## 配信サマリー（振り返りレポート）
+
+配信ログ閲覧画面（`OnliveLogViewerPage`：DB ログ・ローカルログ・JSON インポートの 3 経路共通）に、配信後の振り返りを表示する機能です。ヘッダー右上の「📊 配信サマリー」ボタンからダイアログを開きます。集計はすべてクライアント側で、保存済みログから計算します。
+
+### 表示トリガー
+
+- `OnliveLogViewerPage` の `AppShell` の `headerActions` に [`LiveSummaryDialog`](../components/onlive/live-summary-dialog.tsx) を配置
+- ブロックリスト読み込み中（`isBlockListLoading`）はサマリー未算出のためボタン非表示
+
+### 集計内容
+
+ブロック済みユーザーを除外したコメント・ギフトから、[`computeOnliveSummary`](../lib/onlive-summary.ts) が以下を算出します。
+
+| 指標 | 算出元 |
+|------|--------|
+| 配信時間 | `liveInfo.endedAt`（なければコメントの配信終了通知から復元）− `liveInfo.startedAt` |
+| 獲得ポイント（合計／有料／無料） | `metrics.giftTotals`。ギフトがあればギフトから再集計（`summarizeGiftTotals`） |
+| フォロワー増減 | `roomProfile.followerNum`（なければ `metrics.latestFollowerNum`）− `metrics.initialFollowerNum` |
+| 新規フォロー | コメントのうち `noticeTone === "follow"` の件数 |
+| 初見・初訪問 | コメントのうち `noticeTone === "firstVisit"` の件数 |
+| コメント数／コメンター数 | お知らせ・テロップを除いたコメントの総数／ユニークユーザー数 |
+| ギフト数／ギフター数 | ギフトの総件数／ユニークユーザー数 |
+| トップギフター（上位 5） | ユーザー別の獲得ポイント合計（降順） |
+| トップコメンター（上位 5） | ユーザー別のコメント件数（降順） |
+
+> ギフト 1 件のポイントは `totalPoint` を優先。無料ギフトで `point` が 0／未設定の場合は 1pt × `count` として扱う（オンライブ画面の集計ロジックと同等）。
+
+### 前回配信との比較
+
+`OnliveLogViewerData.previousLog` が存在する場合、同じ計算で前回サマリーを算出し、[`compareOnliveSummaries`](../lib/onlive-summary.ts) で差分を求めて各指標に「前回比 ±N」バッジを表示します。差分は獲得ポイント・有料／無料・フォロワー増減・新規フォロー・コメント数／コメンター数・ギフト数／ギフター数・配信時間が対象です。前回ログがない場合（ローカルログ・JSON インポート、または DB に過去ログがない初回配信）はバッジ非表示で当配信のサマリーのみ表示します。
+
+### ダイアログ構成（`LiveSummaryDialog`）
+
+| 領域 | 内容 |
+|------|------|
+| タイトル | 「配信サマリー」 |
+| 説明 | 前回ログの有無に応じて比較有無を案内（前回ログがあれば `previousLabel`＝前回 `capturedAt` を併記） |
+| 配信時間カード | `formatDuration()` で `H時間MM分` または `MM分SS秒` 表示＋前回比バッジ |
+| 指標グリッド | 上記指標のタイル（値・補足・前回比バッジ） |
+| ランキング | トップギフター（pt）・トップコメンター（件）をアバター付きリストで表示 |
 
 ---
 
@@ -674,6 +722,15 @@ DELETE /api/onlive/logs/{logId}
 - `prisma.userRegisteredRoom.findMany()` と `Promise.all` で並行実行し、ルーム名をマッピング
 - `userId` を指定した場合はそのユーザーのお気に入り状態も取得してマッピング
 
+### getPreviousOnliveLog（前回配信ログ・配信サマリーの比較用）
+
+- **ファイル**: [lib/onlive-log.ts](../lib/onlive-log.ts)
+- **シグネチャ**: `getPreviousOnliveLog(roomId: string, capturedAt: Date)`
+- 条件: `roomId` 一致 かつ `isDeleted = false` かつ `capturedAt < {対象ログの capturedAt}`
+- ソート: `capturedAt DESC` の先頭 1 件（＝直前の配信ログ）
+- 戻り値: `{ capturedAt: Date; log: Record<string, unknown> } | null`
+- DB ログ詳細ページ（`/logs/{logId}`）でのみ呼び出し、「配信サマリー」の前回比較に渡す。`(roomId, isDeleted, capturedAt)` インデックスを利用
+
 ### ローカルストレージ（非プレミアム一般ユーザー）
 
 - **ファイル**: [lib/onlive-local-log.ts](../lib/onlive-local-log.ts)
@@ -894,6 +951,9 @@ type JsonViewerLog = {
 | [components/logs/log-list-page.tsx](../components/logs/log-list-page.tsx) | ログ一覧 UI・JSON インポート・ダウンロード・削除操作 |
 | [components/logs/local-log-viewer-page.tsx](../components/logs/local-log-viewer-page.tsx) | ローカルログ閲覧 UI（非プレミアム） |
 | [components/logs/json-import-viewer-page.tsx](../components/logs/json-import-viewer-page.tsx) | JSON インポートログ閲覧 UI（全ユーザー共通） |
+| [components/onlive/onlive-room-page.tsx](../components/onlive/onlive-room-page.tsx) | 配信ログ閲覧 UI（`OnliveLogViewerPage`）・配信サマリー算出 |
+| [components/onlive/live-summary-dialog.tsx](../components/onlive/live-summary-dialog.tsx) | 配信サマリー（振り返りレポート）ダイアログ UI |
+| [lib/onlive-summary.ts](../lib/onlive-summary.ts) | 配信サマリー集計・前回比較の純粋関数 |
 | [app/api/onlive/logs/route.ts](../app/api/onlive/logs/route.ts) | ログ保存 API（プレミアム専用） |
 | [app/api/onlive/logs/[logId]/route.ts](../app/api/onlive/logs/%5BlogId%5D/route.ts) | ログ取得（GET）・タイトル更新（PATCH）・削除（DELETE）API |
 | [app/api/onlive/logs/[logId]/favorite/route.ts](../app/api/onlive/logs/%5BlogId%5D/favorite/route.ts) | お気に入り切り替え API（PUT） |
