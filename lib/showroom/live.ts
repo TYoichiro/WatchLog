@@ -1,3 +1,5 @@
+import { toJstWallTimeDate } from "@/lib/jst";
+
 import {
   SHOWROOM_API_URL,
   fetchShowroomJson,
@@ -100,9 +102,9 @@ export async function getRoomLiveInfo(
   const isPremiumLive = !!(rawData.redirect_url?.trim());
   const bcsvrKey = isPremiumLive ? null : (rawData.bcsvr_key?.trim() || null);
 
-  const now = new Date();
+  const jstNow = toJstWallTimeDate();
   const pad = (n: number) => String(n).padStart(2, "0");
-  const dateFallback = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const dateFallback = `${jstNow.getUTCFullYear()}${pad(jstNow.getUTCMonth() + 1)}${pad(jstNow.getUTCDate())}`;
 
   return {
     bcsvrKey,
