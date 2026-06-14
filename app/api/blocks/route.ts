@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     });
 
     logger.info("ブロックを作成しました", { userId: user.id, blockId: block.id, blockedUserId });
-    revalidateTag(blockedUserIdsCacheTag(user.id));
+    revalidateTag(blockedUserIdsCacheTag(user.id), "default");
     return Response.json({ block: serializeUserBlock(block) });
   } catch (error) {
     const response = authzErrorResponse(error);

@@ -26,7 +26,7 @@ export async function DELETE(
     }
 
     logger.info("ブロックを削除しました", { userId: user.id, blockId });
-    revalidateTag(blockedUserIdsCacheTag(user.id));
+    revalidateTag(blockedUserIdsCacheTag(user.id), "default");
     return Response.json({ ok: true });
   } catch (error) {
     const response = authzErrorResponse(error);
