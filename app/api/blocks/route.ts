@@ -1,8 +1,10 @@
+import { revalidateTag } from "next/cache";
 import { NextRequest } from "next/server";
 
 import { authzErrorResponse, requireUser } from "@/lib/authz";
 import { logger } from "@/lib/logger";
 import {
+  blockedUserIdsCacheTag,
   createUserBlock,
   DeveloperBlockForbiddenError,
   listUserBlocks,
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest) {
     });
 
     logger.info("ブロックを作成しました", { userId: user.id, blockId: block.id, blockedUserId });
+    revalidateTag(blockedUserIdsCacheTag(user.id));
     return Response.json({ block: serializeUserBlock(block) });
   } catch (error) {
     const response = authzErrorResponse(error);

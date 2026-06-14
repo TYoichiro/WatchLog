@@ -10,8 +10,7 @@ const mocks = vi.hoisted(() => ({
   getRoomProfile: vi.fn(),
   getRoomStatus: vi.fn(),
   getUserRegisteredRoom: vi.fn(),
-  hasTopAdminRole: vi.fn(),
-  hasPremiumRole: vi.fn(),
+  getUserRoles: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({
@@ -19,8 +18,7 @@ vi.mock("@/auth", () => ({
 }));
 
 vi.mock("@/lib/authz", () => ({
-  hasTopAdminRole: mocks.hasTopAdminRole,
-  hasPremiumRole: mocks.hasPremiumRole,
+  getUserRoles: mocks.getUserRoles,
 }));
 
 vi.mock("@/lib/dashboard-notices", () => ({
@@ -98,8 +96,7 @@ async function expectJson(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.hasTopAdminRole.mockResolvedValue(false);
-  mocks.hasPremiumRole.mockResolvedValue(false);
+  mocks.getUserRoles.mockResolvedValue({ isAdmin: false, isPremium: false });
 });
 
 describe("GET /api/dashboard", () => {
@@ -166,12 +163,12 @@ describe("GET /api/dashboard", () => {
     expect(mocks.getRoomActiveFan).toHaveBeenCalledWith("123");
     expect(mocks.getRoomEventAndSupport).toHaveBeenCalledWith("123");
     expect(mocks.getRoomStatus).toHaveBeenCalledWith("alpha-room");
-    expect(mocks.hasTopAdminRole).toHaveBeenCalledWith("user-1");
+    expect(mocks.getUserRoles).toHaveBeenCalledWith("user-1");
   });
 
   it("marks top admins in the dashboard payload", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "admin-1" } });
-    mocks.hasTopAdminRole.mockResolvedValue(true);
+    mocks.getUserRoles.mockResolvedValue({ isAdmin: true, isPremium: false });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
     mocks.getRoomProfile.mockResolvedValue(profile);
     mocks.getRoomActiveFan.mockResolvedValue(null);
@@ -187,7 +184,7 @@ describe("GET /api/dashboard", () => {
       status: "ok",
       isAdmin: true,
     });
-    expect(mocks.hasTopAdminRole).toHaveBeenCalledWith("admin-1");
+    expect(mocks.getUserRoles).toHaveBeenCalledWith("admin-1");
   });
 
   it("keeps the response usable when supplemental sources fail", async () => {
@@ -214,9 +211,9 @@ describe("GET /api/dashboard", () => {
     });
   });
 
-  it("marks premium users in the dashboard payload and calls hasPremiumRole", async () => {
+  it("marks premium users in the dashboard payload and calls getUserRoles", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
-    mocks.hasPremiumRole.mockResolvedValue(true);
+    mocks.getUserRoles.mockResolvedValue({ isAdmin: false, isPremium: true });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
     mocks.getRoomProfile.mockResolvedValue(profile);
     mocks.getRoomActiveFan.mockResolvedValue(null);
@@ -229,7 +226,7 @@ describe("GET /api/dashboard", () => {
 
     expect(response.status).toBe(200);
     expect(data).toMatchObject({ status: "ok", isPremium: true });
-    expect(mocks.hasPremiumRole).toHaveBeenCalledWith("user-1");
+    expect(mocks.getUserRoles).toHaveBeenCalledWith("user-1");
   });
 
   it("returns is_live when profile.isOnlive is true regardless of roomStatus.isLive", async () => {
@@ -250,8 +247,7 @@ describe("GET /api/dashboard", () => {
 
   it("isAdmin と isPremium が両方 true の場合、両フラグが true で返る", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "admin-premium-1" } });
-    mocks.hasTopAdminRole.mockResolvedValue(true);
-    mocks.hasPremiumRole.mockResolvedValue(true);
+    mocks.getUserRoles.mockResolvedValue({ isAdmin: true, isPremium: true });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
     mocks.getRoomProfile.mockResolvedValue(profile);
     mocks.getRoomActiveFan.mockResolvedValue(null);

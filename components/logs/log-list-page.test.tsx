@@ -30,11 +30,9 @@ const makeLog = (overrides: Partial<LogListItem> = {}): LogListItem => ({
   giftCount: 5,
   isFavorite: false,
   liveId: "live-1",
-  liveRankingCount: 3,
   roomId: "room-1",
   roomName: "テストルーム",
   title: null,
-  totalRankingCount: 2,
   updatedAt: "2026-01-01T10:00:00.000+09:00",
   ...overrides,
 });

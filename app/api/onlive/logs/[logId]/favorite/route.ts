@@ -1,4 +1,4 @@
-import { authzErrorResponse, hasTopAdminRole, hasPremiumRole, requireUser } from "@/lib/authz";
+import { authzErrorResponse, getUserRoles, requireUser } from "@/lib/authz";
 import { logger } from "@/lib/logger";
 import { toggleOnliveLogFavorite } from "@/lib/onlive-log";
 
@@ -16,10 +16,7 @@ export async function PUT(
 
   try {
     const user = await requireUser();
-    const [isAdmin, isPremium] = await Promise.all([
-      hasTopAdminRole(user.id),
-      hasPremiumRole(user.id),
-    ]);
+    const { isAdmin, isPremium } = await getUserRoles(user.id);
 
     if (!isAdmin && !isPremium) {
       return Response.json({ error: "Forbidden" }, { status: 403 });

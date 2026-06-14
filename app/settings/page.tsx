@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { AppShell } from "@/components/navigation/app-sidebar";
 import { InvitationCodeCard } from "@/components/settings/invitation-code-card";
 import { RoleCard } from "@/components/settings/role-card";
-import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
+import { getUserRoles } from "@/lib/authz";
 import { listUserInvitationCodes } from "@/lib/invitations";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
 
@@ -29,11 +29,10 @@ export default async function Page() {
     redirect("/");
   }
 
-  const [registeredRoom, invitationCodes, isAdmin, isPremium] = await Promise.all([
+  const [registeredRoom, invitationCodes, { isAdmin, isPremium }] = await Promise.all([
     getUserRegisteredRoom(userId),
     listUserInvitationCodes(userId),
-    hasTopAdminRole(userId),
-    hasPremiumRole(userId),
+    getUserRoles(userId),
   ]);
 
   if (!registeredRoom) {

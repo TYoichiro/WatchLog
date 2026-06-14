@@ -1,4 +1,5 @@
-import { authzErrorResponse, hasTopAdminRole, hasPremiumRole, requireUser } from "@/lib/authz";
+import { authzErrorResponse, getUserRoles, requireUser } from "@/lib/authz";
+import { writeAuditLog } from "@/lib/audit";
 import { toJstWallTimeIsoString } from "@/lib/jst";
 import { logger } from "@/lib/logger";
 import { deleteUserOnliveLog, getAnyOnliveLog, getUserOnliveLog, updateOnliveLogTitle } from "@/lib/onlive-log";
@@ -17,7 +18,7 @@ export async function GET(
 
   try {
     const user = await requireUser();
-    const isAdmin = await hasTopAdminRole(user.id);
+    const { isAdmin } = await getUserRoles(user.id);
     const log = isAdmin
       ? await getAnyOnliveLog(logId)
       : await getUserOnliveLog(user.id, logId);
@@ -52,10 +53,7 @@ export async function PATCH(
 
   try {
     const user = await requireUser();
-    const [isAdmin, isPremium] = await Promise.all([
-      hasTopAdminRole(user.id),
-      hasPremiumRole(user.id),
-    ]);
+    const { isAdmin, isPremium } = await getUserRoles(user.id);
 
     if (!isAdmin && !isPremium) {
       return Response.json({ error: "Forbidden" }, { status: 403 });
@@ -95,13 +93,27 @@ export async function DELETE(
 
   try {
     const user = await requireUser();
-    const deleted = await deleteUserOnliveLog(user.id, logId);
+    const { isAdmin } = await getUserRoles(user.id);
+    const deleted = await deleteUserOnliveLog(user.id, logId, isAdmin);
 
     if (!deleted) {
       return Response.json({ error: "Log not found" }, { status: 404 });
     }
 
-    logger.info("オンライブログを削除しました", { userId: user.id, logId });
+    logger.info("オンライブログを削除しました", { userId: user.id, logId, isAdmin });
+    if (isAdmin) {
+      try {
+        await writeAuditLog({
+          actorUserId: user.id,
+          action: "onlive_log.delete",
+          resource: "onlive_log",
+          resourceId: logId,
+          detail: { isAdmin: true },
+        });
+      } catch (auditError) {
+        logger.error("監査ログの書き込みに失敗しました", { logId, error: String(auditError) });
+      }
+    }
     return Response.json({ ok: true });
   } catch (error) {
     const response = authzErrorResponse(error);

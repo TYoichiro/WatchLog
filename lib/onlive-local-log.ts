@@ -3,7 +3,6 @@ export type OnliveLocalLog = {
   commentCount: number;
   giftCount: number;
   liveId: string;
-  liveRankingCount: number;
   log: Record<string, unknown>;
   roomId: string;
   roomName: string | null;

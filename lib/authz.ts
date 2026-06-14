@@ -103,6 +103,27 @@ export async function hasPremiumRole(userId: string): Promise<boolean> {
   return hasRole(userId, PREMIUM_ROLE_NAME);
 }
 
+export type UserRoles = {
+  isAdmin: boolean;
+  isPremium: boolean;
+};
+
+export async function getUserRoles(userId: string): Promise<UserRoles> {
+  const userRoles = await prisma.userRole.findMany({
+    where: {
+      userId,
+      role: { name: { in: [TOP_ADMIN_ROLE_NAME, PREMIUM_ROLE_NAME] } },
+    },
+    select: { role: { select: { name: true } } },
+  });
+
+  const roleNames = new Set(userRoles.map((ur) => ur.role.name));
+  return {
+    isAdmin: roleNames.has(TOP_ADMIN_ROLE_NAME),
+    isPremium: roleNames.has(PREMIUM_ROLE_NAME),
+  };
+}
+
 export async function requireTopAdminRole(): Promise<AuthenticatedUser> {
   const user = await requireUser();
   const allowed = await hasTopAdminRole(user.id);

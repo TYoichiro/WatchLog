@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { LogListPage, type LogListItem } from "@/components/logs/log-list-page";
 import { AppShell } from "@/components/navigation/app-sidebar";
-import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
+import { getUserRoles } from "@/lib/authz";
 import { toJstWallTimeIsoString } from "@/lib/jst";
 import { listAllOnliveLogs, listUserOnliveLogs, type OnliveLogListItem } from "@/lib/onlive-log";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
@@ -24,11 +24,9 @@ function toListItem(log: OnliveLogListItem): LogListItem {
     id: log.id,
     isFavorite: log.isFavorite,
     liveId: log.liveId,
-    liveRankingCount: log.liveRankingCount,
     roomId: log.roomId,
     roomName: log.roomName,
     title: log.title,
-    totalRankingCount: log.totalRankingCount,
     updatedAt: toJstWallTimeIsoString(log.updatedAt),
   };
 }
@@ -41,7 +39,7 @@ export default async function Page() {
     redirect("/");
   }
 
-  const isAdmin = await hasTopAdminRole(userId);
+  const { isAdmin, isPremium } = await getUserRoles(userId);
 
   if (isAdmin) {
     const logs = await listAllOnliveLogs(userId);
@@ -52,10 +50,7 @@ export default async function Page() {
     );
   }
 
-  const [registeredRoom, isPremium] = await Promise.all([
-    getUserRegisteredRoom(userId),
-    hasPremiumRole(userId),
-  ]);
+  const registeredRoom = await getUserRegisteredRoom(userId);
 
   if (!registeredRoom) {
     redirect("/search");

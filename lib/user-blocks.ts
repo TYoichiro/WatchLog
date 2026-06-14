@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 import { auth } from "@/auth";
 import { toJstWallTimeIsoString } from "@/lib/jst";
 import { prisma } from "@/lib/prisma";
@@ -79,11 +81,25 @@ export async function listBlockedShowroomUserIds(
   return blocks.map((block) => block.blockedShowroomUserId);
 }
 
+export function blockedUserIdsCacheTag(userId: string): string {
+  return `user-blocks-ids-${userId}`;
+}
+
+export async function getCachedBlockedShowroomUserIds(
+  userId: string
+): Promise<string[]> {
+  return unstable_cache(
+    async () => listBlockedShowroomUserIds(userId),
+    ["blocked-showroom-user-ids", userId],
+    { tags: [blockedUserIdsCacheTag(userId)], revalidate: 60 }
+  )();
+}
+
 export async function getOptionalBlockedUserIds(): Promise<Set<string>> {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return new Set<string>();
-  return new Set(await listBlockedShowroomUserIds(userId));
+  return new Set(await getCachedBlockedShowroomUserIds(userId));
 }
 
 export async function createUserBlock(

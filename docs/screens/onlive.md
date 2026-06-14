@@ -542,7 +542,7 @@ Next.js の Error Boundary が捕捉した例外が対象です。
                  writeOnliveLocalLog(roomId, OnliveLocalLog)
                       ├─ キー: watchlog:saved-log:{roomId}（同一ルームの直近1件を上書き）
                       ├─ 保存内容: capturedAt, commentCount, giftCount, liveId,
-                      │            liveRankingCount, log（完全ペイロード）, roomId, roomName, savedAt
+                      │            log（完全ペイロード）, roomId, roomName, savedAt
                       ├─ 成功: セッションストレージ削除 → isLiveEndedDialogOpen = true → ダイアログ表示
                       └─ API 呼び出しなし（ネットワーク不要）
 ```

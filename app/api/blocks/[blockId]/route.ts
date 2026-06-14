@@ -1,6 +1,8 @@
+import { revalidateTag } from "next/cache";
+
 import { authzErrorResponse, requireUser } from "@/lib/authz";
 import { logger } from "@/lib/logger";
-import { deleteUserBlock } from "@/lib/user-blocks";
+import { blockedUserIdsCacheTag, deleteUserBlock } from "@/lib/user-blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,7 @@ export async function DELETE(
     }
 
     logger.info("ブロックを削除しました", { userId: user.id, blockId });
+    revalidateTag(blockedUserIdsCacheTag(user.id));
     return Response.json({ ok: true });
   } catch (error) {
     const response = authzErrorResponse(error);

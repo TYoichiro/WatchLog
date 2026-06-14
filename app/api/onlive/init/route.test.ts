@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => ({
   getRoomLiveInfo: vi.fn(),
   getRoomTelop: vi.fn(),
   getUserRegisteredRoom: vi.fn(),
-  hasPremiumRole: vi.fn(),
-  listBlockedShowroomUserIds: vi.fn(),
+  getUserRoles: vi.fn(),
+  getCachedBlockedShowroomUserIds: vi.fn(),
   loggerDebug: vi.fn(),
   loggerInfo: vi.fn(),
   loggerWarn: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock("@/auth", () => ({
 }));
 
 vi.mock("@/lib/authz", () => ({
-  hasPremiumRole: mocks.hasPremiumRole,
+  getUserRoles: mocks.getUserRoles,
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -44,7 +44,7 @@ vi.mock("@/lib/showroom", () => ({
 }));
 
 vi.mock("@/lib/user-blocks", () => ({
-  listBlockedShowroomUserIds: mocks.listBlockedShowroomUserIds,
+  getCachedBlockedShowroomUserIds: mocks.getCachedBlockedShowroomUserIds,
 }));
 
 vi.mock("@/lib/user-registered-room", () => ({
@@ -64,7 +64,7 @@ async function expectJson(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.hasPremiumRole.mockResolvedValue(false);
+  mocks.getUserRoles.mockResolvedValue({ isAdmin: false, isPremium: false });
 });
 
 describe("GET /api/onlive/init", () => {
@@ -79,15 +79,15 @@ describe("GET /api/onlive/init", () => {
 
     expect(response.status).toBe(200);
     expect(await expectJson(response)).toEqual({ status: "no_room" });
-    expect(mocks.listBlockedShowroomUserIds).not.toHaveBeenCalled();
+    expect(mocks.getCachedBlockedShowroomUserIds).not.toHaveBeenCalled();
     expect(mocks.getRoomLiveInfo).not.toHaveBeenCalled();
   });
 
   it("returns initial live data and filters blocked users", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.hasPremiumRole.mockResolvedValue(true);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue(["blocked-user"]);
+    mocks.getUserRoles.mockResolvedValue({ isAdmin: false, isPremium: true });
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue(["blocked-user"]);
     mocks.getRoomLiveInfo.mockResolvedValue({
       bcsvrKey: "bcsvr-key",
       liveId: "live-123",
@@ -183,7 +183,7 @@ describe("GET /api/onlive/init", () => {
     expect(data.gifts).toEqual([
       expect.objectContaining({ id: "gift-allowed" }),
     ]);
-    expect(mocks.listBlockedShowroomUserIds).toHaveBeenCalledWith("user-1");
+    expect(mocks.getCachedBlockedShowroomUserIds).toHaveBeenCalledWith("user-1");
     expect(mocks.getRoomLiveInfo).toHaveBeenCalledWith("123");
     expect(mocks.getRoomGiftDefinitions).toHaveBeenCalledWith("123");
     expect(mocks.getRoomCommentLog).toHaveBeenCalledWith("123");
@@ -202,7 +202,7 @@ describe("GET /api/onlive/init", () => {
   it("プレミアムライブの場合 getBcsvrKeyFromOnlives を呼び liveInfo の bcsvrKey を更新する", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
     mocks.getRoomLiveInfo.mockResolvedValue({
       bcsvrKey: null,
       isPremiumLive: true,
@@ -229,7 +229,7 @@ describe("GET /api/onlive/init", () => {
   it("getBcsvrKeyFromOnlives が失敗した場合でも bcsvrKey null のまま liveInfo を返す", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
     mocks.getRoomLiveInfo.mockResolvedValue({
       bcsvrKey: null,
       isPremiumLive: true,
@@ -260,7 +260,7 @@ describe("GET /api/onlive/init", () => {
     expect(response.status).toBe(200);
     expect(await expectJson(response)).toEqual({ status: "no_room" });
     expect(mocks.getUserRegisteredRoom).not.toHaveBeenCalled();
-    expect(mocks.listBlockedShowroomUserIds).not.toHaveBeenCalled();
+    expect(mocks.getCachedBlockedShowroomUserIds).not.toHaveBeenCalled();
   });
 
   it("getUserRegisteredRoom が null を返す場合は no_room を返す", async () => {
@@ -271,14 +271,14 @@ describe("GET /api/onlive/init", () => {
 
     expect(response.status).toBe(200);
     expect(await expectJson(response)).toEqual({ status: "no_room" });
-    expect(mocks.listBlockedShowroomUserIds).not.toHaveBeenCalled();
+    expect(mocks.getCachedBlockedShowroomUserIds).not.toHaveBeenCalled();
     expect(mocks.getRoomLiveInfo).not.toHaveBeenCalled();
   });
 
   it("uses safe defaults when optional live sources fail", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
     mocks.getRoomLiveInfo.mockRejectedValue(new Error("live info failed"));
     mocks.getRoomGiftDefinitions.mockRejectedValue(new Error("definitions failed"));
     mocks.getRoomCommentLog.mockRejectedValue(new Error("comments failed"));
@@ -304,7 +304,7 @@ describe("GET /api/onlive/init", () => {
   it("通常ライブ（isPremiumLive が false）では getBcsvrKeyFromOnlives を呼ばない", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
     mocks.getRoomLiveInfo.mockResolvedValue({
       bcsvrKey: "bcsvr-key",
       isPremiumLive: false,
@@ -324,7 +324,7 @@ describe("GET /api/onlive/init", () => {
   it("liveStatus が 1 の場合はロガーを呼ばない", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
     mocks.getRoomLiveInfo.mockResolvedValue({
       bcsvrKey: null,
       isPremiumLive: false,
@@ -346,7 +346,7 @@ describe("GET /api/onlive/init", () => {
   it("liveStatus が 0 の場合はロガーを呼び出す", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
     mocks.getRoomLiveInfo.mockResolvedValue({
       bcsvrKey: null,
       isPremiumLive: false,

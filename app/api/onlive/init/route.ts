@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { hasPremiumRole } from "@/lib/authz";
+import { getUserRoles } from "@/lib/authz";
 import { logger } from "@/lib/logger";
 import {
   getBcsvrKeyFromOnlives,
@@ -11,7 +11,7 @@ import {
 } from "@/lib/showroom";
 import { filterBlockedShowroomItems } from "@/lib/showroom-block-filter";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
-import { listBlockedShowroomUserIds } from "@/lib/user-blocks";
+import { getCachedBlockedShowroomUserIds } from "@/lib/user-blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +19,9 @@ export async function GET() {
   const session = await auth();
   const userId = session?.user?.id ?? null;
 
-  const [registeredRoom, isPremium] = await Promise.all([
+  const [registeredRoom, { isPremium }] = await Promise.all([
     userId ? getUserRegisteredRoom(userId) : Promise.resolve(null),
-    userId ? hasPremiumRole(userId) : Promise.resolve(false),
+    userId ? getUserRoles(userId) : Promise.resolve({ isAdmin: false, isPremium: false }),
   ]);
   const parsedRoomId = registeredRoom ? Number(registeredRoom.roomId) : NaN;
 
@@ -32,7 +32,7 @@ export async function GET() {
   const { roomId, roomUrl } = registeredRoom;
 
   const blockedUserIds = userId
-    ? new Set(await listBlockedShowroomUserIds(userId))
+    ? new Set(await getCachedBlockedShowroomUserIds(userId))
     : new Set<string>();
 
   const [liveInfoResult, giftDefinitionsResult, commentsResult, giftsResult, telopResult] =

@@ -7,14 +7,12 @@ import ShowTubePage from "./page";
 const {
   authMock,
   getOnlivesMock,
-  hasTopAdminRoleMock,
-  hasPremiumRoleMock,
+  getUserRolesMock,
   redirectMock,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
   getOnlivesMock: vi.fn(),
-  hasTopAdminRoleMock: vi.fn(),
-  hasPremiumRoleMock: vi.fn(),
+  getUserRolesMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   }),
@@ -29,8 +27,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/authz", () => ({
-  hasTopAdminRole: hasTopAdminRoleMock,
-  hasPremiumRole: hasPremiumRoleMock,
+  getUserRoles: getUserRolesMock,
 }));
 
 vi.mock("@/lib/showroom", () => ({
@@ -95,14 +92,12 @@ afterEach(() => {
   cleanup();
   authMock.mockReset();
   getOnlivesMock.mockReset();
-  hasTopAdminRoleMock.mockReset();
-  hasPremiumRoleMock.mockReset();
+  getUserRolesMock.mockReset();
   redirectMock.mockClear();
 });
 
 beforeEach(() => {
-  hasTopAdminRoleMock.mockResolvedValue(false);
-  hasPremiumRoleMock.mockResolvedValue(false);
+  getUserRolesMock.mockResolvedValue({ isAdmin: false, isPremium: false });
   getOnlivesMock.mockResolvedValue(onlivesData);
 });
 
@@ -113,8 +108,7 @@ describe("ShowTubePage", () => {
     await expect(ShowTubePage(defaultProps)).rejects.toThrow("NEXT_REDIRECT:/");
 
     expect(redirectMock).toHaveBeenCalledWith("/");
-    expect(hasTopAdminRoleMock).not.toHaveBeenCalled();
-    expect(hasPremiumRoleMock).not.toHaveBeenCalled();
+    expect(getUserRolesMock).not.toHaveBeenCalled();
   });
 
   it("管理者でも有料会員でもない場合は /dashboard にリダイレクトする", async () => {
@@ -127,7 +121,7 @@ describe("ShowTubePage", () => {
 
   it("プレミアムユーザーの場合は ShowTubeShell を表示する", async () => {
     authMock.mockResolvedValue(session);
-    hasPremiumRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: false, isPremium: true });
 
     render(await ShowTubePage(defaultProps));
 
@@ -136,26 +130,25 @@ describe("ShowTubePage", () => {
 
   it("管理者の場合は ShowTubeShell を表示する", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
     render(await ShowTubePage(defaultProps));
 
     expect(screen.getByTestId("showtube-shell")).toBeDefined();
   });
 
-  it("権限チェックを並列で実行する", async () => {
+  it("getUserRoles を user-1 で呼び出す", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
     await ShowTubePage(defaultProps);
 
-    expect(hasTopAdminRoleMock).toHaveBeenCalledWith("user-1");
-    expect(hasPremiumRoleMock).toHaveBeenCalledWith("user-1");
+    expect(getUserRolesMock).toHaveBeenCalledWith("user-1");
   });
 
   it("onlives のジャンルリストを ShowTubeShell に渡す", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
     render(await ShowTubePage(defaultProps));
 
@@ -166,7 +159,7 @@ describe("ShowTubePage", () => {
 
   it("getOnlives が失敗した場合はジャンルなしで ShowTubeShell を表示する", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
     getOnlivesMock.mockRejectedValue(new Error("API error"));
 
     render(await ShowTubePage(defaultProps));
@@ -176,7 +169,7 @@ describe("ShowTubePage", () => {
 
   it("onlives データを ShowTubeLivePage に渡す", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
     render(await ShowTubePage(defaultProps));
 
@@ -188,7 +181,7 @@ describe("ShowTubePage", () => {
 
   it("getOnlives が失敗した場合は hasError=true を ShowTubeLivePage に渡す", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
     getOnlivesMock.mockRejectedValue(new Error("API error"));
 
     render(await ShowTubePage(defaultProps));
@@ -200,7 +193,7 @@ describe("ShowTubePage", () => {
 
   it("genre パラメータが指定された場合は該当ジャンルのルームのみ渡す", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
     render(await ShowTubePage({ searchParams: Promise.resolve({ genre: "0" }) }));
 
@@ -210,7 +203,7 @@ describe("ShowTubePage", () => {
 
   it("genre パラメータが存在しないジャンルIDの場合はルームなしで渡す", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
     render(await ShowTubePage({ searchParams: Promise.resolve({ genre: "999" }) }));
 
@@ -220,7 +213,7 @@ describe("ShowTubePage", () => {
 
   it("genre パラメータが数値以外の場合は全ジャンルのルームを渡す", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
     render(await ShowTubePage({ searchParams: Promise.resolve({ genre: "abc" }) }));
 
@@ -230,7 +223,7 @@ describe("ShowTubePage", () => {
 
   it("複数ジャンルに同じ roomId がある場合は重複排除して渡す", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
     getOnlivesMock.mockResolvedValue({
       onlives: [
         { genreId: 0, genreName: "人気", hasUpcoming: false, lives: [{ roomId: 1 }] },
@@ -246,7 +239,7 @@ describe("ShowTubePage", () => {
 
   it("genre パラメータがある場合は selectedGenreId を ShowTubeShell に渡す", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
     render(await ShowTubePage({ searchParams: Promise.resolve({ genre: "102" }) }));
 
@@ -257,7 +250,7 @@ describe("ShowTubePage", () => {
 
   it("genre パラメータがない場合は selectedGenreId=null を ShowTubeShell に渡す", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
     render(await ShowTubePage(defaultProps));
 

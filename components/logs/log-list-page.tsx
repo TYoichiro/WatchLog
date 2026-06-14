@@ -46,11 +46,9 @@ export type LogListItem = {
   id: string;
   isFavorite: boolean;
   liveId: string;
-  liveRankingCount: number;
   roomId: string;
   roomName: string | null;
   title: string | null;
-  totalRankingCount: number;
   updatedAt: string;
 };
 
@@ -83,11 +81,9 @@ function localLogToListItem(log: OnliveLocalLog): LogListItem {
     id: `local:${log.roomId}`,
     isFavorite: false,
     liveId: log.liveId,
-    liveRankingCount: log.liveRankingCount,
     roomId: log.roomId,
     roomName: log.roomName,
     title: null,
-    totalRankingCount: 0,
     updatedAt: log.savedAt,
   };
 }

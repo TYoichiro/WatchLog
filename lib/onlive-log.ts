@@ -21,11 +21,9 @@ export type OnliveLogListItem = {
   id: string;
   isFavorite: boolean;
   liveId: string;
-  liveRankingCount: number;
   roomId: string;
   roomName: string | null;
   title: string | null;
-  totalRankingCount: number;
   updatedAt: Date;
 };
 
@@ -46,7 +44,7 @@ export type OnliveLogDetail = {
   updatedAt: Date;
 };
 
-function getJsonRecord(value: Prisma.JsonValue): Record<string, unknown> {
+function getJsonRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
@@ -82,15 +80,12 @@ function getLogLiveStartedAt(log: Prisma.JsonValue): number | null {
   return getJsonNumber(liveInfo?.startedAt);
 }
 
-function getLogSummaryCounts(log: Prisma.JsonValue) {
+function getLogSummaryCounts(log: Prisma.InputJsonValue) {
   const record = getJsonRecord(log);
-  const rankings = getRecord(record.rankings);
 
   return {
     commentCount: getArrayLength(record.comments),
     giftCount: getArrayLength(record.gifts),
-    liveRankingCount: getArrayLength(rankings?.live),
-    totalRankingCount: getArrayLength(rankings?.total),
   };
 }
 
@@ -98,6 +93,8 @@ export async function saveOnliveLog(
   input: SaveOnliveLogInput,
   client: OnliveLogClient = prisma
 ) {
+  const counts = getLogSummaryCounts(input.log);
+
   return client.onliveLog.upsert({
     where: {
       roomId_liveId_capturedAt: {
@@ -108,12 +105,16 @@ export async function saveOnliveLog(
     },
     update: {
       log: input.log,
+      commentCount: counts.commentCount,
+      giftCount: counts.giftCount,
     },
     create: {
       roomId: input.roomId,
       liveId: input.liveId,
       capturedAt: input.capturedAt,
       log: input.log,
+      commentCount: counts.commentCount,
+      giftCount: counts.giftCount,
     },
     select: {
       id: true,
@@ -149,7 +150,8 @@ export async function listUserOnliveLogs(
         capturedAt: true,
         createdAt: true,
         updatedAt: true,
-        log: true,
+        commentCount: true,
+        giftCount: true,
         title: true,
       },
     }),
@@ -163,7 +165,6 @@ export async function listUserOnliveLogs(
 
   return logs.map((log) => ({
     ...log,
-    ...getLogSummaryCounts(log.log),
     isFavorite: favoriteSet.has(log.id),
     roomName: registeredRoom.roomName,
   }));
@@ -182,7 +183,8 @@ export async function listAllOnliveLogs(userId?: string): Promise<OnliveLogListI
         capturedAt: true,
         createdAt: true,
         updatedAt: true,
-        log: true,
+        commentCount: true,
+        giftCount: true,
         title: true,
       },
     }),
@@ -204,7 +206,6 @@ export async function listAllOnliveLogs(userId?: string): Promise<OnliveLogListI
 
   return logs.map((log) => ({
     ...log,
-    ...getLogSummaryCounts(log.log),
     isFavorite: favoriteSet.has(log.id),
     roomName: roomNameMap.get(log.roomId) ?? null,
   }));
@@ -375,8 +376,17 @@ export async function toggleOnliveLogFavorite(
 
 export async function deleteUserOnliveLog(
   userId: string,
-  logId: string
+  logId: string,
+  isAdmin: boolean = false
 ): Promise<boolean> {
+  if (isAdmin) {
+    const result = await prisma.onliveLog.updateMany({
+      where: { id: logId },
+      data: { isDeleted: true },
+    });
+    return result.count > 0;
+  }
+
   const registeredRoom = await getUserRegisteredRoom(userId);
 
   if (!registeredRoom) {
