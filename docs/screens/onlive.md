@@ -177,7 +177,7 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 | キー | `watchlog:onlive:{roomId}` |
 | バージョン | `1`（バージョン不一致時は無効化） |
 | 保存タイミング | コメント・ギフトが更新されるたびに |
-| 削除タイミング | 配信終了ログ保存成功時、`liveStatus===1`（配信外）検出時 |
+| 削除タイミング | 配信終了ログ保存成功時、`liveStatus===1`（配信外）検出時、ログレスキュー画面での復旧成功時 |
 
 **保存内容：**
 
@@ -840,3 +840,4 @@ updatedAt             DateTime
 | [lib/showroom-block-filter.ts](../../lib/showroom-block-filter.ts) | ブロックユーザーフィルタリング |
 | [hooks/use-user-blocks.ts](../../hooks/use-user-blocks.ts) | ブロック一覧管理フック |
 | [prisma/schema.prisma](../../prisma/schema.prisma) | `OnliveLog` / `UserBlock` モデル |
+| [docs/screens/rescue.md](rescue.md) | ローカルストレージスナップショットの復旧画面仕様 |

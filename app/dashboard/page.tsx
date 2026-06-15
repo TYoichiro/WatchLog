@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -27,6 +28,30 @@ type DashboardCache = Pick<DashboardData, "profile" | "activeFan" | "notices" | 
 
 const DASHBOARD_CACHE_KEY = "watchlog_dashboard";
 const DASHBOARD_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+const RESCUE_STORAGE_KEY_PREFIX = "watchlog:onlive:";
+
+function checkHasRescuableLogs(): boolean {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(RESCUE_STORAGE_KEY_PREFIX)) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      if (
+        parsed.version === 1 &&
+        typeof parsed.liveId === "string" &&
+        parsed.liveId.trim().length > 0
+      ) {
+        return true;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}
 
 function readDashboardCache(): DashboardCache | null {
   try {
@@ -64,6 +89,7 @@ async function fetchDashboard(signal: AbortSignal): Promise<DashboardBffResponse
 export default function Page() {
   const router = useRouter();
   const [canShowDashboard, setCanShowDashboard] = useState(false);
+  const [hasRescuableLogs, setHasRescuableLogs] = useState(false);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     isAdmin: false,
     isPremium: false,
@@ -229,6 +255,7 @@ export default function Page() {
     }
 
     const timeoutId = window.setTimeout(() => {
+      setHasRescuableLogs(checkHasRescuableLogs());
       void initializeDashboard();
     }, 0);
 
@@ -259,6 +286,17 @@ export default function Page() {
     <AppShell activeKey="dashboard" isAdmin={isAdmin} isPremium={isPremium}>
       <div className="flex shrink-0 flex-col gap-4">
         <HeroCard profile={profile} />
+        {(isPremium || isAdmin) && hasRescuableLogs && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <span>未保存の復旧可能ログがあります</span>
+            <Link
+              href="/rescue"
+              className="shrink-0 font-medium underline underline-offset-4 hover:text-amber-950"
+            >
+              復旧はこちら
+            </Link>
+          </div>
+        )}
         <RoomStatsSection profile={profile} activeFan={activeFan} />
         <EventOverviewCard eventAndSupport={eventAndSupport} />
         <NoticeListCard notices={notices} hasError={noticesHasError} />
