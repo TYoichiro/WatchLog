@@ -742,6 +742,66 @@ describe("LogListPage - JSON import", () => {
     expect(routerPush).not.toHaveBeenCalled();
   });
 
+  it("レスキューJSONファイルを選択すると/logs/json-importへ遷移する", async () => {
+    render(<LogListPage initialLogs={[]} />);
+
+    const rescueSnapshot = {
+      version: 1,
+      roomId: 417115,
+      liveId: "23036613",
+      savedAt: 1781445635000,
+      comments: [{ id: "c1", text: "こんにちは" }],
+      gifts: [],
+      metrics: null,
+    };
+    const file = new File(
+      [JSON.stringify(rescueSnapshot)],
+      "watchlog-rescue-417115-23036613.json",
+      { type: "application/json" },
+    );
+
+    triggerFileChange(getFileInput(), file);
+
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalledWith("/logs/json-import");
+    });
+  });
+
+  it("レスキューJSONをインポートするとlocalStorageに正しく変換して保存される", async () => {
+    render(<LogListPage initialLogs={[]} />);
+
+    const rescueSnapshot = {
+      version: 1,
+      roomId: 417115,
+      liveId: "23036613",
+      savedAt: 1781445635000,
+      comments: [{ id: "c1", text: "こんにちは" }],
+      gifts: [],
+      metrics: null,
+    };
+    const file = new File(
+      [JSON.stringify(rescueSnapshot)],
+      "watchlog-rescue-417115-23036613.json",
+      { type: "application/json" },
+    );
+
+    triggerFileChange(getFileInput(), file);
+
+    await waitFor(() => {
+      const raw = window.localStorage.getItem("watchlog:json-viewer");
+      expect(raw).not.toBeNull();
+      const stored = JSON.parse(raw!);
+      expect(stored).toMatchObject({
+        liveId: "23036613",
+        roomId: "417115",
+        log: expect.objectContaining({
+          comments: [{ id: "c1", text: "こんにちは" }],
+          source: "rescue",
+        }),
+      });
+    });
+  });
+
   it("壊れたJSONファイルを選択するとエラーメッセージを表示する", async () => {
     render(<LogListPage initialLogs={[]} />);
 

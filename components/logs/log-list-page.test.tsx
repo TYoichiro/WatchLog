@@ -20,6 +20,8 @@ vi.mock("@/lib/onlive-local-log", () => ({
   deleteOnliveLocalLog: vi.fn(),
   writeJsonViewerLog: vi.fn(),
   isValidJsonViewerLog: vi.fn().mockReturnValue(false),
+  isRescueSnapshot: vi.fn().mockReturnValue(false),
+  rescueSnapshotToJsonViewerLog: vi.fn(),
 }));
 
 const makeLog = (overrides: Partial<LogListItem> = {}): LogListItem => ({

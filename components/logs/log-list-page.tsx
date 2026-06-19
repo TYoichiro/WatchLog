@@ -32,8 +32,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   deleteOnliveLocalLog,
+  isRescueSnapshot,
   isValidJsonViewerLog,
   readOnliveLocalLog,
+  rescueSnapshotToJsonViewerLog,
   writeJsonViewerLog,
   type OnliveLocalLog,
 } from "@/lib/onlive-local-log";
@@ -518,11 +520,14 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
     reader.onload = (e) => {
       try {
         const parsed: unknown = JSON.parse(e.target?.result as string);
-        if (!isValidJsonViewerLog(parsed)) {
+        if (isValidJsonViewerLog(parsed)) {
+          writeJsonViewerLog(parsed);
+        } else if (isRescueSnapshot(parsed)) {
+          writeJsonViewerLog(rescueSnapshotToJsonViewerLog(parsed));
+        } else {
           setJsonImportError("正しい形式のWatchLog JSONファイルではありません。");
           return;
         }
-        writeJsonViewerLog(parsed);
         router.push("/logs/json-import");
       } catch {
         setJsonImportError("JSONファイルの読み込みに失敗しました。");
