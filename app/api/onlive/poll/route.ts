@@ -6,7 +6,7 @@ import {
 } from "@/lib/showroom";
 import { filterBlockedShowroomItems } from "@/lib/showroom-block-filter";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
-import { listBlockedShowroomUserIds } from "@/lib/user-blocks";
+import { getCachedBlockedShowroomUserIds } from "@/lib/user-blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   const skipRanking = searchParams.get("skip_ranking") === "1";
 
   const blockedUserIds = userId
-    ? new Set(await listBlockedShowroomUserIds(userId))
+    ? new Set(await getCachedBlockedShowroomUserIds(userId))
     : new Set<string>();
 
   const [profileResult, liveRankingResult, totalRankingResult] =

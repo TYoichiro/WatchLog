@@ -4053,7 +4053,6 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
           commentCount: comments.length,
           giftCount: logGifts.length,
           liveId: liveId!,
-          liveRankingCount: visibleLiveRanking.length,
           log: log as Record<string, unknown>,
           roomId: String(roomId),
           roomName: (roomProfile ?? initialRoomProfile)?.roomName ?? null,

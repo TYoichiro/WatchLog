@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   getRoomProfile: vi.fn(),
   getRoomTotalRanking: vi.fn(),
   getUserRegisteredRoom: vi.fn(),
-  listBlockedShowroomUserIds: vi.fn(),
+  getCachedBlockedShowroomUserIds: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({
@@ -22,7 +22,7 @@ vi.mock("@/lib/showroom", () => ({
 }));
 
 vi.mock("@/lib/user-blocks", () => ({
-  listBlockedShowroomUserIds: mocks.listBlockedShowroomUserIds,
+  getCachedBlockedShowroomUserIds: mocks.getCachedBlockedShowroomUserIds,
 }));
 
 vi.mock("@/lib/user-registered-room", () => ({
@@ -89,7 +89,7 @@ describe("GET /api/onlive/poll", () => {
   it("returns poll data and filters blocked ranking users", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue(["blocked-user"]);
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue(["blocked-user"]);
     mocks.getRoomProfile.mockResolvedValue(profile);
     mocks.getRoomLiveRanking.mockResolvedValue([
       {
@@ -162,7 +162,7 @@ describe("GET /api/onlive/poll", () => {
     expect(data.totalRanking).toEqual([
       expect.objectContaining({ id: "total-allowed" }),
     ]);
-    expect(mocks.listBlockedShowroomUserIds).toHaveBeenCalledWith("user-1");
+    expect(mocks.getCachedBlockedShowroomUserIds).toHaveBeenCalledWith("user-1");
     expect(mocks.getRoomProfile).toHaveBeenCalledWith("123");
     expect(mocks.getRoomLiveRanking).toHaveBeenCalledWith("123");
     expect(mocks.getRoomTotalRanking).toHaveBeenCalledWith("123");
@@ -171,7 +171,7 @@ describe("GET /api/onlive/poll", () => {
   it("skip_ranking=1 のクエリがある場合ランキングをスキップして空配列とエラーフラグを返す", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
     mocks.getRoomProfile.mockResolvedValue(profile);
 
     const response = await GET(new Request("http://localhost/api/onlive/poll?skip_ranking=1"));
@@ -193,7 +193,7 @@ describe("GET /api/onlive/poll", () => {
   it("全ソースが失敗した場合は全てデフォルト値で返す", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
     mocks.getRoomProfile.mockRejectedValue(new Error("profile failed"));
     mocks.getRoomLiveRanking.mockRejectedValue(new Error("live ranking failed"));
     mocks.getRoomTotalRanking.mockRejectedValue(new Error("total ranking failed"));
@@ -215,7 +215,7 @@ describe("GET /api/onlive/poll", () => {
   it("reports per-source errors and keeps successful data", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
     mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
-    mocks.listBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
     mocks.getRoomProfile.mockRejectedValue(new Error("profile failed"));
     mocks.getRoomLiveRanking.mockRejectedValue(new Error("live ranking failed"));
     mocks.getRoomTotalRanking.mockResolvedValue([

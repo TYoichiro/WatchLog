@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import type { Prisma } from "@/app/generated/prisma/client";
 
 import { auth } from "@/auth";
-import { hasPremiumRole } from "@/lib/authz";
+import { getUserRoles } from "@/lib/authz";
 import { logger } from "@/lib/logger";
 import { saveOnliveLog } from "@/lib/onlive-log";
 import { filterBlockedShowroomItems } from "@/lib/showroom-block-filter";
@@ -12,7 +12,7 @@ import {
   toJstWallTimeIsoString,
 } from "@/lib/jst";
 import { getRoomTotalRanking } from "@/lib/showroom";
-import { listBlockedShowroomUserIds } from "@/lib/user-blocks";
+import { getCachedBlockedShowroomUserIds } from "@/lib/user-blocks";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
 import type { JsonObject, JsonValue } from "@/types/domain/json";
 import type { OnliveLogRequestBody } from "@/types/api/onlive-logs";
@@ -143,9 +143,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const [registeredRoom, isPremium] = await Promise.all([
+  const [registeredRoom, { isPremium }] = await Promise.all([
     getUserRegisteredRoom(userId),
-    hasPremiumRole(userId),
+    getUserRoles(userId),
   ]);
 
   if (!registeredRoom || registeredRoom.roomId !== roomId) {
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
   try {
     const [ranking, blockedUserIds] = await Promise.all([
       getRoomTotalRanking(roomId),
-      listBlockedShowroomUserIds(userId),
+      getCachedBlockedShowroomUserIds(userId),
     ]);
     totalRanking =
       toJsonValue(

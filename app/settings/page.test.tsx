@@ -7,15 +7,13 @@ import SettingsPage from "./page";
 const {
   authMock,
   getUserRegisteredRoomMock,
-  hasTopAdminRoleMock,
-  hasPremiumRoleMock,
+  getUserRolesMock,
   listUserInvitationCodesMock,
   redirectMock,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
   getUserRegisteredRoomMock: vi.fn(),
-  hasTopAdminRoleMock: vi.fn(),
-  hasPremiumRoleMock: vi.fn(),
+  getUserRolesMock: vi.fn(),
   listUserInvitationCodesMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
@@ -31,8 +29,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/authz", () => ({
-  hasTopAdminRole: hasTopAdminRoleMock,
-  hasPremiumRole: hasPremiumRoleMock,
+  getUserRoles: getUserRolesMock,
 }));
 
 vi.mock("@/lib/user-registered-room", () => ({
@@ -138,16 +135,14 @@ function getRoleDescriptionText(): string {
 }
 
 beforeEach(() => {
-  hasTopAdminRoleMock.mockResolvedValue(false);
-  hasPremiumRoleMock.mockResolvedValue(false);
+  getUserRolesMock.mockResolvedValue({ isAdmin: false, isPremium: false });
 });
 
 afterEach(() => {
   cleanup();
   authMock.mockReset();
   getUserRegisteredRoomMock.mockReset();
-  hasTopAdminRoleMock.mockReset();
-  hasPremiumRoleMock.mockReset();
+  getUserRolesMock.mockReset();
   listUserInvitationCodesMock.mockReset();
   redirectMock.mockClear();
 });
@@ -229,7 +224,7 @@ describe("SettingsPage", () => {
 
   it("displays プレミアム role label for premium users", async () => {
     authMock.mockResolvedValue(session);
-    hasPremiumRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: false, isPremium: true });
     getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
     listUserInvitationCodesMock.mockResolvedValue([]);
 
@@ -240,7 +235,7 @@ describe("SettingsPage", () => {
 
   it("displays 管理者 role label for admin users", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
     getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
     listUserInvitationCodesMock.mockResolvedValue([]);
 
@@ -251,8 +246,7 @@ describe("SettingsPage", () => {
 
   it("displays 管理者 role label when the user has both admin and premium roles", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
-    hasPremiumRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: true });
     getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
     listUserInvitationCodesMock.mockResolvedValue([]);
 
@@ -263,7 +257,7 @@ describe("SettingsPage", () => {
 
   it("shows the generate invitation code button for admin users", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
     getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
     listUserInvitationCodesMock.mockResolvedValue([]);
 
@@ -284,7 +278,7 @@ describe("SettingsPage", () => {
 
   it("shows admin invitation heading with correct counts", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
     getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
     listUserInvitationCodesMock.mockResolvedValue([
       { code: "AAAA111111", isActive: true },
@@ -316,7 +310,7 @@ describe("SettingsPage", () => {
 
   it("shows admin invitation heading when there are no codes at all", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
     getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
     listUserInvitationCodesMock.mockResolvedValue([]);
 
@@ -332,7 +326,7 @@ describe("SettingsPage", () => {
 
   it("shows admin invitation heading when all codes are used", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
     getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
     listUserInvitationCodesMock.mockResolvedValue([
       { code: "AAAA111111", isActive: false },
@@ -351,7 +345,7 @@ describe("SettingsPage", () => {
 
   it("shows admin invitation heading when all codes are active", async () => {
     authMock.mockResolvedValue(session);
-    hasTopAdminRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
     getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
     listUserInvitationCodesMock.mockResolvedValue([
       { code: "AAAA111111", isActive: true },
@@ -371,7 +365,7 @@ describe("SettingsPage", () => {
 
   it("shows general invitation heading for premium users", async () => {
     authMock.mockResolvedValue(session);
-    hasPremiumRoleMock.mockResolvedValue(true);
+    getUserRolesMock.mockResolvedValue({ isAdmin: false, isPremium: true });
     getUserRegisteredRoomMock.mockResolvedValue(registeredRoom);
     listUserInvitationCodesMock.mockResolvedValue([]);
 

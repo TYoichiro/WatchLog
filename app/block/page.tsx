@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 import { BlockListPage } from "@/components/block/block-list-page";
 import { AppShell } from "@/components/navigation/app-sidebar";
-import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
+import { getUserRoles } from "@/lib/authz";
 import { getUserRegisteredRoom } from "@/lib/user-registered-room";
 
 export const dynamic = "force-dynamic";
@@ -21,10 +21,9 @@ export default async function Page() {
     redirect("/");
   }
 
-  const [registeredRoom, isAdmin, isPremium] = await Promise.all([
+  const [registeredRoom, { isAdmin, isPremium }] = await Promise.all([
     getUserRegisteredRoom(userId),
-    hasTopAdminRole(userId),
-    hasPremiumRole(userId),
+    getUserRoles(userId),
   ]);
 
   if (!registeredRoom) {

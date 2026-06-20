@@ -135,11 +135,9 @@
 | `giftCount` | `log.giftCount` |
 | `isFavorite` | `false`（ローカルログはお気に入り未対応） |
 | `liveId` | `log.liveId` |
-| `liveRankingCount` | `log.liveRankingCount` |
 | `roomId` | `log.roomId` |
 | `roomName` | `log.roomName` |
 | `title` | `null`（ローカルログはタイトル未対応） |
-| `totalRankingCount` | `0`（ローカルログは累計ランキング未保持） |
 | `updatedAt` | `log.savedAt` |
 
 ---
@@ -767,8 +765,6 @@ DB の `log` JSON カラムから各カウントを取得します。
 |-----------|------------------|
 | `commentCount` | `log.comments.length` |
 | `giftCount` | `log.gifts.length` |
-| `liveRankingCount` | `log.rankings.live.length` |
-| `totalRankingCount` | `log.rankings.total.length` |
 
 ---
 
@@ -837,11 +833,9 @@ type LogListItem = {
   id: string;
   isFavorite: boolean;
   liveId: string;
-  liveRankingCount: number;
   roomId: string;
   roomName: string | null;
   title: string | null;
-  totalRankingCount: number;
   updatedAt: string;        // JST ISO文字列
 };
 ```
@@ -872,11 +866,9 @@ type OnliveLogListItem = {
   id: string;
   isFavorite: boolean;
   liveId: string;
-  liveRankingCount: number;
   roomId: string;
   roomName: string | null;
   title: string | null;
-  totalRankingCount: number;
   updatedAt: Date;
 };
 ```
@@ -890,7 +882,6 @@ type OnliveLocalLog = {
   commentCount: number;
   giftCount: number;
   liveId: string;
-  liveRankingCount: number;
   log: Record<string, unknown>; // 完全なログペイロード（閲覧・ダウンロードで使用）
   roomId: string;
   roomName: string | null;

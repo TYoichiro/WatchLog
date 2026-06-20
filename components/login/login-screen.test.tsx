@@ -5,7 +5,6 @@ import type { AppNotice } from "@/lib/dashboard-notices";
 import { LoginScreen } from "./login-screen";
 
 const googleLoginLabel = "Google\u3067\u30ed\u30b0\u30a4\u30f3";
-const xLoginLabel = "X\u3067\u30ed\u30b0\u30a4\u30f3\uff08\u6e96\u5099\u4e2d\uff09";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 
@@ -42,9 +41,6 @@ describe("LoginScreen", () => {
     const googleButton = screen.getByRole("button", { name: googleLoginLabel });
     expect(googleButton.getAttribute("type")).toBe("submit");
     expect(googleButton.closest("form")).toBeDefined();
-
-    const xButton = screen.getByRole("button", { name: xLoginLabel });
-    expect((xButton as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("submits the Google sign-in action", async () => {

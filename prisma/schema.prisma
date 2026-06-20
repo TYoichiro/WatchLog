@@ -121,13 +121,15 @@ model MaintenanceWindow {
 }
 
 model OnliveLog {
-  id         String              @id @default(cuid())
-  roomId     String              @map("room_id")
-  liveId     String              @map("live_id")
-  capturedAt DateTime            @map("captured_at")
-  log        Json
-  title      String?
-  isDeleted  Boolean             @default(false) @map("is_deleted")
+  id                String              @id @default(cuid())
+  roomId            String              @map("room_id")
+  liveId            String              @map("live_id")
+  capturedAt        DateTime            @map("captured_at")
+  log               Json
+  title             String?
+  commentCount      Int                 @default(0) @map("comment_count")
+  giftCount         Int                 @default(0) @map("gift_count")
+  isDeleted         Boolean             @default(false) @map("is_deleted")
   createdAt  DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("created_at")
   updatedAt  DateTime            @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')")) @map("updated_at")
   favorites  OnliveLogFavorite[]

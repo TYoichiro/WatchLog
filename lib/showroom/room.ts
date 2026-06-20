@@ -1,3 +1,5 @@
+import { toJstWallTimeDate } from "@/lib/jst";
+
 import {
   SHOWROOM_API_URL,
   fetchShowroomJson,
@@ -233,8 +235,9 @@ export async function getRoomActiveFan(
   const url = new URL(SHOWROOM_API_URL.activeFan);
   url.searchParams.set("room_id", String(roomId));
 
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const jstNow = toJstWallTimeDate(now);
+  const year = jstNow.getUTCFullYear();
+  const month = String(jstNow.getUTCMonth() + 1).padStart(2, "0");
   url.searchParams.set("ym", `${year}${month}`);
 
   const rawData = await fetchShowroomJson<ShowroomActiveFanResponse>(url);

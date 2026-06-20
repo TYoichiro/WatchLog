@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { ShowTubeShell } from "@/components/showtube/showtube-shell";
 import { ShowTubeWatchPage } from "@/components/showtube/showtube-watch-page";
-import { hasTopAdminRole, hasPremiumRole } from "@/lib/authz";
+import { getUserRoles } from "@/lib/authz";
 import { getOnlives, getHlsStreamingUrls, getRoomCommentLog, getRoomLiveInfo } from "@/lib/showroom";
 
 export const dynamic = "force-dynamic";
@@ -25,10 +25,7 @@ export default async function Page({
     redirect("/");
   }
 
-  const [isAdmin, isPremium] = await Promise.all([
-    hasTopAdminRole(userId),
-    hasPremiumRole(userId),
-  ]);
+  const { isAdmin, isPremium } = await getUserRoles(userId);
 
   if (!isAdmin && !isPremium) {
     redirect("/dashboard");

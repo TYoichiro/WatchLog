@@ -4,6 +4,7 @@ import { withAxiom } from "next-axiom";
 process.env.TZ = "Asia/Tokyo";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   allowedDevOrigins: ["127.0.0.1"],
   images: {
     remotePatterns: [

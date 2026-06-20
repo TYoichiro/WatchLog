@@ -21,13 +21,6 @@ function GoogleIcon() {
   );
 }
 
-function XIcon() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M18.244 2H21l-6.545 7.48L22 22h-6.828l-5.34-6.99L3.8 22H1l7.012-8.01L2 2h6.9l4.82 6.41L18.244 2z" />
-    </svg>
-  );
-}
 
 export function LoginScreen({
   hasNoticesError,
@@ -56,16 +49,6 @@ export function LoginScreen({
               </Button>
             </form>
 
-            <Button
-              type="button"
-              disabled
-              className="h-12 w-full rounded-2xl bg-black text-white text-base font-semibold hover:bg-neutral-800"
-            >
-              <span className="mr-3 inline-flex">
-                <XIcon />
-              </span>
-              {"X\u3067\u30ed\u30b0\u30a4\u30f3\uff08\u6e96\u5099\u4e2d\uff09"}
-            </Button>
           </div>
         </section>
 

@@ -10,8 +10,7 @@ const {
   getHlsStreamingUrlsMock,
   getRoomCommentLogMock,
   getRoomLiveInfoMock,
-  hasTopAdminRoleMock,
-  hasPremiumRoleMock,
+  getUserRolesMock,
   redirectMock,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
@@ -19,8 +18,7 @@ const {
   getHlsStreamingUrlsMock: vi.fn(),
   getRoomCommentLogMock: vi.fn(),
   getRoomLiveInfoMock: vi.fn(),
-  hasTopAdminRoleMock: vi.fn(),
-  hasPremiumRoleMock: vi.fn(),
+  getUserRolesMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   }),
@@ -35,8 +33,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/authz", () => ({
-  hasTopAdminRole: hasTopAdminRoleMock,
-  hasPremiumRole: hasPremiumRoleMock,
+  getUserRoles: getUserRolesMock,
 }));
 
 vi.mock("@/lib/showroom", () => ({
@@ -115,14 +112,12 @@ afterEach(() => {
   getHlsStreamingUrlsMock.mockReset();
   getRoomCommentLogMock.mockReset();
   getRoomLiveInfoMock.mockReset();
-  hasTopAdminRoleMock.mockReset();
-  hasPremiumRoleMock.mockReset();
+  getUserRolesMock.mockReset();
   redirectMock.mockClear();
 });
 
 beforeEach(() => {
-  hasTopAdminRoleMock.mockResolvedValue(false);
-  hasPremiumRoleMock.mockResolvedValue(false);
+  getUserRolesMock.mockResolvedValue({ isAdmin: false, isPremium: false });
   getOnlivesMock.mockResolvedValue(onlivesData);
   getHlsStreamingUrlsMock.mockResolvedValue([]);
   getRoomCommentLogMock.mockResolvedValue([]);
@@ -149,7 +144,7 @@ describe("WatchPage", () => {
 
     it("プレミアムユーザーの場合はアクセスできる", async () => {
       authMock.mockResolvedValue(session);
-      hasPremiumRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: false, isPremium: true });
 
       render(await WatchPage(defaultSearchParams));
 
@@ -158,7 +153,7 @@ describe("WatchPage", () => {
 
     it("管理者の場合はアクセスできる", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
       render(await WatchPage(defaultSearchParams));
 
@@ -169,7 +164,7 @@ describe("WatchPage", () => {
   describe("room_id バリデーション", () => {
     it("room_id パラメータがない場合は /showtube にリダイレクトする", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
       await expect(
         WatchPage({ searchParams: Promise.resolve({}) }),
@@ -180,7 +175,7 @@ describe("WatchPage", () => {
 
     it("room_id が数値以外の場合は /showtube にリダイレクトする", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
       await expect(
         WatchPage({ searchParams: Promise.resolve({ room_id: "abc" }) }),
@@ -191,7 +186,7 @@ describe("WatchPage", () => {
 
     it("room_id が 0 の場合は /showtube にリダイレクトする", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
       await expect(
         WatchPage({ searchParams: Promise.resolve({ room_id: "0" }) }),
@@ -204,7 +199,7 @@ describe("WatchPage", () => {
   describe("item 解決", () => {
     it("対象 roomId のルームが onlives にある場合は item を渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
       render(await WatchPage(defaultSearchParams));
 
@@ -215,7 +210,7 @@ describe("WatchPage", () => {
 
     it("対象 roomId のルームが onlives にない場合は item=null を渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
       render(
         await WatchPage({ searchParams: Promise.resolve({ room_id: "99999" }) }),
@@ -228,7 +223,7 @@ describe("WatchPage", () => {
 
     it("getOnlives が失敗した場合は item=null を渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
       getOnlivesMock.mockRejectedValue(new Error("API error"));
 
       render(await WatchPage(defaultSearchParams));
@@ -242,7 +237,7 @@ describe("WatchPage", () => {
   describe("roomId の引き渡し", () => {
     it("roomId を ShowTubeWatchPage に渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
       render(await WatchPage(defaultSearchParams));
 
@@ -255,7 +250,7 @@ describe("WatchPage", () => {
   describe("streamingUrls の引き渡し", () => {
     it("getHlsStreamingUrls の結果を ShowTubeWatchPage に渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
       getHlsStreamingUrlsMock.mockResolvedValue([
         { id: 1, label: "原画", quality: 0, url: "https://example.com/stream.m3u8" },
       ]);
@@ -269,7 +264,7 @@ describe("WatchPage", () => {
 
     it("getHlsStreamingUrls が失敗した場合は空の streamingUrls を渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
       getHlsStreamingUrlsMock.mockRejectedValue(new Error("API error"));
 
       render(await WatchPage(defaultSearchParams));
@@ -283,7 +278,7 @@ describe("WatchPage", () => {
   describe("initialComments の引き渡し", () => {
     it("getRoomCommentLog の結果を ShowTubeWatchPage に渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
       getRoomCommentLogMock.mockResolvedValue([
         {
           id: "c1",
@@ -306,7 +301,7 @@ describe("WatchPage", () => {
 
     it("getRoomCommentLog が失敗した場合は空のコメントを渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
       getRoomCommentLogMock.mockRejectedValue(new Error("API error"));
 
       render(await WatchPage(defaultSearchParams));
@@ -320,7 +315,7 @@ describe("WatchPage", () => {
   describe("bcsvrKey の引き渡し", () => {
     it("getRoomLiveInfo の bcsvrKey を ShowTubeWatchPage に渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
       getRoomLiveInfoMock.mockResolvedValue({ bcsvrKey: "test-bcsvr-key" });
 
       render(await WatchPage(defaultSearchParams));
@@ -332,7 +327,7 @@ describe("WatchPage", () => {
 
     it("getRoomLiveInfo が失敗した場合は bcsvrKey=null を渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
       getRoomLiveInfoMock.mockRejectedValue(new Error("API error"));
 
       render(await WatchPage(defaultSearchParams));
@@ -346,7 +341,7 @@ describe("WatchPage", () => {
   describe("ShowTubeShell へのデータ", () => {
     it("onlives のジャンルリストを ShowTubeShell に渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
       render(await WatchPage(defaultSearchParams));
 
@@ -357,7 +352,7 @@ describe("WatchPage", () => {
 
     it("getOnlives が失敗した場合はジャンルなしで ShowTubeShell を表示する", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
       getOnlivesMock.mockRejectedValue(new Error("API error"));
 
       render(await WatchPage(defaultSearchParams));
@@ -369,7 +364,7 @@ describe("WatchPage", () => {
 
     it("ShowTubeShell に selectedGenreId=null を渡す", async () => {
       authMock.mockResolvedValue(session);
-      hasTopAdminRoleMock.mockResolvedValue(true);
+      getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
       render(await WatchPage(defaultSearchParams));
 

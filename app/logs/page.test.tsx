@@ -9,8 +9,7 @@ import type { OnliveLogListItem } from "@/lib/onlive-log";
 const {
   authMock,
   getUserRegisteredRoomMock,
-  hasTopAdminRoleMock,
-  hasPremiumRoleMock,
+  getUserRolesMock,
   listAllOnliveLogsMock,
   listUserOnliveLogsMock,
   redirectMock,
@@ -19,8 +18,7 @@ const {
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
   getUserRegisteredRoomMock: vi.fn(),
-  hasTopAdminRoleMock: vi.fn(),
-  hasPremiumRoleMock: vi.fn(),
+  getUserRolesMock: vi.fn(),
   listAllOnliveLogsMock: vi.fn(),
   listUserOnliveLogsMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
@@ -43,8 +41,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/authz", () => ({
-  hasTopAdminRole: hasTopAdminRoleMock,
-  hasPremiumRole: hasPremiumRoleMock,
+  getUserRoles: getUserRolesMock,
 }));
 
 vi.mock("@/lib/onlive-log", () => ({
@@ -142,11 +139,9 @@ const onliveLog: OnliveLogListItem = {
   id: "log-1",
   isFavorite: false,
   liveId: "live-1",
-  liveRankingCount: 4,
   roomId: "12345",
   roomName: "Alpha Room",
   title: null,
-  totalRankingCount: 5,
   updatedAt: new Date(Date.UTC(2026, 4, 9, 12, 2, 0)),
 };
 
@@ -158,11 +153,9 @@ const logListItem: LogListItem = {
   id: "log-1",
   isFavorite: false,
   liveId: "live-1",
-  liveRankingCount: 4,
   roomId: "12345",
   roomName: "Alpha Room",
   title: null,
-  totalRankingCount: 5,
   updatedAt: "2026-05-09T12:02:00.000+09:00",
 };
 
@@ -183,8 +176,7 @@ function setupAuthenticatedUser({
   isPremium = true,
 }: { isAdmin?: boolean; isPremium?: boolean } = {}) {
   authMock.mockResolvedValue(session);
-  hasTopAdminRoleMock.mockResolvedValue(isAdmin);
-  hasPremiumRoleMock.mockResolvedValue(isPremium);
+  getUserRolesMock.mockResolvedValue({ isAdmin, isPremium });
 }
 
 async function renderLogsPage() {
@@ -207,8 +199,7 @@ afterEach(() => {
   window.localStorage.clear();
   authMock.mockReset();
   getUserRegisteredRoomMock.mockReset();
-  hasTopAdminRoleMock.mockReset();
-  hasPremiumRoleMock.mockReset();
+  getUserRolesMock.mockReset();
   listAllOnliveLogsMock.mockReset();
   listUserOnliveLogsMock.mockReset();
   redirectMock.mockClear();
@@ -259,7 +250,7 @@ describe("LogsPage", () => {
     await expect(LogsPage()).rejects.toThrow("NEXT_REDIRECT:/");
 
     expect(redirectMock).toHaveBeenCalledWith("/");
-    expect(hasTopAdminRoleMock).not.toHaveBeenCalled();
+    expect(getUserRolesMock).not.toHaveBeenCalled();
   });
 
   it("renders all logs for top admins", async () => {
@@ -390,7 +381,6 @@ describe("LogListPage", () => {
       commentCount: 5,
       giftCount: 2,
       liveId: "live-local-1",
-      liveRankingCount: 3,
       log: {},
       roomId: "12345",
       roomName: "Alpha Room",
@@ -413,7 +403,6 @@ describe("LogListPage", () => {
       commentCount: 5,
       giftCount: 2,
       liveId: "live-local-1",
-      liveRankingCount: 3,
       log: {},
       roomId: "12345",
       roomName: "Alpha Room",
@@ -470,7 +459,6 @@ describe("LogListPage", () => {
       commentCount: 5,
       giftCount: 2,
       liveId: "live-local-1",
-      liveRankingCount: 3,
       log: { comments: [] },
       roomId: "12345",
       roomName: "Alpha Room",
@@ -523,7 +511,6 @@ describe("LogListPage", () => {
       commentCount: 5,
       giftCount: 2,
       liveId: "live-local-1",
-      liveRankingCount: 3,
       log: {},
       roomId: "12345",
       roomName: "Alpha Room",
@@ -655,11 +642,9 @@ describe("LogListPage", () => {
       id: `log-${i + 1}`,
       isFavorite: false,
       liveId: `live-${i + 1}`,
-      liveRankingCount: 0,
       roomId: "12345",
       roomName: "Alpha Room",
       title: `ログ${i + 1}`,
-      totalRankingCount: 0,
       updatedAt: "2026-05-09T12:02:00.000+09:00",
     }));
 
@@ -755,6 +740,66 @@ describe("LogListPage - JSON import", () => {
       await screen.findByText("正しい形式のWatchLog JSONファイルではありません。"),
     ).toBeDefined();
     expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it("レスキューJSONファイルを選択すると/logs/json-importへ遷移する", async () => {
+    render(<LogListPage initialLogs={[]} />);
+
+    const rescueSnapshot = {
+      version: 1,
+      roomId: 417115,
+      liveId: "23036613",
+      savedAt: 1781445635000,
+      comments: [{ id: "c1", text: "こんにちは" }],
+      gifts: [],
+      metrics: null,
+    };
+    const file = new File(
+      [JSON.stringify(rescueSnapshot)],
+      "watchlog-rescue-417115-23036613.json",
+      { type: "application/json" },
+    );
+
+    triggerFileChange(getFileInput(), file);
+
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalledWith("/logs/json-import");
+    });
+  });
+
+  it("レスキューJSONをインポートするとlocalStorageに正しく変換して保存される", async () => {
+    render(<LogListPage initialLogs={[]} />);
+
+    const rescueSnapshot = {
+      version: 1,
+      roomId: 417115,
+      liveId: "23036613",
+      savedAt: 1781445635000,
+      comments: [{ id: "c1", text: "こんにちは" }],
+      gifts: [],
+      metrics: null,
+    };
+    const file = new File(
+      [JSON.stringify(rescueSnapshot)],
+      "watchlog-rescue-417115-23036613.json",
+      { type: "application/json" },
+    );
+
+    triggerFileChange(getFileInput(), file);
+
+    await waitFor(() => {
+      const raw = window.localStorage.getItem("watchlog:json-viewer");
+      expect(raw).not.toBeNull();
+      const stored = JSON.parse(raw!);
+      expect(stored).toMatchObject({
+        liveId: "23036613",
+        roomId: "417115",
+        log: expect.objectContaining({
+          comments: [{ id: "c1", text: "こんにちは" }],
+          source: "rescue",
+        }),
+      });
+    });
   });
 
   it("壊れたJSONファイルを選択するとエラーメッセージを表示する", async () => {
