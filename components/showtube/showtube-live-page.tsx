@@ -57,10 +57,18 @@ export function ShowTubeLivePage({
     );
   }
 
+  const seen = new Set<string>();
+  const uniqueItems = items.filter((item) => {
+    const k = String(item.roomId);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-      {items.map((item) => (
-        <OnliveCard key={item.roomId} item={item} />
+      {uniqueItems.map((item) => (
+        <OnliveCard key={String(item.roomId)} item={item} />
       ))}
     </div>
   );

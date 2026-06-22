@@ -856,6 +856,7 @@ describe("LogListPage - JSON import", () => {
       onerror: (() => void) | null = null;
       readAsText = vi.fn();
       constructor() {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         capturedInstance = this;
       }
     }

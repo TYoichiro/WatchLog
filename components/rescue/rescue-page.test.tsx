@@ -423,9 +423,12 @@ describe("RescuePage", () => {
       fireEvent.click(screen.getByRole("button", { name: "復旧する" }));
       await waitFor(() => {
         expect(screen.getByText("エラー: Forbidden")).toBeDefined();
+        expect((screen.getByRole("button", { name: "削除" }) as HTMLButtonElement).disabled).toBe(false);
       });
       fireEvent.click(screen.getByRole("button", { name: "削除" }));
-      expect(screen.getByText("ローカルストレージにログが見つかりませんでした")).toBeDefined();
+      await waitFor(() => {
+        expect(screen.getByText("ローカルストレージにログが見つかりませんでした")).toBeDefined();
+      });
     });
 
     it("success 状態のエントリには「削除」ボタンを表示しない", async () => {

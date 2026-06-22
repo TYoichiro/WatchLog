@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import type { HlsStreamingUrl, OnliveItem, RoomComment } from "@/lib/showroom";
 import { ShowTubeWatchPage } from "./showtube-watch-page";

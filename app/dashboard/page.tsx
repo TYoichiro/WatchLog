@@ -242,19 +242,12 @@ export default function Page() {
       }
     }
 
-    const cache = readDashboardCache();
-    if (cache) {
-      setDashboardData((prev) => ({
-        ...prev,
-        profile: cache.profile,
-        activeFan: cache.activeFan,
-        notices: cache.notices,
-        noticesHasError: cache.noticesHasError,
-      }));
-      setCanShowDashboard(true);
-    }
-
     const timeoutId = window.setTimeout(() => {
+      const cache = readDashboardCache();
+      if (cache) {
+        setDashboardData((prev) => ({ ...prev, profile: cache.profile, activeFan: cache.activeFan, notices: cache.notices, noticesHasError: cache.noticesHasError }));
+        setCanShowDashboard(true);
+      }
       setHasRescuableLogs(checkHasRescuableLogs());
       void initializeDashboard();
     }, 0);
