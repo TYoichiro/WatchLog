@@ -58,6 +58,9 @@
 │              │ コメント数    42件                      │  │
 │              │ ギフト数      10件                      │  │
 │              │ 最終更新      2026/06/16 12:34:56       │  │
+│              │ ┌──────┐                               │  │
+│              │ │  削除  │                               │  │
+│              │ └──────┘                               │  │
 │              └────────────────────────────────────────┘  │
 │              ┌────────────────────────────────────────┐  │
 │              │ ...（エントリごとにカード）              │  │
@@ -135,6 +138,26 @@ type RawSnapshot = {
 
 ---
 
+## 削除フロー（「削除」ボタン）
+
+各エントリカードに表示される「削除」ボタンで、DB への登録なしにローカルストレージのエントリを削除します。
+
+```
+「削除」ボタンをクリック（エントリごと）
+  │
+  ▼ localStorage.removeItem(entry.key) でキー削除
+  │
+  ▼ setEntryStates で当該エントリを一覧から除去
+  │
+  ▼ 全エントリが除去された場合は空状態メッセージを表示
+```
+
+- **表示条件**: `status.kind === "idle"` または `status.kind === "error"` のエントリのみ表示
+  - `success` 状態はすでに localStorage から削除済みのため不要
+- **無効化条件**: 復旧中（`isPending === true`）は `disabled`
+
+---
+
 ## 復旧フロー（「復旧する」ボタン）
 
 `handleRecoverAll` は `useTransition` を用いて非同期処理します。**idle エントリを逐次処理**します（並行ではなく順番に実行）。
@@ -152,7 +175,7 @@ type RawSnapshot = {
     POST /api/onlive/logs
       リクエスト:
         {
-          capturedAt: snapshot.savedAt の JST ISO 文字列,
+          capturedAt: snapshot.savedAt（Unix ミリ秒、number 型）,
           liveId:     snapshot.liveId,
           log: {
             capturedAt:           snapshot.savedAt の JST ISO 文字列,
@@ -188,7 +211,7 @@ type RawSnapshot = {
   ▼ isPending = false（useTransition 完了）
 ```
 
-> 復旧中（`isPending = true`）は「復旧する」・「ダウンロード」ボタンが `disabled` になります。
+> 復旧中（`isPending = true`）は「復旧する」ボタンのラベルが `"復旧中..."` に変わり、「復旧する」・「ダウンロード」の両ボタンが `disabled` になります。
 
 ---
 
@@ -236,6 +259,14 @@ type RawSnapshot = {
 | `idle` | なし |
 | `success` | 「保存しました」（emerald、`text-emerald-600`） |
 | `error` | 「エラー: {message}」（red、`text-red-600`） |
+
+**削除ボタン（カード下部）：**
+
+| ステータス | 削除ボタン |
+|-----------|-----------|
+| `idle` | 表示（復旧中は `disabled`） |
+| `success` | 非表示（localStorage 削除済み） |
+| `error` | 表示（復旧中は `disabled`） |
 
 ---
 

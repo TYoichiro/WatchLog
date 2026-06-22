@@ -151,6 +151,11 @@ export function RescuePage() {
   );
   const [isPending, startTransition] = useTransition();
 
+  const handleDeleteEntry = (key: string) => {
+    localStorage.removeItem(key);
+    setEntryStates((prev) => prev.filter((s) => s.entry.key !== key));
+  };
+
   const handleRecoverAll = () => {
     const idleIndices = entryStates
       .map((s, i) => ({ s, i }))
@@ -254,6 +259,18 @@ export function RescuePage() {
                 <p className="text-sm font-medium text-red-600">
                   エラー: {state.status.message}
                 </p>
+              )}
+              {(state.status.kind === "idle" || state.status.kind === "error") && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteEntry(state.entry.key)}
+                  disabled={isPending}
+                  className="cursor-pointer text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  削除
+                </Button>
               )}
             </div>
           );

@@ -364,6 +364,81 @@ describe("RescuePage", () => {
     });
   });
 
+  describe("削除ボタン", () => {
+    it("idle エントリのカードに「削除」ボタンを表示する", () => {
+      setEntry("room-1", makeSnapshot());
+      render(<RescuePage />);
+      expect(screen.getByRole("button", { name: "削除" })).toBeDefined();
+    });
+
+    it("「削除」ボタンをクリックするとエントリが一覧から消える", () => {
+      setEntry("room-1", makeSnapshot({ roomId: 12345 }));
+      render(<RescuePage />);
+      fireEvent.click(screen.getByRole("button", { name: "削除" }));
+      expect(screen.getByText("ローカルストレージにログが見つかりませんでした")).toBeDefined();
+    });
+
+    it("「削除」ボタンをクリックするとローカルストレージからキーを削除する", () => {
+      setEntry("room-1", makeSnapshot());
+      expect(localStorage.getItem(KEY_PREFIX + "room-1")).not.toBeNull();
+      render(<RescuePage />);
+      fireEvent.click(screen.getByRole("button", { name: "削除" }));
+      expect(localStorage.getItem(KEY_PREFIX + "room-1")).toBeNull();
+    });
+
+    it("複数エントリのうち1件だけ削除すると残り1件が表示される", () => {
+      setEntry("room-1", makeSnapshot({ roomId: 11111, liveId: "live-1" }));
+      setEntry("room-2", makeSnapshot({ roomId: 22222, liveId: "live-2" }));
+      render(<RescuePage />);
+      const deleteButtons = screen.getAllByRole("button", { name: "削除" });
+      fireEvent.click(deleteButtons[0]);
+      expect(screen.getByText("1件のログが見つかりました")).toBeDefined();
+    });
+
+    it("API エラー後のエントリにも「削除」ボタンを表示する", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 })
+        )
+      );
+      setEntry("room-1", makeSnapshot());
+      render(<RescuePage />);
+      fireEvent.click(screen.getByRole("button", { name: "復旧する" }));
+      await waitFor(() => {
+        expect(screen.getByText("エラー: Forbidden")).toBeDefined();
+      });
+      expect(screen.getByRole("button", { name: "削除" })).toBeDefined();
+    });
+
+    it("API エラー後に「削除」ボタンをクリックするとエントリが消える", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 })
+        )
+      );
+      setEntry("room-1", makeSnapshot());
+      render(<RescuePage />);
+      fireEvent.click(screen.getByRole("button", { name: "復旧する" }));
+      await waitFor(() => {
+        expect(screen.getByText("エラー: Forbidden")).toBeDefined();
+      });
+      fireEvent.click(screen.getByRole("button", { name: "削除" }));
+      expect(screen.getByText("ローカルストレージにログが見つかりませんでした")).toBeDefined();
+    });
+
+    it("success 状態のエントリには「削除」ボタンを表示しない", async () => {
+      setEntry("room-1", makeSnapshot());
+      render(<RescuePage />);
+      fireEvent.click(screen.getByRole("button", { name: "復旧する" }));
+      await waitFor(() => {
+        expect(screen.getByText("保存しました")).toBeDefined();
+      });
+      expect(screen.queryByRole("button", { name: "削除" })).toBeNull();
+    });
+  });
+
   describe("ダウンロードボタン", () => {
     it("「ダウンロード」をクリックすると URL.createObjectURL を呼ぶ", () => {
       setEntry("room-1", makeSnapshot());
