@@ -7,6 +7,6 @@ type LinkProps = {
   [key: string]: unknown;
 };
 
-export default function Link({ href, children, className }: LinkProps) {
-  return <a href={href} className={className}>{children}</a>;
+export default function Link({ href, children, ...rest }: LinkProps) {
+  return <a href={href} {...rest}>{children}</a>;
 }
