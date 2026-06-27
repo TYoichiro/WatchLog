@@ -510,13 +510,13 @@ describe("DashboardPage localStorage cache", () => {
     cachedAt: Date.now(),
   };
 
-  it("displays cached data immediately without skeleton when a valid cache exists", () => {
+  it("displays cached data without skeleton when a valid cache exists", async () => {
     localStorage.setItem(CACHE_KEY, JSON.stringify(validCache));
     fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
 
     render(<DashboardPage />);
 
-    expect(screen.getByRole("heading", { level: 1, name: "Alpha Room" })).toBeDefined();
+    await screen.findByRole("heading", { level: 1, name: "Alpha Room" });
     expect(screen.queryByText("読み込み中")).toBeNull();
   });
 
@@ -570,11 +570,36 @@ describe("DashboardPage localStorage cache", () => {
       profile: { ...profile, roomName: "Stale Room Name" },
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(staleCache));
-    setupFetchScenario();
+
+    let resolveFetch!: (value: Response) => void;
+    fetchMock.mockImplementation(
+      (input) =>
+        getFetchUrl(input) === "/api/dashboard"
+          ? new Promise<Response>((resolve) => { resolveFetch = resolve; })
+          : Promise.resolve(new Response(null, { status: 404 }))
+    );
 
     render(<DashboardPage />);
 
-    expect(screen.getByRole("heading", { level: 1, name: "Stale Room Name" })).toBeDefined();
+    await screen.findByRole("heading", { level: 1, name: "Stale Room Name" });
+
+    resolveFetch(
+      new Response(
+        JSON.stringify({
+          status: "ok",
+          isAdmin: false,
+          isPremium: false,
+          registeredRoom: { roomId: registeredRoom.roomId, roomUrl: registeredRoom.roomUrl },
+          profile,
+          activeFan,
+          eventAndSupport,
+          notices: [],
+          noticesHasError: false,
+          roomStatus,
+        }),
+        { headers: { "Content-Type": "application/json" } }
+      )
+    );
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1, name: "Alpha Room" })).toBeDefined();

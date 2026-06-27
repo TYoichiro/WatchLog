@@ -1667,7 +1667,7 @@ function useOnlivePoll(isEnabled = true, skipRanking = false) {
       currentController?.abort();
       window.clearInterval(intervalId);
     };
-  }, [isEnabled]);
+  }, [isEnabled, skipRanking]);
 
   return {
     profile,

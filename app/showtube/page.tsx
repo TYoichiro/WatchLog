@@ -46,16 +46,19 @@ export default async function Page({
 
   let items: OnliveItem[] = [];
   if (onlives) {
-    if (selectedGenreId !== null && !isNaN(selectedGenreId)) {
-      const genreData = onlives.onlives.find((g) => g.genreId === selectedGenreId);
-      items = genreData?.lives ?? [];
-    } else {
-      const seen = new Set<number>();
-      items = onlives.onlives.flatMap((g) => g.lives).filter((item) => {
-        if (seen.has(item.roomId)) return false;
-        seen.add(item.roomId);
+    const seen = new Set<string>();
+    const dedupe = (lives: OnliveItem[]) =>
+      lives.filter((item) => {
+        const k = String(item.roomId);
+        if (seen.has(k)) return false;
+        seen.add(k);
         return true;
       });
+    if (selectedGenreId !== null && !isNaN(selectedGenreId)) {
+      const genreData = onlives.onlives.find((g) => g.genreId === selectedGenreId);
+      items = dedupe(genreData?.lives ?? []);
+    } else {
+      items = dedupe(onlives.onlives.flatMap((g) => g.lives));
     }
   }
 
