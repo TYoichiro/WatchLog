@@ -214,6 +214,89 @@ Prisma schema を変更した場合は `npm run prisma:generate` を実行し、
 
 `node_modules` は名前付きボリューム（`node_modules`）に格納するため、Windows ホストのバイナリと Linux コンテナのバイナリが混在しません。`DATABASE_URL` は `compose.yml` の `environment:` で上書きされるため、`.env` 内の値は compose 起動時には参照されません。
 
+## 並列開発（AI バイブコーディング）
+
+複数の AI セッション（Claude Code、Copilot など）を同時に走らせる場合、`compose.dev.yml` と `scripts/thread.ps1` を使うと各スレッドに独立した開発環境を割り当てられます。
+
+### ポート割り当て
+
+| スレッド | アプリ URL | PostgreSQL |
+| --- | --- | --- |
+| 1 | http://localhost:3001 | localhost:5501 |
+| 2 | http://localhost:3002 | localhost:5502 |
+| 3 | http://localhost:3003 | localhost:5503 |
+| … | … | … |
+| 9 | http://localhost:3009 | localhost:5509 |
+
+各スレッドは Docker の `COMPOSE_PROJECT_NAME` によってボリューム・ネットワークが完全に分離されます。異なるブランチでマイグレーションが衝突しても互いに影響しません。
+
+### 準備
+
+スクリプト実行を許可していない場合は PowerShell で一度だけ実行してください。
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Google OAuth コンソールに各スレッドのリダイレクト URI を追加します。
+
+```text
+http://localhost:3001/api/auth/callback/google
+http://localhost:3002/api/auth/callback/google
+# … 使うスレッド分だけ
+```
+
+### 既存ブランチでスレッドを起動する
+
+現在のリポジトリのまま独立した環境を起動します。
+
+```powershell
+.\scripts\thread.ps1 start 1
+```
+
+### Git ワークツリーで並列開発する
+
+ブランチごとに別ディレクトリを用意して同時に作業する場合はこちら。
+
+```powershell
+# ワークツリーを作成してスレッド 2 に紐付ける
+.\scripts\thread.ps1 new 2 feature/my-feature
+# → ../WatchLog-2 ディレクトリに worktree が作られる
+
+# そのディレクトリに移動してスレッドを起動
+cd ..\WatchLog-2
+.\scripts\thread.ps1 start 2
+```
+
+### コマンド一覧
+
+| コマンド | 内容 |
+| --- | --- |
+| `.\scripts\thread.ps1 start <N>` | スレッド N の環境を起動 |
+| `.\scripts\thread.ps1 logs <N>` | スレッド N のアプリログを追跡（Ctrl+C で終了） |
+| `.\scripts\thread.ps1 stop <N>` | スレッド N を停止（ボリューム保持） |
+| `.\scripts\thread.ps1 down <N>` | スレッド N を停止してコンテナ・ネットワークを削除 |
+| `.\scripts\thread.ps1 status` | 全スレッドの稼働状況を表示 |
+| `.\scripts\thread.ps1 new <N> [branch]` | ワークツリー作成。ブランチ省略時は `thread/N` |
+
+### シード投入
+
+コンテナ起動後に初期データが必要な場合。
+
+```powershell
+$env:COMPOSE_PROJECT_NAME = "watchlog-1"
+docker compose -f compose.dev.yml exec app npm run prisma:seed
+```
+
+### compose.dev.yml の構成
+
+| サービス | 内容 |
+| --- | --- |
+| `db` | PostgreSQL 16。データはスレッドごとの `db_data` ボリュームに永続化 |
+| `app` | `node:24-alpine` でソースをマウント。起動時に `npm ci → prisma generate → migrate deploy → npm run dev` を実行（ホットリロードあり） |
+
+`node_modules` と `app/generated/prisma`（Prisma クライアント）は各スレッド専用の名前付きボリュームに格納するため、Windows ホストの Linux バイナリが混在しません。`.env` / `.env.local` の AUTH 系シークレットはそのまま読み込み、`DATABASE_URL` と `NEXTAUTH_URL` だけスレッドのポートに合わせて自動上書きされます。
+
 ## ライセンス
 
 [LICENSE](./LICENSE) を参照してください。
