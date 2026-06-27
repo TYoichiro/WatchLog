@@ -15,6 +15,7 @@ WatchLog は SHOWROOM の配信状況を追跡し、配信中のコメント・�
 - SHOWROOM ユーザーのブロックと、コメント・ギフト・ランキング表示へのフィルタ適用
 - `premiumuser` または `admin` 向けの ShowTube 機能（プレミアムライブ視聴対応）
 - `admin` 向けのユーザー、登録ルーム、お知らせ、メンテナンス、BAN 管理、期限切れセッション削除
+- `premiumuser` または `admin` 向けのログレスキュー（ローカルストレージに残った未保存スナップショットを DB に復旧またはダウンロード）
 - API リクエストログ、監査ログ、アプリケーションログ出力
 
 ## 技術スタック
@@ -29,6 +30,7 @@ WatchLog は SHOWROOM の配信状況を追跡し、配信中のコメント・�
 - PostgreSQL
 - Vitest 4 / Testing Library / jsdom
 - hls.js
+- @vercel/analytics / @vercel/speed-insights / next-axiom（計測・ログ転送）
 
 Prisma Client は `prisma/schema.prisma` の generator 設定により `app/generated/prisma` に生成されます。
 
@@ -66,13 +68,13 @@ AUTH_GOOGLE_SECRET="Google OAuth Client Secret"
 NEXTAUTH_URL="http://localhost:3000"
 ```
 
-1 コマンドで PostgreSQL の起動・マイグレーション適用・開発サーバーの起動をすべて行います。
+1 コマンドで PostgreSQL の起動・マイグレーション適用・本番ビルドの起動をすべて行います。
 
 ```bash
 docker compose up
 ```
 
-初回は `npm ci` が走るため数分かかります。2 回目以降は `node_modules` がキャッシュされるため高速に起動します。
+初回は `npm ci` とビルドが走るため数分かかります。2 回目以降は `node_modules` がキャッシュされるため高速に起動します。
 
 初期データが必要な場合は別ターミナルで実行してください。
 
@@ -146,6 +148,7 @@ npm run dev
 | `npm run prisma:generate` | Prisma Client を生成 |
 | `npm run prisma:migrate` | `prisma migrate deploy` で既存マイグレーションを適用 |
 | `npm run prisma:seed` | 初期データを投入 |
+| `npm run batch:backfill-log-counts` | OnliveLog の `comment_count` / `gift_count` を JSON から再計算して更新（1 回限りのバックフィル） |
 
 PowerShell の実行ポリシーで `npm` がブロックされる環境では、`npm.cmd run dev` のように `npm.cmd` を使ってください。
 
@@ -165,6 +168,7 @@ PowerShell の実行ポリシーで `npm` がブロックされる環境では�
 | `/settings` | ロール表示と招待コード一覧 |
 | `/showtube` | 現在配信中のルーム一覧。`admin` / `premiumuser` 向け |
 | `/showtube/watch` | HLS 視聴ページ。`admin` / `premiumuser` 向け |
+| `/rescue` | ログレスキュー。ローカルストレージの未保存スナップショットを DB に復旧またはダウンロード。`admin` / `premiumuser` 向け |
 | `/admin/users` | ユーザー一覧、プレミアム切替、BAN 管理、期限切れセッション削除 |
 | `/admin/rooms` | 登録ルーム一覧 |
 | `/admin/notices` | お知らせ管理 |
@@ -206,7 +210,7 @@ Prisma schema を変更した場合は `npm run prisma:generate` を実行し、
 | サービス | 内容 |
 | --- | --- |
 | `db` | PostgreSQL 16。データは `postgres_data` ボリュームに永続化 |
-| `app` | `node:24-alpine` イメージでソースをマウント。起動時に `npm ci → prisma migrate deploy → npm run dev` を実行 |
+| `app` | `node:24-alpine` イメージでソースをマウント。起動時に `npm ci → prisma migrate deploy → npm run build → npm run start` を実行（本番モード） |
 
 `node_modules` は名前付きボリューム（`node_modules`）に格納するため、Windows ホストのバイナリと Linux コンテナのバイナリが混在しません。`DATABASE_URL` は `compose.yml` の `environment:` で上書きされるため、`.env` 内の値は compose 起動時には参照されません。
 
