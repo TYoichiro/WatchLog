@@ -440,7 +440,7 @@ describe("LogListPage", () => {
     );
 
     render(<LogListPage initialLogs={[logListItem]} />);
-    fireEvent.click(screen.getByRole("button", { name: /ダウンロード/ }));
+    fireEvent.click(screen.getByRole("button", { name: "ダウンロード" }));
 
     await waitFor(() => {
       expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
@@ -484,11 +484,11 @@ describe("LogListPage", () => {
     );
 
     render(<LogListPage initialLogs={[logListItem]} />);
-    fireEvent.click(screen.getByRole("button", { name: /ダウンロード/ }));
+    fireEvent.click(screen.getByRole("button", { name: "ダウンロード" }));
 
     await waitFor(() => {
       const downloadBtn = screen.getByRole("button", {
-        name: /ダウンロード/,
+        name: "ダウンロード",
       }) as HTMLButtonElement;
       expect(downloadBtn.disabled).toBe(false);
     });

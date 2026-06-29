@@ -67,6 +67,7 @@ type LogDownloadPayload = {
 
 type LogListPageProps = {
   initialLogs: LogListItem[];
+  isAdmin?: boolean;
   isPremium?: boolean;
   roomId?: string;
 };
@@ -482,7 +483,7 @@ function LogDeleteDialog({
   );
 }
 
-export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPageProps) {
+export function LogListPage({ initialLogs, isAdmin = false, isPremium = true, roomId }: LogListPageProps) {
   const router = useRouter();
   const [logs, setLogs] = useState<LogListItem[]>(() => {
     if (!isPremium && roomId) {
@@ -495,11 +496,13 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const [downloadingLogId, setDownloadingLogId] = useState<string | null>(null);
+  const [isBulkDownloading, setIsBulkDownloading] = useState(false);
   const [jsonImportError, setJsonImportError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<PageSize>(20);
   const [currentPage, setCurrentPage] = useState(1);
 
   const canEdit = isPremium !== false;
+  const canBulkDownload = isAdmin || isPremium !== false;
 
   const totalPages = Math.max(1, Math.ceil(logs.length / pageSize));
   const clampedPage = Math.min(currentPage, totalPages);
@@ -603,6 +606,30 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
     }
   };
 
+  const handleBulkDownload = async () => {
+    setIsBulkDownloading(true);
+    try {
+      const response = await fetch("/api/onlive/logs/bulk-download", {
+        cache: "no-store",
+      });
+      if (!response.ok) return;
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const disposition = response.headers.get("Content-Disposition");
+      const filenameMatch = disposition?.match(/filename="([^"]+)"/);
+      const filename = filenameMatch?.[1] ?? "watchlog-bulk.json";
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently ignore
+    } finally {
+      setIsBulkDownloading(false);
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (!pendingDeleteLog) return;
 
@@ -651,25 +678,43 @@ export function LogListPage({ initialLogs, isPremium = true, roomId }: LogListPa
             ログ一覧{" "}
             <span className="font-normal text-slate-500">{logs.length}件</span>
           </h1>
-          {logs.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <label htmlFor="page-size-select" className="shrink-0">
-                表示件数
-              </label>
-              <select
-                id="page-size-select"
-                value={pageSize}
-                onChange={(e) => handlePageSizeChange(Number(e.target.value) as PageSize)}
-                className="rounded border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800"
+          <div className="flex flex-wrap items-center gap-3">
+            {canBulkDownload && logs.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isBulkDownloading}
+                onClick={() => void handleBulkDownload()}
               >
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <option key={size} value={size}>
-                    {size}件
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+                {isBulkDownloading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <Download className="h-3.5 w-3.5" aria-hidden />
+                )}
+                一括ダウンロード
+              </Button>
+            )}
+            {logs.length > 0 && (
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <label htmlFor="page-size-select" className="shrink-0">
+                  表示件数
+                </label>
+                <select
+                  id="page-size-select"
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value) as PageSize)}
+                  className="rounded border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800"
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size}件
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
