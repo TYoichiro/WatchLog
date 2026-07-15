@@ -921,7 +921,9 @@ paths:
       tags: [Onlive]
       summary: オンライブログ削除
       description: |
-        指定 ID のオンライブログを削除します。自分が保存したログのみ削除できます。
+        指定 ID のオンライブログを削除します。
+        admin ロールの場合は任意のログを削除できます。それ以外は自分の登録ルームのログのみ削除できます。
+        admin がログを削除した場合、操作は監査ログに記録されます。
 
         **認証**: 必須
       security:
@@ -945,10 +947,14 @@ paths:
                   ok:
                     type: boolean
                     example: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /onlive/logs/{logId}/favorite:
     put:

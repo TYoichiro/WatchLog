@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LogListPage, type LogListItem } from "./log-list-page";
@@ -361,6 +361,146 @@ describe("LogListPage", () => {
     it("ページ数が8以上の場合、省略記号を表示する", () => {
       render(<LogListPage initialLogs={makeLogs(160)} />);
       expect(screen.getAllByText("...").length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("一括ダウンロード", () => {
+    type SavedUrlMethods = {
+      createObjectURL?: typeof URL.createObjectURL;
+      revokeObjectURL?: typeof URL.revokeObjectURL;
+    };
+    const savedUrlMethods: SavedUrlMethods = {};
+
+    function setupBulkDownloadMocks() {
+      const revokeObjectURL = vi.fn();
+      savedUrlMethods.createObjectURL = (URL as typeof URL & SavedUrlMethods).createObjectURL;
+      savedUrlMethods.revokeObjectURL = (URL as typeof URL & SavedUrlMethods).revokeObjectURL;
+      Object.defineProperty(URL, "createObjectURL", {
+        configurable: true,
+        writable: true,
+        value: vi.fn(() => "blob:mock-url"),
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        configurable: true,
+        writable: true,
+        value: revokeObjectURL,
+      });
+      return revokeObjectURL;
+    }
+
+    afterEach(() => {
+      Object.defineProperty(URL, "createObjectURL", {
+        configurable: true,
+        writable: true,
+        value: savedUrlMethods.createObjectURL,
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        configurable: true,
+        writable: true,
+        value: savedUrlMethods.revokeObjectURL,
+      });
+    });
+
+    it("isAdmin=true のとき一括ダウンロードボタンが表示される", () => {
+      render(<LogListPage initialLogs={[makeLog()]} isAdmin />);
+      expect(screen.getByRole("button", { name: "一括ダウンロード" })).toBeDefined();
+    });
+
+    it("isPremium がデフォルト（true）のとき一括ダウンロードボタンが表示される", () => {
+      render(<LogListPage initialLogs={[makeLog()]} />);
+      expect(screen.getByRole("button", { name: "一括ダウンロード" })).toBeDefined();
+    });
+
+    it("isPremium=false のとき一括ダウンロードボタンが表示されない", () => {
+      render(<LogListPage initialLogs={[makeLog()]} isPremium={false} />);
+      expect(screen.queryByRole("button", { name: "一括ダウンロード" })).toBeNull();
+    });
+
+    it("ログが0件のとき一括ダウンロードボタンが表示されない", () => {
+      render(<LogListPage initialLogs={[]} />);
+      expect(screen.queryByRole("button", { name: "一括ダウンロード" })).toBeNull();
+    });
+
+    it("一括ダウンロードボタンをクリックすると /api/onlive/logs/bulk-download を呼ぶ", async () => {
+      setupBulkDownloadMocks();
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ version: "3", exportedAt: "2026-01-01T09:00:00.000+09:00", logs: [] }), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Disposition": 'attachment; filename="watchlog-bulk-20260101.json"',
+          },
+        })
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      render(<LogListPage initialLogs={[makeLog()]} />);
+      fireEvent.click(screen.getByRole("button", { name: "一括ダウンロード" }));
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/onlive/logs/bulk-download",
+          expect.objectContaining({ cache: "no-store" }),
+        );
+      });
+    });
+
+    it("ダウンロード完了後にファイルが保存される", async () => {
+      const revokeObjectURL = setupBulkDownloadMocks();
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ version: "3", exportedAt: "2026-01-01T09:00:00.000+09:00", logs: [] }), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Disposition": 'attachment; filename="watchlog-bulk-20260101.json"',
+          },
+        })
+      ));
+
+      render(<LogListPage initialLogs={[makeLog()]} />);
+      fireEvent.click(screen.getByRole("button", { name: "一括ダウンロード" }));
+
+      await waitFor(() => {
+        expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+      });
+    });
+
+    it("ダウンロード中はボタンが disabled になる", async () => {
+      setupBulkDownloadMocks();
+      let resolveDownload!: (value: Response) => void;
+      const pendingResponse = new Promise<Response>((resolve) => {
+        resolveDownload = resolve;
+      });
+      vi.stubGlobal("fetch", vi.fn().mockReturnValue(pendingResponse));
+
+      render(<LogListPage initialLogs={[makeLog()]} />);
+      fireEvent.click(screen.getByRole("button", { name: "一括ダウンロード" }));
+
+      expect(
+        (screen.getByRole("button", { name: "一括ダウンロード" }) as HTMLButtonElement).disabled
+      ).toBe(true);
+
+      await act(async () => {
+        resolveDownload(
+          new Response(JSON.stringify({ version: "3", logs: [] }), { status: 200 })
+        );
+      });
+    });
+
+    it("APIがエラーを返してもボタンが再び有効になる", async () => {
+      setupBulkDownloadMocks();
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: "server error" }), { status: 500 })
+      ));
+
+      render(<LogListPage initialLogs={[makeLog()]} />);
+      fireEvent.click(screen.getByRole("button", { name: "一括ダウンロード" }));
+
+      await waitFor(() => {
+        expect(
+          (screen.getByRole("button", { name: "一括ダウンロード" }) as HTMLButtonElement).disabled
+        ).toBe(false);
+      });
     });
   });
 

@@ -9,7 +9,7 @@
 | 認証要否 | 必要 |
 | ページタイトル | 配信ログ \| WatchLog |
 
-配信終了時に自動保存された配信ログを一覧表示する画面です。管理者は全ユーザーのログを閲覧でき、プレミアムユーザーは自分の登録ルームの DB ログを閲覧できます。非プレミアムユーザーはローカルストレージに保存された直近 1 件のログのみを閲覧できます。各ログに対して「閲覧」（詳細ページへ遷移）・「ダウンロード」（JSON ファイル出力）・「削除」が行えます。プレミアムユーザー・管理者はさらに「お気に入り登録」（ハートアイコン）および「タイトル編集」（インライン編集）が行えます。また、ダウンロードした JSON ファイルをインポートしてログを閲覧する機能（全ユーザー共通）も備えています。各ログの詳細閲覧画面では、配信後の振り返りとして「配信サマリー」（獲得ポイント・新規フォロー・トップギフター/コメンター等の集計、および前回配信との比較）を表示できます。
+配信終了時に自動保存された配信ログを一覧表示する画面です。管理者は全ユーザーのログを閲覧でき、プレミアムユーザーは自分の登録ルームの DB ログを閲覧できます。非プレミアムユーザーはローカルストレージに保存された直近 1 件のログのみを閲覧できます。各ログに対して「閲覧」（詳細ページへ遷移）・「ダウンロード」（JSON ファイル出力）・「削除」が行えます。プレミアムユーザー・管理者はさらに「お気に入り登録」（ハートアイコン）・「タイトル編集」（インライン編集）・「一括ダウンロード」（全ログを ZIP ファイルで一括出力）が行えます。また、ダウンロードした JSON ファイルをインポートしてログを閲覧する機能（全ユーザー共通）も備えています。各ログの詳細閲覧画面では、配信後の振り返りとして「配信サマリー」（獲得ポイント・新規フォロー・トップギフター/コメンター等の集計、および前回配信との比較）を表示できます。
 
 ---
 
@@ -51,7 +51,7 @@
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│ [サイドバー]  ログ一覧 N件                        [表示件数: 20件▼] │
+│ [サイドバー]  ログ一覧 N件  [↓一括ダウンロード]  [表示件数: 20件▼] │
 │              ┌────────────────────────────────────────────────┐    │
 │              │ 📄 JSONログ閲覧                                  │    │
 │              │   ダウンロードしたJSONファイルを選択して         │    │
@@ -73,7 +73,7 @@
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-> ♡ = お気に入りボタン（canEdit 時のみ表示）、✏️ = タイトル編集ボタン（canEdit 時のみ表示）
+> ♡ = お気に入りボタン（canEdit 時のみ表示）、✏️ = タイトル編集ボタン（canEdit 時のみ表示）、[↓一括ダウンロード] = プレミアム・管理者かつログあり時のみ表示
 
 ---
 
@@ -90,6 +90,7 @@
 | prop | 型 | デフォルト | 説明 |
 |------|----|-----------|------|
 | `initialLogs` | `LogListItem[]` | — | サーバーから渡された初期ログ一覧（プレミアムユーザー・管理者のみ有効） |
+| `isAdmin` | `boolean` | `false` | 管理者か否か（一括ダウンロード権限の判定に使用） |
 | `isPremium` | `boolean` | `true` | プレミアムユーザーか否か（非プレミアム時はローカルストレージを使用） |
 | `roomId` | `string \| undefined` | — | 非プレミアムユーザーのローカルストレージキー用ルームID |
 
@@ -102,13 +103,16 @@
 | `isDeleting` | `boolean` | `false` | 削除処理中フラグ |
 | `deleteErrorMessage` | `string \| null` | `null` | 削除エラーメッセージ |
 | `downloadingLogId` | `string \| null` | `null` | ダウンロード処理中のログ ID |
+| `isBulkDownloading` | `boolean` | `false` | 一括ダウンロード処理中フラグ |
 | `jsonImportError` | `string \| null` | `null` | JSONインポートエラーメッセージ |
 | `pageSize` | `PageSize`（20 \| 50 \| 100） | `20` | 1ページあたりの表示件数 |
 | `currentPage` | `number` | `1` | 現在のページ番号 |
 
-**派生値（`canEdit`）：**
+**派生値（`canEdit`・`canBulkDownload`）：**
 
 `canEdit = isPremium !== false` — お気に入り切り替え・タイトル編集はプレミアムユーザー・管理者のみ操作可能。非プレミアムユーザーは表示のみ。
+
+`canBulkDownload = isAdmin || isPremium !== false` — 一括ダウンロードボタンの表示条件。管理者またはプレミアムユーザーで、かつ表示中ログが 1 件以上ある場合に表示される。
 
 **ページネーション：**
 
@@ -155,7 +159,7 @@
 1. `auth()` でユーザーID 確認、なければ `/` へリダイレクト
 2. `hasTopAdminRole(userId)` で管理者判定
 3. 管理者なら `listAllOnliveLogs(userId)` で全ログ取得（最大 500 件）。`userId` を渡すことで管理者自身のお気に入り状態も取得する
-4. `<LogListPage initialLogs={...}>` をレンダリング
+4. `<LogListPage initialLogs={...} isAdmin>` をレンダリング
 
 **処理フロー（一般ユーザー）**:
 1. `auth()` でユーザーID 確認、なければ `/` へリダイレクト
@@ -425,6 +429,38 @@
 
 ---
 
+## 一括ダウンロードフロー
+
+一括ダウンロード機能は**管理者・プレミアムユーザー専用**です。ログ一覧のヘッダーに表示される「一括ダウンロード」ボタンから起動します（`canBulkDownload && logs.length > 0` の場合のみ表示）。
+
+```
+「一括ダウンロード」ボタンをクリック
+  │
+  ▼ setIsBulkDownloading(true) → ボタンにスピナー表示・disabled
+  │
+  ▼ handleBulkDownload()
+GET /api/onlive/logs/bulk-download
+  │
+  ├─ 成功（200）
+  │   ├─ Blob を生成（application/zip）
+  │   ├─ Content-Disposition ヘッダーからファイル名を取得
+  │   │   （取得失敗時のフォールバック: "watchlog-bulk.json"）
+  │   ├─ URL.createObjectURL(blob) で一時 URL を取得
+  │   ├─ <a> 要素を動的生成し、href と download 属性をセット
+  │   ├─ a.click() でブラウザのファイルダウンロードをトリガー
+  │   └─ URL.revokeObjectURL(url) で一時 URL を解放
+  │
+  ├─ 失敗（response.ok = false）
+  │   └─ ダウンロードをスキップ（エラー表示なし）
+  │
+  └─ 例外発生時（ネットワークエラー等）
+      └─ エラーを無視（ダウンロードをスキップ）
+  │
+  ▼ setIsBulkDownloading(false) → ボタンを通常状態に戻す
+```
+
+---
+
 ## ダウンロードフロー
 
 ダウンロード機能は**全ユーザー共通**で利用可能です（管理者・プレミアム・非プレミアム問わず）。
@@ -567,6 +603,37 @@ DELETE /api/onlive/logs/{logId}
 ---
 
 ## API エンドポイント
+
+### GET /api/onlive/logs/bulk-download
+
+- **ファイル**: [app/api/onlive/logs/bulk-download/route.ts](../app/api/onlive/logs/bulk-download/route.ts)
+- **認証**: 必要（`requireUser()`）
+- **権限制限**: `isAdmin || isPremium` でなければ `403 Forbidden`
+- **キャッシュ制御**: `force-dynamic`
+- **用途**: 全ログを ZIP ファイルとして一括ダウンロードする（管理者・プレミアムユーザー専用）
+
+**権限制御**:
+- 管理者（`isAdmin`）: `getAllOnliveLogsWithData()` で全ルームのログを取得
+- プレミアムユーザー: `getUserOnliveLogsWithData(userId)` で自ルームのログを取得
+
+**レスポンス（200）**:
+- Content-Type: `application/zip`
+- Content-Disposition: `attachment; filename="watchlog-bulk-{YYYYMMDD}.zip"` （JST 基準の実行日付）
+- ZIP 内の各エントリ: `watchlog-{liveId}-{YYYYMMDD-HHMMSS}.json`（JST 基準の capturedAt）
+
+各 JSON ファイルは `LogDownloadPayload` と同じ構造（`capturedAt`・`liveId`・`log`・`roomId`）で、インデント 2 スペースで出力されます。
+
+**エラーレスポンス**:
+
+| ステータス | 条件 |
+|---------|------|
+| 401 | 未認証 |
+| 403 | プレミアムユーザーでも管理者でもない |
+| 500 | DB エラー・ZIP 生成エラー |
+
+> ZIP 生成には `fflate` ライブラリを使用します（`strToU8` / `zipSync`）。
+
+---
 
 ### POST /api/onlive/logs
 
@@ -720,6 +787,25 @@ DELETE /api/onlive/logs/{logId}
 - `prisma.userRegisteredRoom.findMany()` と `Promise.all` で並行実行し、ルーム名をマッピング
 - `userId` を指定した場合はそのユーザーのお気に入り状態も取得してマッピング
 
+### getAllOnliveLogsWithData（管理者・一括ダウンロード用）
+
+- **ファイル**: [lib/onlive-log.ts](../lib/onlive-log.ts)
+- **シグネチャ**: `getAllOnliveLogsWithData(): Promise<OnliveLogWithData[]>`
+- 全ルームのログを `isDeleted = false` で取得
+- ソート: `capturedAt DESC`
+- `select`: `capturedAt`, `liveId`, `log`, `roomId` のみ（`log` JSON を含む）
+- 一括ダウンロード API（`GET /api/onlive/logs/bulk-download`）の管理者向けに使用
+
+### getUserOnliveLogsWithData（プレミアム・一括ダウンロード用）
+
+- **ファイル**: [lib/onlive-log.ts](../lib/onlive-log.ts)
+- **シグネチャ**: `getUserOnliveLogsWithData(userId: string): Promise<OnliveLogWithData[]>`
+- `getUserRegisteredRoom(userId)` で登録ルームを取得（なければ空配列を返す）
+- 条件: `isDeleted = false` かつ `roomId = registeredRoom.roomId`
+- ソート: `capturedAt DESC`
+- `select`: `capturedAt`, `liveId`, `log`, `roomId` のみ
+- 一括ダウンロード API（`GET /api/onlive/logs/bulk-download`）のプレミアムユーザー向けに使用
+
 ### getPreviousOnliveLog（前回配信ログ・配信サマリーの比較用）
 
 - **ファイル**: [lib/onlive-log.ts](../lib/onlive-log.ts)
@@ -854,6 +940,20 @@ type LogDownloadPayload = {
 
 `GET /api/onlive/logs/{logId}` のレスポンスと同じ構造です。ダウンロード JSON ファイルはこの型の内容がインデント 2 スペースで出力されます。
 
+### OnliveLogWithData（一括ダウンロード用）
+
+```typescript
+// lib/onlive-log.ts
+export type OnliveLogWithData = {
+  capturedAt: Date;
+  liveId: string;
+  log: Record<string, unknown>; // 完全なログペイロード
+  roomId: string;
+};
+```
+
+一括ダウンロード API で使用するサーバー側の型。`getAllOnliveLogsWithData` / `getUserOnliveLogsWithData` が返します。
+
 ### OnliveLogListItem（サーバー側）
 
 ```typescript
@@ -946,6 +1046,7 @@ type JsonViewerLog = {
 | [components/onlive/live-summary-dialog.tsx](../components/onlive/live-summary-dialog.tsx) | 配信サマリー（振り返りレポート）ダイアログ UI |
 | [lib/onlive-summary.ts](../lib/onlive-summary.ts) | 配信サマリー集計・前回比較の純粋関数 |
 | [app/api/onlive/logs/route.ts](../app/api/onlive/logs/route.ts) | ログ保存 API（プレミアム専用） |
+| [app/api/onlive/logs/bulk-download/route.ts](../app/api/onlive/logs/bulk-download/route.ts) | 一括ダウンロード API（管理者・プレミアム専用、ZIP 出力） |
 | [app/api/onlive/logs/[logId]/route.ts](../app/api/onlive/logs/%5BlogId%5D/route.ts) | ログ取得（GET）・タイトル更新（PATCH）・削除（DELETE）API |
 | [app/api/onlive/logs/[logId]/favorite/route.ts](../app/api/onlive/logs/%5BlogId%5D/favorite/route.ts) | お気に入り切り替え API（PUT） |
 | [lib/onlive-log.ts](../lib/onlive-log.ts) | ログ DB 操作・集計 |

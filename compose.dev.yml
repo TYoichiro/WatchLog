@@ -1,0 +1,64 @@
+# 並列開発スレッド用 Dev Compose
+#
+# 直接実行する場合:
+#   COMPOSE_PROJECT_NAME=watchlog-1 APP_PORT=3001 DB_PORT=5501 docker compose -f compose.dev.yml up -d
+#
+# 推奨 — scripts/thread.ps1 を使う:
+#   .\scripts\thread.ps1 start 1    → http://localhost:3001
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: watchlog
+      POSTGRES_USER: watchlog
+      POSTGRES_PASSWORD: watchlog
+    ports:
+      - "${DB_PORT:-5501}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U watchlog -d watchlog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    image: node:24-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      # コンテナ内で生成する Prisma クライアントをホスト側と分離する
+      # (Linux バイナリ vs Windows バイナリの衝突を防ぐ)
+      - prisma_client:/app/app/generated
+    ports:
+      - "${APP_PORT:-3001}:3000"
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
+    environment:
+      # env_file の DATABASE_URL / NEXTAUTH_URL をコンテナ内 DB 向けに上書き
+      DATABASE_URL: "postgresql://watchlog:watchlog@db:5432/watchlog?schema=public"
+      NODE_ENV: development
+      NEXTAUTH_URL: "http://localhost:${APP_PORT:-3001}"
+      TZ: Asia/Tokyo
+      LOG_LEVEL: "${LOG_LEVEL:-debug}"
+    command: >-
+      sh -c "
+        npm ci &&
+        npx prisma generate &&
+        npx prisma migrate deploy &&
+        npm run dev
+      "
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  node_modules:
+  prisma_client:

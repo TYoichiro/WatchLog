@@ -45,7 +45,7 @@ export default async function Page() {
     const logs = await listAllOnliveLogs(userId);
     return (
       <AppShell activeKey="logs" isAdmin>
-        <LogListPage initialLogs={logs.map(toListItem)} />
+        <LogListPage initialLogs={logs.map(toListItem)} isAdmin />
       </AppShell>
     );
   }

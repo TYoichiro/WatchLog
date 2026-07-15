@@ -17,6 +17,7 @@ WatchLog is a Japanese SHOWROOM live-streaming log tool. Users register a SHOWRO
 - **Prisma Client is at `app/generated/prisma`**, not `@prisma/client`. Import from there.
 - **Timezone is hardcoded to `Asia/Tokyo`** everywhere. Use `lib/jst.ts` helpers for date formatting. Never use `new Date().toLocaleString()` without explicit timezone.
 - **Next.js docs are local**: read `node_modules/next/dist/docs/` before using any Next.js API — this version has breaking changes from older conventions.
+- **Middleware is named `proxy.ts`, not `middleware.ts`**: Next.js 16 renamed Middleware to Proxy. The root-level `proxy.ts` exports `proxy` (wrapping `auth()`) and `config.matcher`, same conventions as the old Middleware API. Never create a `middleware.ts` file.
 - **Images**: use `<img>` tags, not `next/image`.
 - **No unauthorized destructive refactoring**: small change requests (add a field, fix a bug) must not trigger layout restructuring or component rewrites.
 
@@ -24,11 +25,12 @@ WatchLog is a Japanese SHOWROOM live-streaming log tool. Users register a SHOWRO
 
 `lib/authz.ts` provides:
 - `requireUser()` — throws `UnauthorizedError` if not logged in
-- Role-based checks: `admin`, `premiumuser`, `user`
+- Fixed roles: `admin`, `premiumuser`, `user` (the last is assigned automatically on account creation)
+- A finer-grained permission system backs role checks: `Role` → `RolePermission` → `Permission` tables. Admin API routes mostly use `requirePermission(action)` (e.g. `"role.assign"`), not plain role checks
 - Ban status is checked in the root layout (redirects to `/banned`)
-- Admin roles cannot be assigned via API — DB only
+- Admin (`admin`) role cannot be assigned via API — routes reject it explicitly and require assigning it directly in the DB
 
-Always call `requireUser()` at the top of API routes. Use `ForbiddenError` for permission violations. Log significant actions with `lib/audit.ts`.
+Always call `requireUser()` (or `requirePermission()` for admin actions) at the top of API routes. Use `ForbiddenError` for permission violations. Log significant actions with `lib/audit.ts`.
 
 ## Key Patterns
 
@@ -36,7 +38,7 @@ Always call `requireUser()` at the top of API routes. Use `ForbiddenError` for p
 
 **API routes** live in `app/api/**/route.ts`. Export named functions per HTTP method (`GET`, `POST`, etc.). Validate input at the boundary; trust `lib/` functions internally.
 
-**Data access**: all DB queries go through Prisma singleton (`lib/prisma.ts`). Use transactions for multi-step writes. Type definitions live in `types/api/` (request/response) and `types/domain/` (domain models).
+**Data access**: all DB queries go through Prisma singleton (`lib/prisma.ts`). Use transactions for multi-step writes. Request/response types live in `types/api/`; page-level prop/data types live in `types/pages/`. There is no separate domain-model type layer — `types/domain/` only holds a shared `JsonValue`/`JsonObject` type; domain models are imported directly from `app/generated/prisma` or defined alongside the `lib/` functions that own them.
 
 **SHOWROOM integration**: REST wrappers in `lib/showroom/`, WebSocket parsing in `lib/showroom-realtime.ts`. Do not call SHOWROOM APIs directly from components or routes.
 
