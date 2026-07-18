@@ -11,7 +11,7 @@ const {
   getAnyOnliveLogMock,
   getPreviousOnliveLogMock,
   getUserOnliveLogMock,
-  hasTopAdminRoleMock,
+  getUserRolesMock,
   notFoundMock,
   redirectMock,
 } = vi.hoisted(() => ({
@@ -20,7 +20,7 @@ const {
   getAnyOnliveLogMock: vi.fn(),
   getPreviousOnliveLogMock: vi.fn(),
   getUserOnliveLogMock: vi.fn(),
-  hasTopAdminRoleMock: vi.fn(),
+  getUserRolesMock: vi.fn(),
   notFoundMock: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
@@ -42,7 +42,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/authz", () => ({
-  hasTopAdminRole: hasTopAdminRoleMock,
+  getUserRoles: getUserRolesMock,
 }));
 
 vi.mock("@/lib/onlive-log", () => ({
@@ -62,12 +62,21 @@ vi.mock("@/hooks/use-user-blocks", () => ({
 vi.mock("@/components/navigation/app-sidebar", () => ({
   AppShell: ({
     activeKey,
+    isAdmin,
+    isPremium,
     children,
   }: {
     activeKey?: string;
+    isAdmin?: boolean;
+    isPremium?: boolean;
     children: ReactNode;
   }) => (
-    <div data-active-key={activeKey} data-testid="app-shell">
+    <div
+      data-active-key={activeKey}
+      data-is-admin={String(!!isAdmin)}
+      data-is-premium={String(!!isPremium)}
+      data-testid="app-shell"
+    >
       {children}
     </div>
   ),
@@ -238,9 +247,12 @@ async function renderResolvedLogDetailPage(logId = "log-1") {
   );
 }
 
-function setupAuthenticatedUser({ isAdmin = false }: { isAdmin?: boolean } = {}) {
+function setupAuthenticatedUser({
+  isAdmin = false,
+  isPremium = false,
+}: { isAdmin?: boolean; isPremium?: boolean } = {}) {
   authMock.mockResolvedValue(session);
-  hasTopAdminRoleMock.mockResolvedValue(isAdmin);
+  getUserRolesMock.mockResolvedValue({ isAdmin, isPremium });
   getPreviousOnliveLogMock.mockResolvedValue(null);
 }
 
@@ -253,7 +265,7 @@ afterEach(() => {
   getAnyOnliveLogMock.mockReset();
   getPreviousOnliveLogMock.mockReset();
   getUserOnliveLogMock.mockReset();
-  hasTopAdminRoleMock.mockReset();
+  getUserRolesMock.mockReset();
   notFoundMock.mockClear();
   redirectMock.mockClear();
 });
@@ -267,20 +279,20 @@ describe("LogDetailPage", () => {
     ).rejects.toThrow("NEXT_REDIRECT:/");
 
     expect(redirectMock).toHaveBeenCalledWith("/");
-    expect(hasTopAdminRoleMock).not.toHaveBeenCalled();
+    expect(getUserRolesMock).not.toHaveBeenCalled();
     expect(getUserOnliveLogMock).not.toHaveBeenCalled();
     expect(getAnyOnliveLogMock).not.toHaveBeenCalled();
   });
 
-  it("管理者は任意のログ詳細を表示できる", async () => {
+  it("管理者は任意のログ詳細を表示でき、管理者メニューが表示される", async () => {
     setupAuthenticatedUser({ isAdmin: true });
     getAnyOnliveLogMock.mockResolvedValue(logDetail);
 
     await renderResolvedLogDetailPage();
 
-    expect(screen.getByTestId("app-shell").getAttribute("data-active-key")).toBe(
-      "logs",
-    );
+    const appShell = screen.getByTestId("app-shell");
+    expect(appShell.getAttribute("data-active-key")).toBe("logs");
+    expect(appShell.getAttribute("data-is-admin")).toBe("true");
     expect(screen.getByText("Archived hello")).toBeDefined();
     expect(screen.getByText("Archived telop")).toBeDefined();
     expect(screen.getByText("Free Star")).toBeDefined();
@@ -291,12 +303,29 @@ describe("LogDetailPage", () => {
     expect(getUserOnliveLogMock).not.toHaveBeenCalled();
   });
 
+  it("プレミアムユーザーは自分のルームのログ詳細を表示でき、プレミアムメニューが表示される", async () => {
+    setupAuthenticatedUser({ isPremium: true });
+    getUserOnliveLogMock.mockResolvedValue(logDetail);
+
+    await renderResolvedLogDetailPage();
+
+    const appShell = screen.getByTestId("app-shell");
+    expect(appShell.getAttribute("data-is-admin")).toBe("false");
+    expect(appShell.getAttribute("data-is-premium")).toBe("true");
+    expect(screen.getByText("Archived hello")).toBeDefined();
+    expect(getUserOnliveLogMock).toHaveBeenCalledWith("user-1", "log-1");
+    expect(getAnyOnliveLogMock).not.toHaveBeenCalled();
+  });
+
   it("一般ユーザーは自分のルームのログ詳細を表示する", async () => {
     setupAuthenticatedUser();
     getUserOnliveLogMock.mockResolvedValue(logDetail);
 
     await renderResolvedLogDetailPage();
 
+    const appShell = screen.getByTestId("app-shell");
+    expect(appShell.getAttribute("data-is-admin")).toBe("false");
+    expect(appShell.getAttribute("data-is-premium")).toBe("false");
     expect(screen.getByText("Archived hello")).toBeDefined();
     expect(getUserOnliveLogMock).toHaveBeenCalledWith("user-1", "log-1");
     expect(getAnyOnliveLogMock).not.toHaveBeenCalled();

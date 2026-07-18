@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { LocalLogViewerPage } from "@/components/logs/local-log-viewer-page";
+import { getUserRoles } from "@/lib/authz";
 
 export const metadata: Metadata = {
   title: "配信ログ詳細 | WatchLog",
@@ -23,6 +24,9 @@ export default async function Page({
   }
 
   const { roomId } = await params;
+  const { isAdmin, isPremium } = await getUserRoles(userId);
 
-  return <LocalLogViewerPage roomId={roomId} />;
+  return (
+    <LocalLogViewerPage roomId={roomId} isAdmin={isAdmin} isPremium={isPremium} />
+  );
 }

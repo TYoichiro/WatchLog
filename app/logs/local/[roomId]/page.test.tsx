@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import LocalLogPage from "./page";
 
-const { authMock, redirectMock } = vi.hoisted(() => ({
+const { authMock, getUserRolesMock, redirectMock } = vi.hoisted(() => ({
   authMock: vi.fn(),
+  getUserRolesMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   }),
@@ -18,9 +19,26 @@ vi.mock("next/navigation", () => ({
   redirect: redirectMock,
 }));
 
+vi.mock("@/lib/authz", () => ({
+  getUserRoles: getUserRolesMock,
+}));
+
 vi.mock("@/components/logs/local-log-viewer-page", () => ({
-  LocalLogViewerPage: ({ roomId }: { roomId: string }) => (
-    <div data-testid="local-log-viewer" data-room-id={roomId} />
+  LocalLogViewerPage: ({
+    roomId,
+    isAdmin,
+    isPremium,
+  }: {
+    roomId: string;
+    isAdmin?: boolean;
+    isPremium?: boolean;
+  }) => (
+    <div
+      data-testid="local-log-viewer"
+      data-room-id={roomId}
+      data-is-admin={String(!!isAdmin)}
+      data-is-premium={String(!!isPremium)}
+    />
   ),
 }));
 
@@ -33,6 +51,7 @@ const session = {
 afterEach(() => {
   cleanup();
   authMock.mockReset();
+  getUserRolesMock.mockReset();
   redirectMock.mockClear();
 });
 
@@ -47,8 +66,9 @@ describe("LocalLogPage", () => {
     expect(redirectMock).toHaveBeenCalledWith("/");
   });
 
-  it("ログイン済みの場合はroomIdを渡してLocalLogViewerPageを表示する", async () => {
+  it("ログイン済みの場合はroomIdとロール情報を渡してLocalLogViewerPageを表示する", async () => {
     authMock.mockResolvedValue(session);
+    getUserRolesMock.mockResolvedValue({ isAdmin: true, isPremium: false });
 
     render(
       await LocalLogPage({ params: Promise.resolve({ roomId: "12345" }) }),
@@ -56,5 +76,7 @@ describe("LocalLogPage", () => {
 
     const viewer = screen.getByTestId("local-log-viewer");
     expect(viewer.getAttribute("data-room-id")).toBe("12345");
+    expect(viewer.getAttribute("data-is-admin")).toBe("true");
+    expect(viewer.getAttribute("data-is-premium")).toBe("false");
   });
 });

@@ -3521,8 +3521,12 @@ function formatPreviousLogLabel(value: string | null | undefined): string | null
 
 export function OnliveLogViewerPage({
   data,
+  isAdmin = false,
+  isPremium = false,
 }: {
   data: OnliveLogViewerData;
+  isAdmin?: boolean;
+  isPremium?: boolean;
 }) {
   const log = data.log;
   const snapshot = getLoggedSnapshot(log);
@@ -3624,6 +3628,8 @@ export function OnliveLogViewerPage({
   return (
     <AppShell
       activeKey="logs"
+      isAdmin={isAdmin}
+      isPremium={isPremium}
       mainClassName="xl:min-h-0 xl:overflow-hidden"
       headerActions={
         summary ? (
