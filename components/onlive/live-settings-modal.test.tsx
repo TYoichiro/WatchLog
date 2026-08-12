@@ -68,4 +68,85 @@ describe("LiveSettingsModal", () => {
     fireEvent.click(screen.getByRole("switch"));
     expect(onShowNoticeChange).toHaveBeenCalledWith(true);
   });
+
+  it("isPremium未指定のときは「〇日ぶり・初コメバッジ」トグルが表示されない", () => {
+    render(<LiveSettingsModal showNotice={true} onShowNoticeChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "設定" }));
+    expect(screen.queryByText("〇日ぶり・初コメバッジ")).toBeNull();
+  });
+
+  it("isPremium=falseのときは「〇日ぶり・初コメバッジ」トグルが表示されない", () => {
+    render(
+      <LiveSettingsModal
+        isPremium={false}
+        showNotice={true}
+        onShowNoticeChange={vi.fn()}
+        showLastCommentBadge={true}
+        onShowLastCommentBadgeChange={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "設定" }));
+    expect(screen.queryByText("〇日ぶり・初コメバッジ")).toBeNull();
+  });
+
+  it("isPremium=trueのときは「〇日ぶり・初コメバッジ」トグルが表示される", () => {
+    render(
+      <LiveSettingsModal
+        isPremium={true}
+        showNotice={true}
+        onShowNoticeChange={vi.fn()}
+        showLastCommentBadge={true}
+        onShowLastCommentBadgeChange={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "設定" }));
+    expect(screen.getByText("〇日ぶり・初コメバッジ")).toBeDefined();
+  });
+
+  it("showLastCommentBadge=trueのときスイッチがONになっている", () => {
+    render(
+      <LiveSettingsModal
+        isPremium={true}
+        showNotice={true}
+        onShowNoticeChange={vi.fn()}
+        showLastCommentBadge={true}
+        onShowLastCommentBadgeChange={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "設定" }));
+    const switches = screen.getAllByRole("switch");
+    expect(switches[1].getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("showLastCommentBadge=falseのときスイッチがOFFになっている", () => {
+    render(
+      <LiveSettingsModal
+        isPremium={true}
+        showNotice={true}
+        onShowNoticeChange={vi.fn()}
+        showLastCommentBadge={false}
+        onShowLastCommentBadgeChange={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "設定" }));
+    const switches = screen.getAllByRole("switch");
+    expect(switches[1].getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("バッジトグルをクリックするとonShowLastCommentBadgeChangeが呼ばれる", () => {
+    const onShowLastCommentBadgeChange = vi.fn();
+    render(
+      <LiveSettingsModal
+        isPremium={true}
+        showNotice={true}
+        onShowNoticeChange={vi.fn()}
+        showLastCommentBadge={true}
+        onShowLastCommentBadgeChange={onShowLastCommentBadgeChange}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "設定" }));
+    const switches = screen.getAllByRole("switch");
+    fireEvent.click(switches[1]);
+    expect(onShowLastCommentBadgeChange).toHaveBeenCalledWith(false);
+  });
 });

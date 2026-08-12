@@ -22,7 +22,7 @@ users 1─* accounts / sessions            （NextAuth）
 users *─* roles (user_roles) ─ roles *─* permissions (role_permissions)
 users 1─* audit_logs (actor)
 users *─* onlive_logs (onlive_log_favorites)
-dashboard_notices / maintenance_windows / verification_tokens は独立テーブル
+dashboard_notices / maintenance_windows / verification_tokens / room_user_last_comments は独立テーブル（room_user_last_comments は room_id・showroom_user_id とも FK なしの文字列）
 ```
 
 ## 2. テーブル定義
@@ -122,6 +122,19 @@ dashboard_notices / maintenance_windows / verification_tokens は独立テーブ
 | created_at | TIMESTAMP(3) | |
 | UNIQUE(user_id, log_id) / INDEX(user_id, created_at) | | |
 
+### room_user_last_comments（ルーム×SHOWROOMユーザーの最終コメント日時）
+| カラム | 型 | 制約 |
+| --- | --- | --- |
+| id | TEXT (cuid) | PK |
+| room_id | TEXT | NOT NULL（SHOWROOM のルーム ID。FK なし） |
+| showroom_user_id | TEXT | NOT NULL（SHOWROOM のユーザー ID。FK なし、`user_blocks.blocked_showroom_user_id` と同じ「文字列で保持」方式） |
+| showroom_user_name | TEXT | NOT NULL |
+| last_comment_at | TIMESTAMP(3) | NOT NULL（JST 壁時計） |
+| created_at / updated_at | TIMESTAMP(3) | JST デフォルト（トリガー対象外。`updated_at` はアプリの upsert 時に明示更新） |
+| UNIQUE(room_id, showroom_user_id) / INDEX(room_id, last_comment_at) | | |
+
+配信終了時のログ保存（`POST /api/onlive/logs`）成功後、`lib/room-user-last-comment.ts` の `upsertRoomUserLastComments` が `log.comments` から算出したユーザーごとの最新コメント日時で upsert する（既存値より新しい場合のみ上書き）。オンライブ画面初期化（`GET /api/onlive/init`）で `getRoomLastCommentMap(roomId)` が読み出し、コメント一覧の「初コメ／N日ぶり」バッジ判定に使う（[SPEC.md](./SPEC.md) §4.5）。
+
 ### accounts / sessions / verification_tokens（NextAuth 標準）
 - accounts: UNIQUE(provider, provider_account_id)、INDEX(user_id)、FK→users CASCADE。token 系カラムは TEXT。
 - sessions: session_token UNIQUE、expires TIMESTAMP(3)、INDEX(user_id)、FK→users CASCADE。**DB セッション戦略**（maxAge 180 日）。
@@ -155,6 +168,7 @@ dashboard_notices / maintenance_windows / verification_tokens は独立テーブ
 | 20260528000001_add_invite_code_failure_count | users.invite_code_failure_count 追加 |
 | 20260613115450_add_onlive_log_counts | comment_count/gift_count/live_ranking_count/total_ranking_count 追加＋JSONB からバックフィル |
 | 20260614000001_drop_onlive_log_ranking_counts | live_ranking_count/total_ranking_count 削除 |
+| 20260812053739_add_room_user_last_comment | room_user_last_comments 作成（最終コメントバッジ用） |
 
 ## 4. シードデータ（prisma/seed.ts）
 
@@ -168,3 +182,4 @@ dashboard_notices / maintenance_windows / verification_tokens は独立テーブ
 ## 5. 付随バッチ
 
 - `scripts/backfill-onlive-log-counts.ts`（`npm run batch:backfill-log-counts`）: onlive_logs の comment_count/gift_count を log JSONB から再計算する 1 回限りのバッチ。カーソルページング（200 件/バッチ）。
+- `scripts/backfill-room-user-last-comments.ts`（`npm run batch:backfill-room-user-last-comments`）: 既存 onlive_logs の log.comments を全件走査し、(room_id, showroom_user_id) ごとの最新コメント日時を集計して room_user_last_comments へ初期投入する 1 回限りのバッチ。onlive_logs はカーソルページング（200 件/バッチ）、投入は 200 件ずつ `$transaction` + upsert。

@@ -101,6 +101,7 @@ type OnliveInitOkResponse = {
   comments: RoomComment[];
   gifts: RoomGiftLog[];
   telop: string | null;
+  lastCommentByUser: Record<string, string> | null;
 };
 
 type OnlivePollResponse = {
@@ -1294,6 +1295,60 @@ function UserVisitStatusBadge({
   userVisitStatus: number | null | undefined;
 }) {
   const badge = getUserVisitStatusBadge(userId, userVisitStatus);
+
+  if (!badge) {
+    return null;
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-semibold leading-4 ring-1",
+        badge.className
+      )}
+    >
+      {badge.label}
+    </span>
+  );
+}
+
+function getLastCommentBadge(
+  lastCommentAtMs: number | null | undefined,
+  currentCommentAtSeconds: number | null
+): { className: string; label: string } | null {
+  if (currentCommentAtSeconds === null) {
+    return null;
+  }
+
+  if (lastCommentAtMs === null || lastCommentAtMs === undefined) {
+    return {
+      className: "bg-rose-100 text-rose-700 ring-rose-200",
+      label: "WL集計初コメ",
+    };
+  }
+
+  const daysSince = Math.floor(
+    (currentCommentAtSeconds * 1000 - lastCommentAtMs) / (24 * 60 * 60 * 1000)
+  );
+
+  if (daysSince < 1) {
+    return null;
+  }
+
+  return {
+    className: "bg-amber-100 text-amber-700 ring-amber-200",
+    label: `WL集計${daysSince}日ぶり`,
+  };
+}
+
+function LastCommentBadge({
+  currentCommentAt,
+  lastCommentAtMs,
+}: {
+  currentCommentAt: number | null;
+  lastCommentAtMs: number | null | undefined;
+}) {
+  const badge = getLastCommentBadge(lastCommentAtMs, currentCommentAt);
 
   if (!badge) {
     return null;
@@ -2522,12 +2577,15 @@ function CommentPane({
   initialTelop = null,
   isSnapshot = false,
   isLiveEnded,
+  isPremium = false,
+  lastCommentByUser = null,
   liveComments,
   liveId,
   liveStatus,
   liveTelop,
   onOpenProfile,
   roomId,
+  showLastCommentBadge = true,
   showNotice = true,
 }: {
   blockedUserIds: ReadonlySet<string>;
@@ -2536,12 +2594,15 @@ function CommentPane({
   initialTelop?: string | null;
   isSnapshot?: boolean;
   isLiveEnded: boolean;
+  isPremium?: boolean;
+  lastCommentByUser?: ReadonlyMap<string, number> | null;
   liveComments: readonly CommentRow[];
   liveId: string | null;
   liveStatus: number | null;
   liveTelop: string | null;
   onOpenProfile: OpenProfileHandler;
   roomId: number;
+  showLastCommentBadge?: boolean;
   showNotice?: boolean;
 }) {
   const [comments] = useState<CommentRow[]>(() =>
@@ -2575,6 +2636,30 @@ function CommentPane({
     filterBlockedShowroomItems(mergedComments, blockedUserIds),
     showNotice
   );
+  const showBadges = isPremium && showLastCommentBadge;
+  const firstCommentRowIdByUser = useMemo(() => {
+    if (!showBadges) {
+      return null;
+    }
+
+    const firstByUser = new Map<string, { id: string; createdAt: number }>();
+
+    for (const item of filteredComments) {
+      if (item.notice || item.telop || !item.userId || item.createdAt === null) {
+        continue;
+      }
+
+      const existing = firstByUser.get(item.userId);
+
+      if (!existing || item.createdAt < existing.createdAt) {
+        firstByUser.set(item.userId, { id: item.id, createdAt: item.createdAt });
+      }
+    }
+
+    return new Map(
+      [...firstByUser.entries()].map(([userId, entry]) => [userId, entry.id])
+    );
+  }, [filteredComments, showBadges]);
   const isTableLoading = !isSnapshot && isLoading && mergedComments.length === 0;
   const hasTableError = !isSnapshot && hasError && mergedComments.length === 0;
   const telopText = isSnapshot
@@ -2685,6 +2770,17 @@ function CommentPane({
                                 userId={comment.userId}
                                 userVisitStatus={comment.userVisitStatus}
                               />
+                              {showBadges &&
+                                comment.userId &&
+                                firstCommentRowIdByUser?.get(comment.userId) ===
+                                comment.id && (
+                                  <LastCommentBadge
+                                    currentCommentAt={comment.createdAt}
+                                    lastCommentAtMs={lastCommentByUser?.get(
+                                      comment.userId
+                                    )}
+                                  />
+                                )}
                               <div className="truncate text-sm font-semibold text-slate-900">
                                 {comment.name}
                               </div>
@@ -3114,8 +3210,10 @@ function LiveBody({
   isLiveRankingLoading,
   isTotalRankingLoading,
   isGiftLoading,
+  isPremium = false,
   isPremiumLive = false,
   isSnapshot = false,
+  lastCommentByUser = null,
   liveComments,
   liveId,
   liveRanking,
@@ -3123,6 +3221,7 @@ function LiveBody({
   liveTelop,
   onOpenProfile,
   roomId,
+  showLastCommentBadge = true,
   showNotice = true,
   totalRanking,
 }: {
@@ -3138,8 +3237,10 @@ function LiveBody({
   isLiveRankingLoading: boolean;
   isTotalRankingLoading: boolean;
   isGiftLoading: boolean;
+  isPremium?: boolean;
   isPremiumLive?: boolean;
   isSnapshot?: boolean;
+  lastCommentByUser?: ReadonlyMap<string, number> | null;
   liveComments: readonly CommentRow[];
   liveId: string | null;
   liveRanking: readonly RoomLiveRankingUser[];
@@ -3147,6 +3248,7 @@ function LiveBody({
   liveTelop: string | null;
   onOpenProfile: OpenProfileHandler;
   roomId: number;
+  showLastCommentBadge?: boolean;
   showNotice?: boolean;
   totalRanking: readonly RoomTotalRankingUser[];
 }) {
@@ -3172,12 +3274,15 @@ function LiveBody({
           initialTelop={initialTelop}
           isSnapshot={isSnapshot}
           isLiveEnded={isLiveEnded}
+          isPremium={isPremium}
+          lastCommentByUser={lastCommentByUser}
           liveComments={liveComments}
           liveId={liveId}
           liveStatus={liveStatus}
           liveTelop={liveTelop}
           onOpenProfile={onOpenProfile}
           roomId={roomId}
+          showLastCommentBadge={showLastCommentBadge}
           showNotice={showNotice}
         />
       </div>
@@ -3734,7 +3839,20 @@ export function OnliveLogViewerPage({
 function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
   const router = useRouter();
   const [showNotice, setShowNotice] = useState(true);
+  const [showLastCommentBadge, setShowLastCommentBadge] = useState(true);
   const { roomId, isPremium } = initData;
+  const lastCommentByUser = useMemo(() => {
+    if (!initData.lastCommentByUser) {
+      return null;
+    }
+
+    return new Map(
+      Object.entries(initData.lastCommentByUser).map(([userId, isoDate]) => [
+        userId,
+        new Date(isoDate).getTime(),
+      ])
+    );
+  }, [initData.lastCommentByUser]);
   const { gifts, isLoading: isGiftLoading, hasError: hasGiftError } =
     useRoomGiftLogs(initData.gifts);
   const {
@@ -4158,8 +4276,11 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
       activeKey="dashboard"
       headerActions={
         <LiveSettingsModal
+          isPremium={isPremium}
           showNotice={showNotice}
           onShowNoticeChange={setShowNotice}
+          showLastCommentBadge={showLastCommentBadge}
+          onShowLastCommentBadgeChange={setShowLastCommentBadge}
         />
       }
       headerClassName="h-8"
@@ -4243,7 +4364,10 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
           visibleMergedGifts.length === 0
         }
         hasGiftError={hasGiftError && visibleMergedGifts.length === 0}
+        isPremium={isPremium}
         isPremiumLive={initData.liveInfo?.isPremiumLive ?? false}
+        lastCommentByUser={lastCommentByUser}
+        showLastCommentBadge={showLastCommentBadge}
         showNotice={showNotice}
       />
 

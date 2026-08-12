@@ -11,11 +11,17 @@ import {
 import { Switch } from "@/components/ui/switch";
 
 export function LiveSettingsModal({
+  isPremium = false,
   showNotice,
   onShowNoticeChange,
+  showLastCommentBadge,
+  onShowLastCommentBadgeChange,
 }: {
+  isPremium?: boolean;
   showNotice: boolean;
   onShowNoticeChange: (value: boolean) => void;
+  showLastCommentBadge?: boolean;
+  onShowLastCommentBadgeChange?: (value: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -42,6 +48,15 @@ export function LiveSettingsModal({
                 checked={showNotice}
                 onCheckedChange={onShowNoticeChange}
               />
+              {isPremium &&
+                showLastCommentBadge !== undefined &&
+                onShowLastCommentBadgeChange && (
+                  <SettingRow
+                    label="〇日ぶり・初コメバッジ"
+                    checked={showLastCommentBadge}
+                    onCheckedChange={onShowLastCommentBadgeChange}
+                  />
+                )}
             </section>
           </div>
         </DialogContent>

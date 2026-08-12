@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   getRoomTotalRanking: vi.fn(),
   getCachedBlockedShowroomUserIds: vi.fn(),
   getUserRegisteredRoom: vi.fn(),
+  extractRoomUserCommentsFromLog: vi.fn(),
+  upsertRoomUserLastComments: vi.fn(),
   loggerInfo: vi.fn(),
   loggerWarn: vi.fn(),
   loggerError: vi.fn(),
@@ -37,6 +39,11 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@/lib/onlive-log", () => ({
   saveOnliveLog: mocks.saveOnliveLog,
+}));
+
+vi.mock("@/lib/room-user-last-comment", () => ({
+  extractRoomUserCommentsFromLog: mocks.extractRoomUserCommentsFromLog,
+  upsertRoomUserLastComments: mocks.upsertRoomUserLastComments,
 }));
 
 vi.mock("@/lib/showroom-block-filter", () => ({
@@ -107,6 +114,8 @@ beforeEach(() => {
   mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
   mocks.filterBlockedShowroomItems.mockReturnValue([]);
   mocks.saveOnliveLog.mockResolvedValue(savedLog);
+  mocks.extractRoomUserCommentsFromLog.mockReturnValue([]);
+  mocks.upsertRoomUserLastComments.mockResolvedValue(undefined);
 });
 
 describe("POST /api/onlive/logs", () => {
@@ -280,6 +289,33 @@ describe("POST /api/onlive/logs", () => {
 
       expect(body.log.capturedAt).toBe("2026-06-27T21:00:00.000+09:00");
       expect(body.log.updatedAt).toBe("2026-06-27T21:00:00.000+09:00");
+    });
+
+    it("ログ保存成功後、最終コメント日時の更新処理を呼び出す", async () => {
+      const extracted = [
+        { userId: "u1", userName: "Alice", commentedAt: capturedAtDate },
+      ];
+      mocks.extractRoomUserCommentsFromLog.mockReturnValue(extracted);
+
+      await POST(makeRequest(validBody));
+
+      expect(mocks.extractRoomUserCommentsFromLog).toHaveBeenCalledWith([]);
+      expect(mocks.upsertRoomUserLastComments).toHaveBeenCalledWith(
+        "room-123",
+        extracted
+      );
+    });
+
+    it("最終コメント日時の更新に失敗してもログ保存レスポンスは成功する", async () => {
+      mocks.upsertRoomUserLastComments.mockRejectedValue(new Error("update failed"));
+
+      const response = await POST(makeRequest(validBody));
+
+      expect(response.status).toBe(200);
+      expect(mocks.loggerWarn).toHaveBeenCalledWith(
+        "最終コメント日時の更新に失敗しました",
+        expect.any(Object)
+      );
     });
 
     it("log にサーバーランキングスナップショットがマージされる", async () => {
