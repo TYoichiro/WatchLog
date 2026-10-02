@@ -6,6 +6,35 @@ type OnliveLogClient =
   | Pick<PrismaClient, "onliveLog">
   | Pick<Prisma.TransactionClient, "onliveLog">;
 
+const onliveLogListSelect = {
+  id: true,
+  roomId: true,
+  liveId: true,
+  capturedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  commentCount: true,
+  giftCount: true,
+  title: true,
+} as const;
+
+const onliveLogDetailSelect = {
+  id: true,
+  roomId: true,
+  liveId: true,
+  capturedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  log: true,
+} as const;
+
+const onliveLogDataSelect = {
+  capturedAt: true,
+  liveId: true,
+  log: true,
+  roomId: true,
+} as const;
+
 export type SaveOnliveLogInput = {
   capturedAt: Date;
   liveId: string;
@@ -143,17 +172,7 @@ export async function listUserOnliveLogs(
         capturedAt: "desc",
       },
       take: 100,
-      select: {
-        id: true,
-        roomId: true,
-        liveId: true,
-        capturedAt: true,
-        createdAt: true,
-        updatedAt: true,
-        commentCount: true,
-        giftCount: true,
-        title: true,
-      },
+      select: onliveLogListSelect,
     }),
     prisma.onliveLogFavorite.findMany({
       where: { userId },
@@ -176,17 +195,7 @@ export async function listAllOnliveLogs(userId?: string): Promise<OnliveLogListI
       where: { isDeleted: false },
       orderBy: { capturedAt: "desc" },
       take: 500,
-      select: {
-        id: true,
-        roomId: true,
-        liveId: true,
-        capturedAt: true,
-        createdAt: true,
-        updatedAt: true,
-        commentCount: true,
-        giftCount: true,
-        title: true,
-      },
+      select: onliveLogListSelect,
     }),
     prisma.userRegisteredRoom.findMany({
       select: { roomId: true, roomName: true },
@@ -216,15 +225,7 @@ export async function getAnyOnliveLog(
 ): Promise<OnliveLogDetail | null> {
   const log = await prisma.onliveLog.findFirst({
     where: { id: logId, isDeleted: false },
-    select: {
-      id: true,
-      roomId: true,
-      liveId: true,
-      capturedAt: true,
-      createdAt: true,
-      updatedAt: true,
-      log: true,
-    },
+    select: onliveLogDetailSelect,
   });
 
   if (!log) {
@@ -260,15 +261,7 @@ export async function getUserOnliveLog(
       isDeleted: false,
       roomId: registeredRoom.roomId,
     },
-    select: {
-      id: true,
-      roomId: true,
-      liveId: true,
-      capturedAt: true,
-      createdAt: true,
-      updatedAt: true,
-      log: true,
-    },
+    select: onliveLogDetailSelect,
   });
 
   if (!log) {
@@ -299,24 +292,25 @@ export type OnliveLogWithData = {
   roomId: string;
 };
 
-export async function getAllOnliveLogsWithData(): Promise<OnliveLogWithData[]> {
-  const logs = await prisma.onliveLog.findMany({
-    where: { isDeleted: false },
-    orderBy: { capturedAt: "desc" },
-    select: {
-      capturedAt: true,
-      liveId: true,
-      log: true,
-      roomId: true,
-    },
-  });
-
-  return logs.map((log) => ({
+function toOnliveLogWithData(
+  log: Prisma.OnliveLogGetPayload<{ select: typeof onliveLogDataSelect }>
+): OnliveLogWithData {
+  return {
     capturedAt: log.capturedAt,
     liveId: log.liveId,
     log: getJsonRecord(log.log),
     roomId: log.roomId,
-  }));
+  };
+}
+
+export async function getAllOnliveLogsWithData(): Promise<OnliveLogWithData[]> {
+  const logs = await prisma.onliveLog.findMany({
+    where: { isDeleted: false },
+    orderBy: { capturedAt: "desc" },
+    select: onliveLogDataSelect,
+  });
+
+  return logs.map(toOnliveLogWithData);
 }
 
 export async function getUserOnliveLogsWithData(userId: string): Promise<OnliveLogWithData[]> {
@@ -329,20 +323,10 @@ export async function getUserOnliveLogsWithData(userId: string): Promise<OnliveL
       roomId: registeredRoom.roomId,
     },
     orderBy: { capturedAt: "desc" },
-    select: {
-      capturedAt: true,
-      liveId: true,
-      log: true,
-      roomId: true,
-    },
+    select: onliveLogDataSelect,
   });
 
-  return logs.map((log) => ({
-    capturedAt: log.capturedAt,
-    liveId: log.liveId,
-    log: getJsonRecord(log.log),
-    roomId: log.roomId,
-  }));
+  return logs.map(toOnliveLogWithData);
 }
 
 export async function getPreviousOnliveLog(

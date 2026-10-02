@@ -7,8 +7,8 @@ import {
   type MaintenanceItem,
 } from "@/components/admin/maintenance-page";
 import { AppShell } from "@/components/navigation/app-sidebar";
+import { serializeWindow } from "@/lib/admin-maintenance";
 import { hasTopAdminRole } from "@/lib/authz";
-import { toJstWallTimeIsoString } from "@/lib/jst";
 import { listAllMaintenanceWindows } from "@/lib/maintenance";
 
 export const dynamic = "force-dynamic";
@@ -33,16 +33,7 @@ export default async function Page() {
 
   const windows = await listAllMaintenanceWindows();
 
-  const items: MaintenanceItem[] = windows.map((w) => ({
-    id: w.id,
-    title: w.title,
-    message: w.message,
-    startsAt: toJstWallTimeIsoString(w.startsAt),
-    endsAt: toJstWallTimeIsoString(w.endsAt),
-    isEnabled: w.isEnabled,
-    createdAt: toJstWallTimeIsoString(w.createdAt),
-    updatedAt: toJstWallTimeIsoString(w.updatedAt),
-  }));
+  const items: MaintenanceItem[] = windows.map(serializeWindow);
 
   return (
     <AppShell activeKey="admin-maintenance" isAdmin>

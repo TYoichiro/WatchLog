@@ -1,5 +1,6 @@
 import type { DashboardNoticeTarget } from "@/app/generated/prisma/enums";
 
+import { noticeSelect, serializeNotice, VALID_TARGETS } from "@/lib/admin-notices";
 import { writeAuditLog } from "@/lib/audit";
 import { authzErrorResponse, requireTopAdminRole } from "@/lib/authz";
 import { parseJstWallTime, toJstWallTimeIsoString } from "@/lib/jst";
@@ -7,48 +8,6 @@ import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
-
-export const noticeSelect = {
-  id: true,
-  title: true,
-  content: true,
-  displayTarget: true,
-  publishedAt: true,
-  expiresAt: true,
-  linkUrl: true,
-  createdAt: true,
-  updatedAt: true,
-} as const;
-
-export function serializeNotice(n: {
-  id: number;
-  title: string;
-  content: string;
-  displayTarget: DashboardNoticeTarget;
-  publishedAt: Date;
-  expiresAt: Date | null;
-  linkUrl: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  return {
-    id: n.id,
-    title: n.title,
-    content: n.content,
-    displayTarget: n.displayTarget as string,
-    publishedAt: toJstWallTimeIsoString(n.publishedAt),
-    expiresAt: n.expiresAt ? toJstWallTimeIsoString(n.expiresAt) : null,
-    linkUrl: n.linkUrl,
-    createdAt: toJstWallTimeIsoString(n.createdAt),
-    updatedAt: toJstWallTimeIsoString(n.updatedAt),
-  };
-}
-
-export const VALID_TARGETS: readonly DashboardNoticeTarget[] = [
-  "AUTHENTICATED",
-  "LOGIN",
-  "ALL",
-];
 
 export async function GET() {
   try {
