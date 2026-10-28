@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useNavigationRouter as useRouter } from "@/components/navigation/navigation-progress";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -12,6 +12,7 @@ import {
   Eye,
   ExternalLink,
   Gem,
+  Loader2,
   type LucideIcon,
   Minus,
   ShieldCheck,
@@ -1832,6 +1833,7 @@ function useLiveProfile(roomId: number) {
   };
 
   const handleBlockUser = async (target: ProfileTarget, profile: RoomUserProfile | null) => {
+    if (isBlockActionPending) return;
     setIsBlockActionPending(true);
     setBlockErrorMessage(null);
 
@@ -2298,8 +2300,11 @@ export function UserProfileModal({
                             isBlockActionPending
                           }
                           onClick={() => onBlockUser(target, profile)}
+                          aria-busy={isBlockActionPending}
                         >
-                          <Ban className="h-4 w-4" aria-hidden />
+                          {isBlockActionPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                          ) : <Ban className="h-4 w-4" aria-hidden />}
                           {blockButtonLabel}
                         </Button>
                         {blockErrorMessage ? (
@@ -3897,6 +3902,7 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
   const [storedMetrics, setStoredMetrics] =
     useState<OnliveStoredMetrics | null>(null);
   const [isLiveEndedDialogOpen, setIsLiveEndedDialogOpen] = useState(false);
+  const [isReloading, setIsReloading] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const savedOnliveLogKeysRef = useRef(new Set<string>());
   const savingOnliveLogKeysRef = useRef(new Set<string>());
@@ -4263,6 +4269,8 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
   };
 
   const handleFatalErrorConfirm = () => {
+    if (isReloading) return;
+    setIsReloading(true);
     window.location.reload();
   };
 
@@ -4393,8 +4401,9 @@ function OnliveRoomPage({ initData }: { initData: OnliveInitOkResponse }) {
           <DialogTitle>エラーが発生しました</DialogTitle>
           <DialogDescription>再読み込みを行います。</DialogDescription>
           <DialogFooter>
-            <Button type="button" onClick={handleFatalErrorConfirm}>
-              OK
+            <Button type="button" onClick={handleFatalErrorConfirm} disabled={isReloading} aria-busy={isReloading}>
+              {isReloading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+              {isReloading ? "再読み込み中..." : "OK"}
             </Button>
           </DialogFooter>
         </DialogContent>

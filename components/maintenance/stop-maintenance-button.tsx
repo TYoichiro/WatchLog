@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { ShieldOff } from "lucide-react";
+import { useNavigationRouter as useRouter } from "@/components/navigation/navigation-progress";
+import { Loader2, ShieldOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -12,6 +12,7 @@ export function StopMaintenanceButton({ windowId }: { windowId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   function handleStop() {
+    if (isPending) return;
     setError(null);
     startTransition(async () => {
       try {
@@ -27,8 +28,10 @@ export function StopMaintenanceButton({ windowId }: { windowId: string }) {
           return;
         }
 
-        router.refresh();
-        router.push("/");
+        startTransition(() => {
+          router.refresh();
+          router.push("/");
+        });
       } catch {
         setError("通信エラーが発生しました");
       }
@@ -43,9 +46,14 @@ export function StopMaintenanceButton({ windowId }: { windowId: string }) {
         variant="destructive"
         onClick={handleStop}
         disabled={isPending}
+        aria-busy={isPending}
         className="gap-2"
       >
-        <ShieldOff className="h-4 w-4" aria-hidden />
+        {isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        ) : (
+          <ShieldOff className="h-4 w-4" aria-hidden />
+        )}
         {isPending ? "停止中..." : "メンテナンスを停止"}
       </Button>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

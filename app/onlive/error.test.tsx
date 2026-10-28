@@ -59,6 +59,11 @@ describe("Onlive エラーバウンダリ", () => {
     fireEvent.click(screen.getByRole("button", { name: "OK" }));
 
     expect(reloadMock).toHaveBeenCalledOnce();
+    const pendingButton = screen.getByRole("button", { name: "再読み込み中..." }) as HTMLButtonElement;
+    expect(pendingButton.disabled).toBe(true);
+    expect(pendingButton.getAttribute("aria-busy")).toBe("true");
+    fireEvent.click(pendingButton);
+    expect(reloadMock).toHaveBeenCalledOnce();
   });
 
   it("ESCキーとダイアログ外クリックの防止ハンドラが設定されている", () => {

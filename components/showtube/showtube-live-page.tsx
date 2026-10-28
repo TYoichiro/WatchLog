@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { Hash } from "lucide-react";
 
 import type { OnliveItem } from "@/lib/showroom";

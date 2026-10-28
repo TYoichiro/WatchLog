@@ -1,3 +1,4 @@
+import { maintenanceWindowSelect, serializeWindow } from "@/lib/admin-maintenance";
 import { writeAuditLog } from "@/lib/audit";
 import { authzErrorResponse, requireTopAdminRole } from "@/lib/authz";
 import { parseJstWallTime, toJstWallTimeIsoString } from "@/lib/jst";
@@ -5,39 +6,6 @@ import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
-
-export const maintenanceWindowSelect = {
-  id: true,
-  title: true,
-  message: true,
-  startsAt: true,
-  endsAt: true,
-  isEnabled: true,
-  createdAt: true,
-  updatedAt: true,
-} as const;
-
-export function serializeWindow(w: {
-  id: string;
-  title: string;
-  message: string | null;
-  startsAt: Date;
-  endsAt: Date;
-  isEnabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  return {
-    id: w.id,
-    title: w.title,
-    message: w.message,
-    startsAt: toJstWallTimeIsoString(w.startsAt),
-    endsAt: toJstWallTimeIsoString(w.endsAt),
-    isEnabled: w.isEnabled,
-    createdAt: toJstWallTimeIsoString(w.createdAt),
-    updatedAt: toJstWallTimeIsoString(w.updatedAt),
-  };
-}
 
 export async function GET() {
   try {

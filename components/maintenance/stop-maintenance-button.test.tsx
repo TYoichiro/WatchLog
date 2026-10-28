@@ -37,6 +37,29 @@ afterEach(() => {
 });
 
 describe("StopMaintenanceButton", () => {
+  it("停止中の表示を維持し、二重送信を防ぎ、失敗時に操作を再開できる", async () => {
+    let rejectRequest!: (reason: Error) => void;
+    fetchMock.mockReturnValueOnce(new Promise<Response>((_, reject) => {
+      rejectRequest = reject;
+    }));
+
+    render(<StopMaintenanceButton windowId="mw-1" />);
+    fireEvent.click(screen.getByRole("button", { name: "メンテナンスを停止" }));
+    const button = screen.getByRole("button", { name: "停止中..." }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.querySelector(".animate-spin")).not.toBeNull();
+    fireEvent.click(button);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    rejectRequest(new Error("offline"));
+    await waitFor(() => {
+      expect(screen.getByText("通信エラーが発生しました")).toBeDefined();
+      expect(button.disabled).toBe(false);
+    });
+    expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
   it("「メンテナンスを停止」ボタンが表示される", () => {
     render(<StopMaintenanceButton windowId="mw-1" />);
 

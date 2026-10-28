@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -168,6 +168,83 @@ beforeEach(() => {
 });
 
 describe("ShowroomRoomSearchPage", () => {
+  it("shows progress while checking the registered room", async () => {
+    let finishCheck!: (response: Response) => void;
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => {
+      finishCheck = resolve;
+    }));
+    render(<ShowroomRoomSearchPage />);
+
+    expect(screen.getByRole("status").textContent).toContain("登録情報を確認中...");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await act(async () => finishCheck(jsonResponse({ room: null })));
+    expect(await screen.findByRole("dialog", { name: inviteDialogTitle })).toBeDefined();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("keeps registration pending across duplicate checking and saving, then permits retry after failure", async () => {
+    setupFetchScenario({ rooms: [sampleRoom] });
+    await renderSearchPage();
+    await verifyInviteCode();
+    fireEvent.change(screen.getByPlaceholderText(searchInputPlaceholder), {
+      target: { value: "Alpha" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: searchButtonLabel }));
+    fireEvent.click(await screen.findByRole("button", { name: /Alpha Room/ }));
+
+    let finishDuplicateCheck!: (response: Response) => void;
+    let finishSave!: (response: Response) => void;
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => {
+      finishDuplicateCheck = resolve;
+    }));
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => {
+      finishSave = resolve;
+    }));
+    fireEvent.click(screen.getByRole("button", { name: registerButtonLabel }));
+
+    const pendingButton = screen.getByRole("button", { name: "登録中..." });
+    expect((pendingButton as HTMLButtonElement).disabled).toBe(true);
+    expect(pendingButton.getAttribute("aria-busy")).toBe("true");
+    expect((screen.getByRole("button", { name: "いいえ" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(pendingButton);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByRole("dialog", { name: registerDialogTitle })).toBeDefined();
+    expect(fetchCallsFor("/api/registered-room/check")).toHaveLength(1);
+
+    await act(async () => finishDuplicateCheck(jsonResponse({ isDuplicate: false })));
+    expect((screen.getByRole("button", { name: "登録中..." }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => finishSave(jsonResponse({ error: "登録に失敗しました" }, { status: 500 })));
+    expect(await screen.findByRole("dialog", { name: "登録できません" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    fireEvent.click(screen.getByRole("button", { name: /Alpha Room/ }));
+    expect((screen.getByRole("button", { name: registerButtonLabel }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: registerButtonLabel }));
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/dashboard"));
+    expect(fetchCallsFor("/api/registered-room/check")).toHaveLength(2);
+    expect((screen.getByRole("button", { name: "登録中..." }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("prevents repeated invitation submissions while verification is slow and recovers on error", async () => {
+    setupFetchScenario();
+    await renderSearchPage();
+    let failVerify!: (reason: Error) => void;
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((_, reject) => {
+      failVerify = reject;
+    }));
+    fireEvent.change(screen.getByPlaceholderText("ABCD123456"), {
+      target: { value: "ABCD123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: confirmButtonLabel }));
+    const pendingButton = screen.getByRole("button", { name: "確認中..." });
+    expect((pendingButton as HTMLButtonElement).disabled).toBe(true);
+    expect(pendingButton.getAttribute("aria-busy")).toBe("true");
+    fireEvent.submit(pendingButton.closest("form")!);
+    expect(fetchCallsFor("/api/invitations/verify")).toHaveLength(1);
+
+    await act(async () => failVerify(new Error("Network error")));
+    expect((screen.getByRole("button", { name: confirmButtonLabel }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("redirects to the dashboard when a room is already registered", async () => {
     setupFetchScenario({
       registeredRoom: {

@@ -243,12 +243,15 @@ describe("BanSelect", () => {
     await waitFor(() => {
       expect(select.disabled).toBe(true);
     });
+    expect(screen.getByRole("status").textContent).toBe("更新中...");
+    expect(select.getAttribute("aria-busy")).toBe("true");
 
     resolveFetch({ ok: true });
 
     await waitFor(() => {
       expect(select.disabled).toBe(false);
     });
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("同じ値を選択しても API を呼び出さない", async () => {

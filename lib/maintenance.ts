@@ -1,35 +1,19 @@
+import {
+  maintenanceWindowSelect,
+  type MaintenanceWindowListItem,
+} from "@/lib/admin-maintenance";
 import { prisma } from "@/lib/prisma";
 import {
   formatJstWallDateTime,
   toJstWallTimeDate,
 } from "@/lib/jst";
 
-export type MaintenanceWindowListItem = {
-  id: string;
-  title: string;
-  message: string | null;
-  startsAt: Date;
-  endsAt: Date;
-  isEnabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-const maintenanceWindowListSelect = {
-  id: true,
-  title: true,
-  message: true,
-  startsAt: true,
-  endsAt: true,
-  isEnabled: true,
-  createdAt: true,
-  updatedAt: true,
-} as const;
+export type { MaintenanceWindowListItem };
 
 export async function listAllMaintenanceWindows(): Promise<MaintenanceWindowListItem[]> {
   return prisma.maintenanceWindow.findMany({
     orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }],
-    select: maintenanceWindowListSelect,
+    select: maintenanceWindowSelect,
   });
 }
 

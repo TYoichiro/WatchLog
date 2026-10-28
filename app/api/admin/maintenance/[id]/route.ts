@@ -1,11 +1,11 @@
 import type { Prisma } from "@/app/generated/prisma/client";
 
+import { maintenanceWindowSelect, serializeWindow } from "@/lib/admin-maintenance";
 import { writeAuditLog } from "@/lib/audit";
 import { authzErrorResponse, requireTopAdminRole } from "@/lib/authz";
 import { parseJstWallTime } from "@/lib/jst";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import { maintenanceWindowSelect, serializeWindow } from "../route";
 
 export const dynamic = "force-dynamic";
 

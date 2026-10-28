@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next-auth/react", () => ({
@@ -39,6 +39,26 @@ afterEach(() => {
 });
 
 describe("ShowTubeShell", () => {
+  it("keeps logout pending during a slow request and restores the button on failure", async () => {
+    let failSignOut!: (reason: Error) => void;
+    vi.mocked(signOut).mockImplementationOnce(() => new Promise((_, reject) => {
+      failSignOut = reject;
+    }));
+    render(<ShowTubeShell genres={genres} selectedGenreId={null}><div /></ShowTubeShell>);
+    fireEvent.click(screen.getAllByRole("button", { name: "ログアウト" })[0]);
+
+    const pendingButton = screen.getByRole("button", { name: "ログアウト中..." });
+    expect((pendingButton as HTMLButtonElement).disabled).toBe(true);
+    expect(pendingButton.getAttribute("aria-busy")).toBe("true");
+    fireEvent.click(pendingButton);
+    expect(signOut).toHaveBeenCalledTimes(1);
+
+    await act(async () => failSignOut(new Error("Network error")));
+    expect(screen.getByRole("alert").textContent).toContain("ログアウトできませんでした");
+    expect(screen.queryByRole("button", { name: "ログアウト中..." })).toBeNull();
+    expect((screen.getAllByRole("button", { name: "ログアウト" })[0] as HTMLButtonElement).disabled).toBe(false);
+  });
+
   describe("ヘッダー", () => {
     it("「ShowTube」リンクをヘッダーに表示する", () => {
       render(

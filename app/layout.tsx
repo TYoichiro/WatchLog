@@ -6,6 +6,7 @@ import { GeistSans } from "geist/font/sans";
 import { cn } from "@/lib/utils";
 import { getActiveMaintenanceWindow } from "@/lib/maintenance";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { NavigationProgressProvider } from "@/components/navigation/navigation-progress";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -50,7 +51,7 @@ export default async function RootLayout({
     <html lang="ja" className={cn("font-sans", GeistSans.variable)}>
       <body>
         <TooltipProvider>
-          {children}
+          <NavigationProgressProvider>{children}</NavigationProgressProvider>
         </TooltipProvider>
         <SpeedInsights />
         <Analytics />

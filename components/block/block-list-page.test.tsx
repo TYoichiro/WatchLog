@@ -229,7 +229,7 @@ describe("BlockListPage", () => {
       expect(screen.getByText("テストユーザー")).toBeDefined();
     });
 
-    it("削除中は「はい」ボタンが無効化される", async () => {
+    it("削除中は処理中の表示になり連打を防ぐ", async () => {
       let resolveDelete!: () => void;
       fetchMock
         .mockResolvedValueOnce(blocksOkResponse([makeBlock()]))
@@ -244,8 +244,12 @@ describe("BlockListPage", () => {
       fireEvent.click(screen.getByRole("button", { name: "はい" }));
 
       await waitFor(() => {
-        expect((screen.getByRole("button", { name: /はい/ }) as HTMLButtonElement).disabled).toBe(true);
+        const button = screen.getByRole("button", { name: "解除中..." }) as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+        expect(button.getAttribute("aria-busy")).toBe("true");
       });
+      fireEvent.click(screen.getByRole("button", { name: "解除中..." }));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
 
       resolveDelete();
 

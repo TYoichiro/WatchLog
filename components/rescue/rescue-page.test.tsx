@@ -1,6 +1,6 @@
 "use client";
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RescuePage } from "./rescue-page";
@@ -41,6 +41,29 @@ afterEach(() => {
 });
 
 describe("RescuePage", () => {
+  it("復旧中は状態を表示して重複送信を防ぎ、失敗時には操作を再開できる", async () => {
+    setEntry("room-1", makeSnapshot());
+    let resolveResponse!: (response: Response) => void;
+    const fetchMock = vi.fn().mockReturnValue(new Promise<Response>((resolve) => {
+      resolveResponse = resolve;
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<RescuePage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "復旧する" }));
+    const pendingButton = screen.getByRole("button", { name: "復旧中..." }) as HTMLButtonElement;
+    expect(pendingButton.disabled).toBe(true);
+    expect(pendingButton.getAttribute("aria-busy")).toBe("true");
+    expect(pendingButton.querySelector("svg.animate-spin")).not.toBeNull();
+    fireEvent.click(pendingButton);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => resolveResponse(new Response(null, { status: 500 })));
+    expect(screen.queryByRole("button", { name: "復旧中..." })).toBeNull();
+    expect((screen.getByRole("button", { name: "ダウンロード" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(localStorage.getItem(KEY_PREFIX + "room-1")).not.toBeNull();
+  });
+
   describe("空の状態", () => {
     it("ローカルストレージが空のとき空状態メッセージを表示する", () => {
       render(<RescuePage />);

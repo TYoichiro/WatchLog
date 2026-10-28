@@ -1,6 +1,7 @@
 "use client"
 
 import { ChevronRight, type LucideIcon } from "lucide-react"
+import { NavigationLink as Link } from "@/components/navigation/navigation-link"
 
 import {
   Collapsible,
@@ -45,9 +46,9 @@ export function NavMain({
 
     return (
       <SidebarMenuSubButton asChild>
-        <a href={subItem.url}>
+        <Link href={subItem.url}>
           <span>{subItem.title}</span>
-        </a>
+        </Link>
       </SidebarMenuSubButton>
     )
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import Hls from "hls.js";
 import { ArrowLeft, Eye, Hash, Radio } from "lucide-react";
 
