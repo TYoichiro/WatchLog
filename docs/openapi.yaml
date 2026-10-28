@@ -2383,7 +2383,7 @@ components:
     # ── Onlive ──
     OnliveInitOkResponse:
       type: object
-      required: [status, roomId, isPremium, liveInfo, giftDefinitions, comments, gifts, telop]
+      required: [status, roomId, isPremium, liveInfo, giftDefinitions, comments, gifts, telop, lastCommentByUser]
       properties:
         status:
           type: string
@@ -2412,6 +2412,14 @@ components:
         telop:
           type: string
           nullable: true
+        lastCommentByUser:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+          description: >-
+            ルーム内SHOWROOMユーザーID(showroomUserId)をキーとした最終コメント日時(JST ISO文字列)のマップ。
+            プレミアムユーザーのみ算出され、非プレミアムの場合は null。「〇日ぶりコメント」「初コメ」バッジの判定に使用。
 
     OnliveNoRoomResponse:
       type: object

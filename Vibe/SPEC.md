@@ -169,7 +169,8 @@ WatchLog は **SHOWROOM（日本のライブ配信サービス）の配信ログ
 **各種ダイアログ**: プレミアムライブで bcsvrKey 取得不可→「プレミアムライブ/この配信はプレミアムライブです\n接続まで暫くお待ちください」→OK で /dashboard。liveStatus=1 または初回 profile.isOnlive=false→「配信中ではありません」→OK で /dashboard。
 
 **ユーザープロフィールモーダル**（コメント・ギフト・ランキングのアバター/行クリック）: `/api/room/user-profile` を取得しキャッシュ。ユーザー/ルームのタブ切替（ルームプロフィールがある場合）。ファンレベル・リスナーレベル・クラスレベル、SNS リンク、SMS 認証済み/未認証バッジ、ブロックボタン（開発者 ID `3699368` は「開発者はブロックできません」で無効。ブロック済みは「ブロック済み」）。開発者には「私がWatchLogの開発者」バッジと専用訪問バッジ（violet）。訪問ステータスバッジ: ua=2「初見」(sky)、ua=1「ビギナー」(emerald)。
-**ヘッダー設定モーダル**: 「お知らせ系通知」スイッチ（OFF でコメント欄から notice 行を非表示）。
+**最終コメントバッジ（premium 限定）**: コメント一覧の各行、当該配信中の対象ユーザーの最初のコメント行にのみ表示。`room_user_last_comments`（roomId×showroomUserId の最終コメント日時）に記録がなければ「初コメ」(rose)、記録があり経過 1 日以上なら「N日ぶり」(amber)、1 日未満は非表示。データは `GET /api/onlive/init` の `lastCommentByUser`（premium のみ算出、非 premium は null）から取得し、配信終了時の `POST /api/onlive/logs` 成功後にベストエフォートで更新（失敗してもログ保存自体は成功扱い）。既存ログからの初期データは 1 回限りのバッチ `scripts/backfill-room-user-last-comments.ts` で投入。
+**ヘッダー設定モーダル**: 「お知らせ系通知」スイッチ（OFF でコメント欄から notice 行を非表示）。premium ユーザーには追加で「〇日ぶり・初コメバッジ」スイッチ（OFF で上記最終コメントバッジを非表示。非 premium には表示されない）。
 
 ### 4.6 ログ一覧 `/logs`
 - サーバー側分岐: admin→`listAllOnliveLogs`（全ルーム、capturedAt desc、**500 件**）、premium→`listUserOnliveLogs`（自ルーム、**100 件**）、非 premium→空配列を渡し、クライアントで `watchlog:saved-log:<roomId>` の 1 件を表示
@@ -269,9 +270,9 @@ POST 時に `log.rankings.total` / `totalFetchedAt` / `totalFetchError`、`log.s
 | GET | `/api/room/search` | proxy 前提 | ルーム検索（HTML スクレイピング） |
 | GET | `/api/room/profile` `/status` `/comments` `/gifts` `/paid-gifts` `/gift-definitions` `/telop` `/live-ranking` `/total-ranking` `/activefan` `/eventandsupport` `/user-profile` | proxy 前提（一部ブロックフィルタ） | SHOWROOM プロキシ 12 本 |
 | GET | `/api/live/liveinfo` | proxy 前提 | ライブ情報（プレミアムライブ判定） |
-| GET | `/api/onlive/init` | 認証 | オンライブ初期化データ |
+| GET | `/api/onlive/init` | 認証 | オンライブ初期化データ（premium は最終コメントマップ `lastCommentByUser` 同梱） |
 | GET | `/api/onlive/poll` | 認証 | 60 秒ポーリング（profile/ランキング） |
-| POST | `/api/onlive/logs` | premium | 配信ログ保存（total ranking 追記） |
+| POST | `/api/onlive/logs` | premium | 配信ログ保存（total ranking 追記、room_user_last_comments をベストエフォート更新） |
 | GET/PATCH/DELETE | `/api/onlive/logs/[logId]` | 認証（PATCH は premium/admin） | ログ取得 / タイトル / 論理削除 |
 | PUT | `/api/onlive/logs/[logId]/favorite` | premium/admin | お気に入りトグル |
 | GET | `/api/onlive/logs/bulk-download` | premium/admin | 全ログ ZIP |
@@ -287,7 +288,7 @@ POST 時に `log.rankings.total` / `totalFetchedAt` / `totalFetchError`、`log.s
 
 ## 7.6 データモデル仕様（テーブル一覧）
 
-定義・制約・リレーションの詳細は [DATA_MODEL.md](./DATA_MODEL.md)。全 16 テーブル:
+定義・制約・リレーションの詳細は [DATA_MODEL.md](./DATA_MODEL.md)。全 17 テーブル:
 
 | テーブル | 役割 |
 | --- | --- |
@@ -301,6 +302,7 @@ POST 時に `log.rankings.total` / `totalFetchedAt` / `totalFetchError`、`log.s
 | `maintenance_windows` | メンテナンス期間 |
 | `onlive_logs` | 配信ログ本体（JSONB＋counts、論理削除） |
 | `onlive_log_favorites` | ログお気に入り |
+| `room_user_last_comments` | ルーム×SHOWROOMユーザーの最終コメント日時（最終コメントバッジ用） |
 | `audit_logs` | 監査ログ |
 
 ## 8. 外部連携仕様

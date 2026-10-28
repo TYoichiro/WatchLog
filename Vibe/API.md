@@ -122,11 +122,13 @@ RoomLiveInfo の癖: `redirect_url` があれば **プレミアムライブ** �
 
 ### GET `/api/onlive/init` — 認証は実質必須（未認証/ルームなし→`{"status":"no_room"}`）
 登録ルームの roomId が正の整数でなければ no_room。
-liveInfo / giftDefinitions / comments / gifts / telop を並列取得（allSettled）。プレミアムライブなら `getBcsvrKeyFromOnlives(roomId)`（onlives 一覧から bcsvr_key を探す）で liveInfo.bcsvrKey を補完。comments/gifts はブロックフィルタ済み。
+liveInfo / giftDefinitions / comments / gifts / telop / (premium のみ)lastCommentByUser を並列取得（allSettled）。プレミアムライブなら `getBcsvrKeyFromOnlives(roomId)`（onlives 一覧から bcsvr_key を探す）で liveInfo.bcsvrKey を補完。comments/gifts はブロックフィルタ済み。
 ```json
 {"status":"ok","roomId":123,"isPremium":bool,"liveInfo":RoomLiveInfo|null,
- "giftDefinitions":[...],"comments":[...],"gifts":[...],"telop":string|null}
+ "giftDefinitions":[...],"comments":[...],"gifts":[...],"telop":string|null,
+ "lastCommentByUser":{"<showroomUserId>":"JST ISO"}|null}
 ```
+`lastCommentByUser` は `isPremium===true` の場合のみ `getRoomLastCommentMap(roomId)`（`room_user_last_comments` から）を算出し JST ISO 文字列のマップに変換したもの。非 premium は `null`。最終コメントバッジ（[SPEC.md](./SPEC.md) §4.5）の判定に使う。
 
 ### GET `/api/onlive/poll?skip_ranking=1?` — 登録ルームなし→404
 プロキシの API リクエストログ対象外（高頻度のため明示除外）。
@@ -138,6 +140,7 @@ Body: `{roomId, liveId, capturedAt, log}`。capturedAt は `parseJstWallTime` �
 - 登録ルーム不一致→403、`isPremium=false`→403（**admin ロールだけでは不可**。isPremium 判定のため）
 - サーバー側で `getRoomTotalRanking` を取得（ブロックフィルタ適用）し、`log.rankings.total` / `totalFetchedAt` / `totalFetchError` と `log.server={savedAt, version:1}` をマージ
 - `saveOnliveLog` upsert（UNIQUE(roomId,liveId,capturedAt)。comment_count/gift_count を log から算出）
+- 保存成功後、`log.comments`（notice/telop 除く実コメントのみ）からユーザーごとの最新コメント日時を算出し `upsertRoomUserLastComments(roomId, ...)` で `room_user_last_comments` をベストエフォート更新（既存値より新しい場合のみ上書き。失敗しても warn ログのみでレスポンスには影響しない）
 - 200 `{"log": {id, capturedAt, updatedAt}}`（JST ISO 文字列）
 
 ### GET `/api/onlive/logs/[logId]` — requireUser

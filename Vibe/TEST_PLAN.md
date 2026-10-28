@@ -47,6 +47,13 @@ Route Handler テストは **`vi.hoisted` + `vi.mock` で `@/auth`・`@/lib/pris
 - サマリー集計: notice(follow→新規フォロー数 / firstVisit→初見数)・telop はコメント数から除外、userId null は `name:` キーで集約、トップ 5、無料ギフト point0→1pt、比較 delta 計算
 - ローカルログ/JSON ビューア/レスキュースナップショットの読み書き・検証・変換（不正 JSON は null、SSR では null）
 
+### 3.4.1 lib/room-user-last-comment（最終コメントバッジ）
+- `upsertRoomUserLastComments`: 0 件は no-op（findMany/`$transaction` 未呼び出し）、同一ユーザーの複数コメントは最新日時のみ書き込み、既存の `lastCommentAt` より古い日時は更新しない、既存より新しい／未登録ユーザーは upsert する
+- `getRoomLastCommentMap`: `showroomUserId → lastCommentAt` の Map を返す（該当なしは空 Map）
+- `extractRoomUserCommentsFromLog`: notice/telop 行・userId 欠落・createdAt 欠落を除外し、`createdAt`(UNIX 秒) を `toJstWallTimeDate` で JST 壁時計 Date に変換する。配列でない入力は空配列
+- `POST /api/onlive/logs`: 保存成功後に `extractRoomUserCommentsFromLog`→`upsertRoomUserLastComments` を呼び出す、更新失敗時も 200 を返し warn ログのみ
+- `GET /api/onlive/init`: premium のときのみ `getRoomLastCommentMap` を呼び `lastCommentByUser` を JST ISO 文字列マップで返す、非 premium は呼ばず null
+
 ### 3.5 lib/showroom/*
 - 各 API ラッパー: レスポンスのスネークケース→キャメルケース正規化、数値/文字列両対応（`toFiniteNumber`）、trim・フォールバック（name→"Unknown" 等）
 - room: RANK_TIME_CHARGE_MAP の対応、activefan の ym=JST 当月
@@ -78,7 +85,8 @@ Route Handler テストは **`vi.hoisted` + `vi.mock` で `@/auth`・`@/lib/pris
 - ログイン: notices 失敗でもレンダリング（hasError バッジ）
 - 検索: 招待コードモーダルのバリデーション文言・残り回数・BAN 遷移、重複エラーモーダル、登録成功で /dashboard replace
 - ダッシュボード: no_room/is_live リダイレクト、キャッシュ表示、レスキューバナー（premium/admin のみ）、WS 開始検知
-- オンライブ: 初期化リダイレクト、WS コメント/ギフト/通知/終了処理、重複排除・マージ、メトリクス表示・delta、ログ自動保存（premium=API/非 premium=localStorage）、各ダイアログ
+- オンライブ: 初期化リダイレクト、WS コメント/ギフト/通知/終了処理、重複排除・マージ、メトリクス表示・delta、ログ自動保存（premium=API/非 premium=localStorage）、各ダイアログ、最終コメントバッジ（premium かつ設定 ON のときのみ・配信中の初回コメント行のみ）
+- 設定モーダル（LiveSettingsModal）: お知らせ通知トグルの表示/ON-OFF、「〇日ぶり・初コメバッジ」トグルは isPremium=true のときのみ表示されコールバックが呼ばれる
 - ログ一覧: 非 premium のローカル 1 件表示、お気に入り楽観更新ロールバック、タイトル編集（Enter/Esc/空）、ページング境界、JSON インポート検証文言、一括 DL
 - ログ詳細ビューア: スナップショットマージ、サマリー・前回比較、ブロックフィルタ
 - ブロック一覧: 一覧・削除・プロフィールモーダル連携、エラー文言

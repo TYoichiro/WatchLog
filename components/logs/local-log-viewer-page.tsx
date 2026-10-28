@@ -10,6 +10,8 @@ import {
 
 type Props = {
   roomId: string;
+  isAdmin?: boolean;
+  isPremium?: boolean;
 };
 
 type SnapshotCache = { raw: string | null | undefined; log: OnliveLocalLog | null };
@@ -28,7 +30,7 @@ function toViewerData(localLog: OnliveLocalLog): OnliveLogViewerData {
   };
 }
 
-export function LocalLogViewerPage({ roomId }: Props) {
+export function LocalLogViewerPage({ roomId, isAdmin, isPremium }: Props) {
   const cacheRef = useRef<SnapshotCache>({ raw: undefined, log: null });
 
   const localLog = useSyncExternalStore(
@@ -52,5 +54,11 @@ export function LocalLogViewerPage({ roomId }: Props) {
     );
   }
 
-  return <OnliveLogViewerPage data={toViewerData(localLog)} />;
+  return (
+    <OnliveLogViewerPage
+      data={toViewerData(localLog)}
+      isAdmin={isAdmin}
+      isPremium={isPremium}
+    />
+  );
 }

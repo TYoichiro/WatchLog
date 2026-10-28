@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getUserRegisteredRoom: vi.fn(),
   getUserRoles: vi.fn(),
   getCachedBlockedShowroomUserIds: vi.fn(),
+  getRoomLastCommentMap: vi.fn(),
   loggerDebug: vi.fn(),
   loggerInfo: vi.fn(),
   loggerWarn: vi.fn(),
@@ -51,6 +52,10 @@ vi.mock("@/lib/user-registered-room", () => ({
   getUserRegisteredRoom: mocks.getUserRegisteredRoom,
 }));
 
+vi.mock("@/lib/room-user-last-comment", () => ({
+  getRoomLastCommentMap: mocks.getRoomLastCommentMap,
+}));
+
 const registeredRoom = {
   imageUrl: null,
   roomId: "123",
@@ -65,6 +70,7 @@ async function expectJson(response: Response) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getUserRoles.mockResolvedValue({ isAdmin: false, isPremium: false });
+  mocks.getRoomLastCommentMap.mockResolvedValue(new Map());
 });
 
 describe("GET /api/onlive/init", () => {
@@ -297,8 +303,52 @@ describe("GET /api/onlive/init", () => {
       comments: [],
       gifts: [],
       telop: null,
+      lastCommentByUser: null,
     });
     expect(mocks.loggerInfo).not.toHaveBeenCalled();
+  });
+
+  it("プレミアムユーザーの場合は lastCommentByUser をJST ISO文字列のマップとして返す", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.getUserRoles.mockResolvedValue({ isAdmin: false, isPremium: true });
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getRoomLiveInfo.mockResolvedValue(null);
+    mocks.getRoomGiftDefinitions.mockResolvedValue([]);
+    mocks.getRoomCommentLog.mockResolvedValue([]);
+    mocks.getRoomGiftLog.mockResolvedValue([]);
+    mocks.getRoomTelop.mockResolvedValue(null);
+    mocks.getRoomLastCommentMap.mockResolvedValue(
+      new Map([["showroom-user-1", new Date("2026-08-01T00:00:00.000Z")]])
+    );
+
+    const response = await GET();
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(mocks.getRoomLastCommentMap).toHaveBeenCalledWith("123");
+    expect(data.lastCommentByUser).toEqual({
+      "showroom-user-1": "2026-08-01T00:00:00.000+09:00",
+    });
+  });
+
+  it("非プレミアムユーザーの場合は getRoomLastCommentMap を呼ばず lastCommentByUser は null", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.getUserRegisteredRoom.mockResolvedValue(registeredRoom);
+    mocks.getUserRoles.mockResolvedValue({ isAdmin: false, isPremium: false });
+    mocks.getCachedBlockedShowroomUserIds.mockResolvedValue([]);
+    mocks.getRoomLiveInfo.mockResolvedValue(null);
+    mocks.getRoomGiftDefinitions.mockResolvedValue([]);
+    mocks.getRoomCommentLog.mockResolvedValue([]);
+    mocks.getRoomGiftLog.mockResolvedValue([]);
+    mocks.getRoomTelop.mockResolvedValue(null);
+
+    const response = await GET();
+    const data = await expectJson(response);
+
+    expect(response.status).toBe(200);
+    expect(mocks.getRoomLastCommentMap).not.toHaveBeenCalled();
+    expect(data.lastCommentByUser).toBeNull();
   });
 
   it("通常ライブ（isPremiumLive が false）では getBcsvrKeyFromOnlives を呼ばない", async () => {

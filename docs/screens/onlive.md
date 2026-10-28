@@ -292,8 +292,11 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 | セクション | 設定名 | 内容 |
 |---|---|---|
 | コメント設定 | お知らせ系通知 | ON のとき通知行（`notice=true`）をコメント一覧に表示する。OFF のとき非表示。デフォルト ON |
+| コメント設定 | 〇日ぶり・初コメバッジ | プレミアムユーザーのみ表示される設定行。ON のときコメント一覧に最終コメントバッジを表示する。OFF のとき非表示。デフォルト ON |
 
 `showNotice` ステートは `OnliveRoomPage` が管理し、`CommentPane` に props として渡されます。`filterComments()` 関数が `showNotice=false` のとき `notice=true` のコメント行を除外します。
+
+`showLastCommentBadge` ステートも同様に `OnliveRoomPage` が管理し、`CommentPane` へ渡されます。`isPremium=false` の場合、`LiveSettingsModal` はこの設定行自体を描画しません（`isPremium` props で判定）。
 
 ---
 
@@ -315,10 +318,26 @@ SHOWROOMの配信をリアルタイムで監視するアプリケーションの
 | アバター画像 | クリックでプロフィールモーダルを開く（`userId` がある場合） |
 | クラスレベル | アバター下に `Class XX`（なければ `Class --`） |
 | 訪問ステータスバッジ | 初見（sky）、ビギナー（emerald）、開発者（violet） |
+| 最終コメントバッジ | 「初コメ」（rose）／「N日ぶり」（amber）。プレミアムユーザーのみ、条件を満たす行にのみ表示（詳細下記） |
 | ユーザー名 | 太字 |
 | ユーザー ID | `ID: XXXXXXXX` |
 | 時刻 | `HH時MM分SS秒` |
 | コメント本文 | — |
+
+### 最終コメントバッジ（プレミアム限定）
+
+配信中、そのユーザーがそのルームで最後にいつコメントしたかを示すバッジをコメント一覧に表示します。`isPremium && showLastCommentBadge` の場合のみ有効です。
+
+| 項目 | 内容 |
+|---|---|
+| 表示タイミング | その配信中、当該ユーザーの**最初のコメント時のみ**（`filteredComments` を `createdAt` の最小値で走査し、ユーザーごとに最初の実コメント行 ID を特定。notice/telop 行は対象外） |
+| 「初コメ」 | `lastCommentByUser`（下記データソース）に当該 `userId` の記録がない場合。rose 色 |
+| 「N日ぶり」 | 記録があり、前回コメントからの経過日数が **1 日以上** の場合。`Math.floor((今回コメントの unixSeconds*1000 - 前回コメントの epoch ms) / 86400000)`。amber 色 |
+| 非表示 | 経過日数が 1 日未満（同日中の再コメント）の場合、または非プレミアムの場合 |
+
+**データソース：** `GET /api/onlive/init` レスポンスの `lastCommentByUser`（`showroomUserId → JST ISO 文字列` のマップ、プレミアムユーザーのみ算出）。`OnliveRoomPage` が `Map<string, number>`（epoch ms）に変換して `CommentPane` に渡します。
+
+**データ更新：** 配信終了時のログ保存（`POST /api/onlive/logs`、プレミアム専用）成功後、保存された `log.comments` からユーザーごとの最新コメント日時を算出し、`room_user_last_comments` テーブルへベストエフォートで反映します（更新失敗時もログ保存自体は成功として扱う）。詳細は「配信終了ログ保存フロー」参照。
 
 **通知行のインタラクション：**  
 通知行（`notice=true`）かつ `userId` がある場合、行全体がクリック可能になりプロフィールモーダルが開きます。
@@ -528,6 +547,8 @@ Next.js の Error Boundary が捕捉した例外が対象です。
                       │             comments, gifts, liveInfo, metrics, rankings.live,
                       │             roomProfile, localStorageSnapshot
                       ├─ サーバー側: 総合ランキングを追加取得して rankings.total に追加保存
+                      ├─ サーバー側: log.comments から room_user_last_comments（roomId×showroomUserId
+                      │   の最終コメント日時）をベストエフォートで更新（失敗してもログ保存は成功扱い）
                       ├─ 成功: セッションストレージ削除 → isLiveEndedDialogOpen = true → ダイアログ表示
                       └─ 失敗: コンソールエラーログのみ（ダイアログなし）
 ```
@@ -621,11 +642,14 @@ Next.js の Error Boundary が捕捉した例外が対象です。
   "giftDefinitions": [...],
   "comments": [...],
   "gifts": [...],
-  "telop": "テロップテキスト"
+  "telop": "テロップテキスト",
+  "lastCommentByUser": { "showroomUserId": "2026-08-01T09:00:00.000+09:00", "...": "..." }
 }
 ```
 
 `isPremium` は `hasPremiumRole(userId)` の結果です。`OnliveRoomPage` がこの値を元にログ保存先（DB / ローカルストレージ）を分岐します。
+
+`lastCommentByUser` は `isPremium === true` の場合のみ `room_user_last_comments` から算出したマップ（`showroomUserId → 最終コメント日時の JST ISO 文字列`）、それ以外は `null` です。最終コメントバッジ（上記「最終コメントバッジ」参照）の判定に使用します。
 
 `liveInfo.isPremiumLive` は Showroom の `/live_info` レスポンスに `redirect_url` が存在する場合に `true` になります。プレミアムライブ時は `liveStatus` が `null`、`bcsvrKey` は `getBcsvrKeyFromOnlives` による補完値（失敗時は `null`）、`liveId` は `live_id` が取得できない場合に `YYYYMMDD` 形式の日付文字列をフォールバックとして設定します。
 
@@ -797,6 +821,24 @@ updatedAt             DateTime
 @@unique([blockerUserId, blockedShowroomUserId])
 ```
 
+### `RoomUserLastComment`
+
+```
+id               String   @id @default(cuid())
+roomId           String
+showroomUserId   String
+showroomUserName String
+lastCommentAt    DateTime
+createdAt        DateTime
+updatedAt        DateTime
+
+@@unique([roomId, showroomUserId])
+@@index([roomId, lastCommentAt])
+@@map("room_user_last_comments")
+```
+
+ルーム×SHOWROOMユーザーごとの最終コメント日時。`UserBlock` と同様に SHOWROOM ユーザー ID を文字列で持ち、`User`/`Room` テーブルへの FK はありません。配信終了時のログ保存（`POST /api/onlive/logs`）で `lib/room-user-last-comment.ts` の `upsertRoomUserLastComments` がベストエフォート更新し（既存値より新しい場合のみ上書き）、配信開始時の `GET /api/onlive/init` で `getRoomLastCommentMap` が読み出します。既存ログからの初期投入は 1 回限りのバッチ `scripts/backfill-room-user-last-comments.ts`（`npm run batch:backfill-room-user-last-comments`）で行います。
+
 ---
 
 ## 定数
@@ -836,8 +878,10 @@ updatedAt             DateTime
 | [lib/showroom/room.ts](../../lib/showroom/room.ts) | ルームプロフィール取得 |
 | [lib/onlive-log.ts](../../lib/onlive-log.ts) | ログ保存・取得・削除 |
 | [lib/onlive-local-log.ts](../../lib/onlive-local-log.ts) | 非プレミアム用ローカルストレージログ読み書き |
+| [lib/room-user-last-comment.ts](../../lib/room-user-last-comment.ts) | ルーム×SHOWROOMユーザーの最終コメント日時の更新・取得（最終コメントバッジ用） |
+| [scripts/backfill-room-user-last-comments.ts](../../scripts/backfill-room-user-last-comments.ts) | 既存 `OnliveLog` から `room_user_last_comments` を初期投入する1回限りのバッチ |
 | [lib/showroom-users.ts](../../lib/showroom-users.ts) | `DEVELOPER_USER_ID` 定数 |
 | [lib/showroom-block-filter.ts](../../lib/showroom-block-filter.ts) | ブロックユーザーフィルタリング |
 | [hooks/use-user-blocks.ts](../../hooks/use-user-blocks.ts) | ブロック一覧管理フック |
-| [prisma/schema.prisma](../../prisma/schema.prisma) | `OnliveLog` / `UserBlock` モデル |
+| [prisma/schema.prisma](../../prisma/schema.prisma) | `OnliveLog` / `UserBlock` / `RoomUserLastComment` モデル |
 | [docs/screens/rescue.md](rescue.md) | ローカルストレージスナップショットの復旧画面仕様 |

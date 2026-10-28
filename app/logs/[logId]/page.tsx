@@ -6,7 +6,7 @@ import {
   OnliveLogViewerPage,
   type OnliveLogViewerData,
 } from "@/components/onlive/onlive-room-page";
-import { hasTopAdminRole } from "@/lib/authz";
+import { getUserRoles } from "@/lib/authz";
 import { toJstWallTimeIsoString } from "@/lib/jst";
 import {
   getAnyOnliveLog,
@@ -57,7 +57,7 @@ export default async function Page({
 
   const { logId } = await params;
 
-  const isAdmin = await hasTopAdminRole(userId);
+  const { isAdmin, isPremium } = await getUserRoles(userId);
   const log = isAdmin
     ? await getAnyOnliveLog(logId)
     : await getUserOnliveLog(userId, logId);
@@ -68,5 +68,11 @@ export default async function Page({
 
   const previousLog = await getPreviousOnliveLog(log.roomId, log.capturedAt);
 
-  return <OnliveLogViewerPage data={toViewerData(log, previousLog)} />;
+  return (
+    <OnliveLogViewerPage
+      data={toViewerData(log, previousLog)}
+      isAdmin={isAdmin}
+      isPremium={isPremium}
+    />
+  );
 }

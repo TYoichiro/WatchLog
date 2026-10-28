@@ -5,6 +5,10 @@ import { auth } from "@/auth";
 import { getUserRoles } from "@/lib/authz";
 import { logger } from "@/lib/logger";
 import { saveOnliveLog } from "@/lib/onlive-log";
+import {
+  extractRoomUserCommentsFromLog,
+  upsertRoomUserLastComments,
+} from "@/lib/room-user-last-comment";
 import { filterBlockedShowroomItems } from "@/lib/showroom-block-filter";
 import {
   parseJstWallTime,
@@ -195,6 +199,15 @@ export async function POST(request: NextRequest) {
     });
 
     logger.info("オンライブログを保存しました", { userId, roomId, liveId, logId: savedLog.id });
+
+    try {
+      await upsertRoomUserLastComments(
+        roomId,
+        extractRoomUserCommentsFromLog(clientLog.comments)
+      );
+    } catch (error) {
+      logger.warn("最終コメント日時の更新に失敗しました", { userId, roomId, liveId, error: String(error) });
+    }
 
     return Response.json({
       log: {
