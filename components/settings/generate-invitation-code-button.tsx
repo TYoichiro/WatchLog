@@ -1,30 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useNavigationRouter as useRouter } from "@/components/navigation/navigation-progress";
+import { Loader2, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
 export function GenerateInvitationCodeButton() {
   const router = useRouter();
-  const [isPending, setIsPending] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  async function handleClick() {
-    setIsPending(true);
+  function handleClick() {
+    if (isPending) return;
     setError(null);
-    try {
-      const res = await fetch("/api/invitations", { method: "POST" });
-      if (!res.ok) {
-        throw new Error("招待コードの生成に失敗しました");
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/invitations", { method: "POST" });
+        if (!res.ok) {
+          throw new Error("招待コードの生成に失敗しました");
+        }
+        startTransition(() => router.refresh());
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "招待コードの生成に失敗しました");
       }
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "招待コードの生成に失敗しました");
-    } finally {
-      setIsPending(false);
-    }
+    });
   }
 
   return (
@@ -34,9 +34,10 @@ export function GenerateInvitationCodeButton() {
         size="sm"
         onClick={handleClick}
         disabled={isPending}
+        aria-busy={isPending}
       >
-        <Plus />
-        招待コード生成
+        {isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />}
+        {isPending ? "生成中..." : "招待コード生成"}
       </Button>
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>

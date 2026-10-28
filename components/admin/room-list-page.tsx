@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Hash, User } from "lucide-react";
+import { ExternalLink, Hash, Loader2, User } from "lucide-react";
 import { useState } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -69,6 +69,7 @@ function RoleSelect({ userId, initialIsPremium }: { userId: string; initialIsPre
       <select
         value={role}
         disabled={pending}
+        aria-busy={pending}
         onChange={(e) => handleChange(e.target.value as RoleValue)}
         className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
         aria-label="ロール変更"
@@ -76,6 +77,12 @@ function RoleSelect({ userId, initialIsPremium }: { userId: string; initialIsPre
         <option value="general">一般ユーザー</option>
         <option value="premiumuser">プレミアムユーザー</option>
       </select>
+      {pending && (
+        <p role="status" className="inline-flex items-center gap-1 text-xs text-slate-500">
+          <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+          更新中...
+        </p>
+      )}
       {error && (
         <p className="text-xs text-red-500">変更に失敗しました</p>
       )}

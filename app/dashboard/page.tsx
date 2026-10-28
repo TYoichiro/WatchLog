@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
+import { useNavigationRouter as useRouter } from "@/components/navigation/navigation-progress";
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { EventOverviewCard, EventOverviewCardSkeleton } from "@/components/dashboard/event-overview-card";
 import { HeroCard, HeroCardSkeleton } from "@/components/dashboard/hero-card";
@@ -264,6 +265,10 @@ export default function Page() {
     return (
       <AppShell activeKey="dashboard">
         <div className="flex shrink-0 flex-col gap-4">
+          <div role="status" className="flex items-center gap-2 text-sm text-slate-600">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ダッシュボードを読み込み中...
+          </div>
           <HeroCardSkeleton />
           <RoomStatsSectionSkeleton />
           <EventOverviewCardSkeleton />

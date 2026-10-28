@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -122,6 +122,7 @@ export function NoticesPage({
   const [deleteTarget, setDeleteTarget] = useState<NoticeItem | null>(null);
   const [form, setForm] = useState<FormValues>(DEFAULT_FORM);
   const [formError, setFormError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function openCreateDialog() {
@@ -153,6 +154,7 @@ export function NoticesPage({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isPending) return;
     setFormError(null);
 
     startTransition(async () => {
@@ -208,9 +210,9 @@ export function NoticesPage({
   }
 
   function handleConfirmDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || isPending) return;
     const target = deleteTarget;
-    setDeleteTarget(null);
+    setDeleteError(null);
 
     startTransition(async () => {
       try {
@@ -220,13 +222,14 @@ export function NoticesPage({
 
         if (!res.ok) {
           const data = (await res.json()) as { error?: string };
-          alert(data.error ?? "削除に失敗しました");
+          setDeleteError(data.error ?? "削除に失敗しました");
           return;
         }
 
         setNotices((prev) => prev.filter((n) => n.id !== target.id));
+        setDeleteTarget(null);
       } catch {
-        alert("通信エラーが発生しました");
+        setDeleteError("通信エラーが発生しました");
       }
     });
   }
@@ -309,7 +312,10 @@ export function NoticesPage({
                       variant="outline"
                       size="icon"
                       className="h-9 w-9 rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700"
-                      onClick={() => setDeleteTarget(notice)}
+                      onClick={() => {
+                        setDeleteError(null);
+                        setDeleteTarget(notice);
+                      }}
                       disabled={isPending}
                       aria-label="削除"
                     >
@@ -323,7 +329,7 @@ export function NoticesPage({
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => !open && !isPending && closeDialog()}>
         <DialogContent className="w-full max-w-lg" aria-describedby={undefined}>
           <DialogTitle>
             {editingNotice ? "お知らせを編集" : "お知らせを作成"}
@@ -476,7 +482,8 @@ export function NoticesPage({
               >
                 キャンセル
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" disabled={isPending} aria-busy={isPending}>
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
                 {isPending ? "保存中..." : editingNotice ? "更新" : "作成"}
               </Button>
             </DialogFooter>
@@ -486,7 +493,7 @@ export function NoticesPage({
 
       <AlertDialog
         open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onOpenChange={(open) => !open && !isPending && setDeleteTarget(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -496,16 +503,22 @@ export function NoticesPage({
               」を削除しますか？この操作は元に戻せません。
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError ? <p role="alert" className="text-sm text-red-600">{deleteError}</p> : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isPending}>
               キャンセル
             </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={handleConfirmDelete}
+              onClick={(event) => {
+                event.preventDefault();
+                handleConfirmDelete();
+              }}
               disabled={isPending}
+              aria-busy={isPending}
             >
-              削除
+              {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+              {isPending ? "削除中..." : "削除"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -534,7 +534,12 @@ describe("LogListPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "お気に入りに追加" }));
 
-    expect(screen.getByRole("button", { name: "お気に入りを解除" })).toBeDefined();
+    const pendingButton = screen.getByRole("button", { name: "お気に入りを更新中..." }) as HTMLButtonElement;
+    expect(pendingButton.disabled).toBe(true);
+    expect(pendingButton.getAttribute("aria-busy")).toBe("true");
+
+    const completedButton = await screen.findByRole("button", { name: "お気に入りを解除" });
+    expect((completedButton as HTMLButtonElement).disabled).toBe(false);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

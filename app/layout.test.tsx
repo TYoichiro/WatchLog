@@ -28,6 +28,7 @@ vi.mock("next/headers", () => ({
 
 vi.mock("next/navigation", () => ({
   redirect: redirectMock,
+  useRouter: () => ({}),
 }));
 
 vi.mock("@/auth", () => ({

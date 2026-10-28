@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,7 +12,10 @@ import {
 } from "@/components/ui/dialog";
 
 export default function Error() {
+  const [isReloading, setIsReloading] = useState(false);
   const handleReload = () => {
+    if (isReloading) return;
+    setIsReloading(true);
     window.location.reload();
   };
 
@@ -24,8 +29,9 @@ export default function Error() {
         <DialogTitle>エラーが発生しました</DialogTitle>
         <DialogDescription>再読み込みを行います。</DialogDescription>
         <DialogFooter>
-          <Button type="button" onClick={handleReload}>
-            OK
+          <Button type="button" onClick={handleReload} disabled={isReloading} aria-busy={isReloading}>
+            {isReloading ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+            {isReloading ? "再読み込み中..." : "OK"}
           </Button>
         </DialogFooter>
       </DialogContent>

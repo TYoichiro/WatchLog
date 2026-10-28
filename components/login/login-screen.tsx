@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 
 import type { AppNotice } from "@/lib/dashboard-notices";
 import { NoticeListCard } from "@/components/notices/notice-list-card";
-import { Button } from "@/components/ui/button";
+import { LoginSubmitButton } from "@/components/login/login-submit-button";
 
 type LoginScreenProps = {
   hasNoticesError: boolean;
@@ -37,16 +37,12 @@ export function LoginScreen({
 
           <div className="mt-6 space-y-3">
             <form action={signInWithGoogle}>
-              <Button
-                type="submit"
-                variant="outline"
-                className="h-12 cursor-pointer w-full rounded-2xl border-slate-200 bg-white text-base font-semibold hover:bg-slate-50"
-              >
+              <LoginSubmitButton>
                 <span className="mr-3 inline-flex">
                   <GoogleIcon />
                 </span>
                 {"Google\u3067\u30ed\u30b0\u30a4\u30f3"}
-              </Button>
+              </LoginSubmitButton>
             </form>
 
           </div>

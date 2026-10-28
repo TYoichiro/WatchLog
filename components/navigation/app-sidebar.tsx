@@ -1,17 +1,18 @@
 "use client";
 
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
 import { APP_VERSION } from "@/lib/version";
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import {
   Ban,
   Bell,
   ChevronRight,
   Home,
   List,
+  Loader2,
   LogOut,
   Menu,
   Play,
@@ -104,12 +105,22 @@ function SidebarContent({
   isPremium?: boolean;
   onSelect?: () => void;
 }) {
-  const [isSigningOut, startSignOutTransition] = useTransition();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const signOutPendingRef = useRef(false);
 
-  const handleSignOut = () => {
-    startSignOutTransition(() => {
-      void signOut({ redirectTo: "/" });
-    });
+  const handleSignOut = async () => {
+    if (signOutPendingRef.current) return;
+    signOutPendingRef.current = true;
+    setIsSigningOut(true);
+    setSignOutError(null);
+    try {
+      await signOut({ redirectTo: "/" });
+    } catch {
+      signOutPendingRef.current = false;
+      setIsSigningOut(false);
+      setSignOutError("ログアウトできませんでした。もう一度お試しください。");
+    }
   };
 
   return (
@@ -294,10 +305,17 @@ function SidebarContent({
           className="h-11 w-full justify-start gap-3 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
           onClick={handleSignOut}
           disabled={isSigningOut}
+          aria-busy={isSigningOut}
+          aria-live="polite"
         >
-          <LogOut className="h-5 w-5" aria-hidden />
+          {isSigningOut ? (
+            <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+          ) : (
+            <LogOut className="h-5 w-5" aria-hidden />
+          )}
           {isSigningOut ? "ログアウト中..." : "ログアウト"}
         </Button>
+        {signOutError ? <p role="alert" className="text-sm text-red-600">{signOutError}</p> : null}
       </div>
     </>
   );

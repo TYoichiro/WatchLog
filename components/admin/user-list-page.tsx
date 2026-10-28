@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShieldAlert, Tv, UserIcon } from "lucide-react";
+import { Loader2, ShieldAlert, Tv, UserIcon } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -81,6 +81,7 @@ function BanSelect({
       <select
         value={status}
         disabled={pending}
+        aria-busy={pending}
         onChange={(e) => handleChange(e.target.value as BanStatus)}
         className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 data-[banned=true]:border-red-200 data-[banned=true]:text-red-700"
         data-banned={status === "banned"}
@@ -89,6 +90,12 @@ function BanSelect({
         <option value="allowed">許可</option>
         <option value="banned">BAN</option>
       </select>
+      {pending && (
+        <p role="status" className="inline-flex items-center gap-1 text-xs text-slate-500">
+          <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+          更新中...
+        </p>
+      )}
       {error && (
         <p className="text-xs text-red-500">変更に失敗しました</p>
       )}

@@ -47,6 +47,12 @@ function makeLogs(count: number): LogListItem[] {
 
 const okResponse = () => new Response(JSON.stringify({ ok: true }), { status: 200 });
 
+function deferredResponse() {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((complete) => { resolve = complete; });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(okResponse()));
 });
@@ -59,6 +65,77 @@ afterEach(() => {
 });
 
 describe("LogListPage", () => {
+  describe("処理中の表示", () => {
+    it("お気に入りの応答待ち中は連打を防ぎ、失敗後は元の状態で再操作できる", async () => {
+      const response = deferredResponse();
+      const fetchMock = vi.fn().mockReturnValue(response.promise);
+      vi.stubGlobal("fetch", fetchMock);
+      render(<LogListPage initialLogs={[makeLog()]} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "お気に入りに追加" }));
+      const pendingButton = screen.getByRole("button", { name: "お気に入りを更新中..." }) as HTMLButtonElement;
+      expect(pendingButton.disabled).toBe(true);
+      expect(pendingButton.getAttribute("aria-busy")).toBe("true");
+      fireEvent.click(pendingButton);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => response.resolve(new Response(null, { status: 500 })));
+      const retryButton = screen.getByRole("button", { name: "お気に入りに追加" }) as HTMLButtonElement;
+      expect(retryButton.disabled).toBe(false);
+      expect(retryButton.getAttribute("aria-busy")).toBe("false");
+    });
+
+    it("タイトルの保存中は状態を表示し、失敗後に再編集できる", async () => {
+      const response = deferredResponse();
+      const fetchMock = vi.fn().mockReturnValue(response.promise);
+      vi.stubGlobal("fetch", fetchMock);
+      render(<LogListPage initialLogs={[makeLog({ title: "保存前" })]} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "タイトルを編集" }));
+      fireEvent.change(screen.getByRole("textbox"), { target: { value: "保存後" } });
+      fireEvent.blur(screen.getByRole("textbox"));
+      expect(screen.getByRole("status").textContent).toBe("保存中...");
+      const editButton = screen.getByRole("button", { name: "タイトルを編集" }) as HTMLButtonElement;
+      expect(editButton.disabled).toBe(true);
+      fireEvent.click(editButton);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => response.resolve(new Response(null, { status: 500 })));
+      expect(screen.queryByRole("status")).toBeNull();
+      expect(screen.getByRole("alert").textContent).toContain("タイトルの保存に失敗しました");
+      expect(editButton.disabled).toBe(false);
+      expect(screen.getByText("保存前")).toBeDefined();
+      fireEvent.click(editButton);
+      expect(screen.getByRole("textbox")).toBeDefined();
+    });
+
+    it("複数のダウンロードをそれぞれの完了まで処理中として表示する", async () => {
+      const first = deferredResponse();
+      const second = deferredResponse();
+      const fetchMock = vi.fn()
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise);
+      vi.stubGlobal("fetch", fetchMock);
+      render(<LogListPage initialLogs={makeLogs(2)} />);
+
+      const buttons = screen.getAllByRole("button", { name: "ダウンロード" }) as HTMLButtonElement[];
+      fireEvent.click(buttons[0]);
+      fireEvent.click(buttons[1]);
+      fireEvent.click(buttons[0]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(screen.getAllByRole("button", { name: "ダウンロード中..." })).toHaveLength(2);
+
+      await act(async () => first.resolve(new Response(null, { status: 500 })));
+      expect(buttons[0].disabled).toBe(false);
+      expect(buttons[1].disabled).toBe(true);
+      expect(screen.getAllByRole("button", { name: "ダウンロード中..." })).toHaveLength(1);
+
+      await act(async () => second.resolve(new Response(null, { status: 500 })));
+      expect(buttons[1].disabled).toBe(false);
+      expect(screen.queryByRole("button", { name: "ダウンロード中..." })).toBeNull();
+    });
+  });
+
   describe("基本表示", () => {
     it("ログが0件の場合、空状態メッセージを表示する", () => {
       render(<LogListPage initialLogs={[]} />);

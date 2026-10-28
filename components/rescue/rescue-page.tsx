@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -157,6 +158,7 @@ export function RescuePage() {
   };
 
   const handleRecoverAll = () => {
+    if (isPending) return;
     const idleIndices = entryStates
       .map((s, i) => ({ s, i }))
       .filter(({ s }) => s.status.kind === "idle")
@@ -212,8 +214,10 @@ export function RescuePage() {
             type="button"
             onClick={handleRecoverAll}
             disabled={isPending}
+            aria-busy={isPending}
             className="flex-1 cursor-pointer"
           >
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             {isPending ? "復旧中..." : "復旧する"}
           </Button>
         )}

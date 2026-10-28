@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { NavigationLink as Link } from "@/components/navigation/navigation-link";
+import { useNavigationRouter as useRouter } from "@/components/navigation/navigation-progress";
 import {
   CalendarClock,
   ChevronLeft,
@@ -274,7 +274,8 @@ function JsonImportCard({ error, onClearError, onFileChange }: JsonImportCardPro
 
 type LogRowProps = {
   canEdit: boolean;
-  downloadingLogId: string | null;
+  isDownloading: boolean;
+  isFavoritePending: boolean;
   log: LogListItem;
   onDelete: () => void;
   onDownload: () => void;
@@ -282,14 +283,18 @@ type LogRowProps = {
   onTitleSave: (logId: string, title: string | null) => void;
 };
 
-function LogRow({ canEdit, downloadingLogId, log, onDelete, onDownload, onFavoriteToggle, onTitleSave }: LogRowProps) {
+function LogRow({ canEdit, isDownloading, isFavoritePending, log, onDelete, onDownload, onFavoriteToggle, onTitleSave }: LogRowProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const cancelledRef = useRef(false);
   const isSavingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const startEditing = () => {
+    if (isSavingRef.current) return;
+    setSaveError(null);
     setEditTitle(log.title ?? "");
     cancelledRef.current = false;
     setIsEditing(true);
@@ -302,6 +307,8 @@ function LogRow({ canEdit, downloadingLogId, log, onDelete, onDownload, onFavori
     }
     if (isSavingRef.current) return;
     isSavingRef.current = true;
+    setIsSaving(true);
+    setSaveError(null);
     setIsEditing(false);
 
     const newTitle = editTitle.trim() || null;
@@ -312,13 +319,13 @@ function LogRow({ canEdit, downloadingLogId, log, onDelete, onDownload, onFavori
         body: JSON.stringify({ title: newTitle }),
         cache: "no-store",
       });
-      if (response.ok) {
-        onTitleSave(log.id, newTitle);
-      }
+      if (!response.ok) throw new Error("タイトルの保存に失敗しました");
+      onTitleSave(log.id, newTitle);
     } catch {
-      // silently ignore
+      setSaveError("タイトルの保存に失敗しました。もう一度お試しください。");
     } finally {
       isSavingRef.current = false;
+      setIsSaving(false);
     }
   };
 
@@ -342,16 +349,21 @@ function LogRow({ canEdit, downloadingLogId, log, onDelete, onDownload, onFavori
         {canEdit && (
           <button
             type="button"
-            className="mt-0.5 shrink-0 text-slate-300 transition-colors hover:text-pink-400"
+            className="mt-0.5 shrink-0 text-slate-300 transition-colors hover:text-pink-400 disabled:cursor-wait disabled:opacity-60"
             onClick={() => onFavoriteToggle(log.id)}
-            aria-label={log.isFavorite ? "お気に入りを解除" : "お気に入りに追加"}
+            disabled={isFavoritePending}
+            aria-busy={isFavoritePending}
+            aria-label={isFavoritePending ? "お気に入りを更新中..." : log.isFavorite ? "お気に入りを解除" : "お気に入りに追加"}
           >
-            <Heart
+            {isFavoritePending ? (
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+            ) : <Heart
               className={cn(
                 "h-5 w-5 transition-colors",
                 log.isFavorite ? "fill-pink-500 text-pink-500" : "fill-none"
               )}
-            />
+              aria-hidden
+            />}
           </button>
         )}
         <div className="min-w-0 flex-1">
@@ -378,14 +390,20 @@ function LogRow({ canEdit, downloadingLogId, log, onDelete, onDownload, onFavori
               <button
                 type="button"
                 onClick={startEditing}
+                disabled={isSaving}
+                aria-busy={isSaving}
                 aria-label="タイトルを編集"
-                className="text-slate-400 transition-colors hover:text-slate-600"
+                className="text-slate-400 transition-colors hover:text-slate-600 disabled:cursor-wait"
               >
-                <Pencil className="h-3.5 w-3.5" aria-hidden />
+                {isSaving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : <Pencil className="h-3.5 w-3.5" aria-hidden />}
               </button>
             )}
+            {isSaving ? <span role="status" className="text-xs text-slate-500">保存中...</span> : null}
             <Badge variant="outline">Live ID: {log.liveId}</Badge>
           </div>
+          {saveError ? <p role="alert" className="mt-2 text-xs text-rose-600">{saveError}</p> : null}
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
             <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1">
               <MessageSquareText className="h-3.5 w-3.5" />
@@ -409,15 +427,16 @@ function LogRow({ canEdit, downloadingLogId, log, onDelete, onDownload, onFavori
           type="button"
           variant="outline"
           size="sm"
-          disabled={downloadingLogId === log.id}
+          disabled={isDownloading}
+          aria-busy={isDownloading}
           onClick={onDownload}
         >
-          {downloadingLogId === log.id ? (
+          {isDownloading ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
           ) : (
             <Download className="h-3.5 w-3.5" aria-hidden />
           )}
-          ダウンロード
+          {isDownloading ? "ダウンロード中..." : "ダウンロード"}
         </Button>
         <Button
           type="button"
@@ -467,6 +486,7 @@ function LogDeleteDialog({
           <AlertDialogAction
             variant="destructive"
             disabled={isDeleting}
+            aria-busy={isDeleting}
             onClick={(event) => {
               event.preventDefault();
               onConfirm();
@@ -475,7 +495,7 @@ function LogDeleteDialog({
             {isDeleting ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             ) : null}
-            はい
+            {isDeleting ? "削除中..." : "はい"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -495,7 +515,10 @@ export function LogListPage({ initialLogs, isAdmin = false, isPremium = true, ro
   const [pendingDeleteLog, setPendingDeleteLog] = useState<LogListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
-  const [downloadingLogId, setDownloadingLogId] = useState<string | null>(null);
+  const [downloadingLogIds, setDownloadingLogIds] = useState(new Set<string>());
+  const downloadingLogIdsRef = useRef(new Set<string>());
+  const [pendingFavoriteIds, setPendingFavoriteIds] = useState(new Set<string>());
+  const pendingFavoriteIdsRef = useRef(new Set<string>());
   const [isBulkDownloading, setIsBulkDownloading] = useState(false);
   const [jsonImportError, setJsonImportError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<PageSize>(20);
@@ -543,6 +566,9 @@ export function LogListPage({ initialLogs, isAdmin = false, isPremium = true, ro
   };
 
   const handleFavoriteToggle = async (logId: string) => {
+    if (pendingFavoriteIdsRef.current.has(logId)) return;
+    pendingFavoriteIdsRef.current.add(logId);
+    setPendingFavoriteIds(new Set(pendingFavoriteIdsRef.current));
     setLogs((current) =>
       current.map((log) =>
         log.id === logId ? { ...log, isFavorite: !log.isFavorite } : log
@@ -567,6 +593,9 @@ export function LogListPage({ initialLogs, isAdmin = false, isPremium = true, ro
           log.id === logId ? { ...log, isFavorite: !log.isFavorite } : log
         )
       );
+    } finally {
+      pendingFavoriteIdsRef.current.delete(logId);
+      setPendingFavoriteIds(new Set(pendingFavoriteIdsRef.current));
     }
   };
 
@@ -577,7 +606,9 @@ export function LogListPage({ initialLogs, isAdmin = false, isPremium = true, ro
   };
 
   const handleDownload = async (log: LogListItem) => {
-    setDownloadingLogId(log.id);
+    if (downloadingLogIdsRef.current.has(log.id)) return;
+    downloadingLogIdsRef.current.add(log.id);
+    setDownloadingLogIds(new Set(downloadingLogIdsRef.current));
     try {
       if (!isPremium && roomId) {
         const localLog = readOnliveLocalLog(roomId);
@@ -602,11 +633,13 @@ export function LogListPage({ initialLogs, isAdmin = false, isPremium = true, ro
     } catch {
       // download errors are silently ignored
     } finally {
-      setDownloadingLogId(null);
+      downloadingLogIdsRef.current.delete(log.id);
+      setDownloadingLogIds(new Set(downloadingLogIdsRef.current));
     }
   };
 
   const handleBulkDownload = async () => {
+    if (isBulkDownloading) return;
     setIsBulkDownloading(true);
     try {
       const response = await fetch("/api/onlive/logs/bulk-download", {
@@ -631,7 +664,7 @@ export function LogListPage({ initialLogs, isAdmin = false, isPremium = true, ro
   };
 
   const handleConfirmDelete = async () => {
-    if (!pendingDeleteLog) return;
+    if (!pendingDeleteLog || isDeleting) return;
 
     if (!isPremium) {
       if (roomId) deleteOnliveLocalLog(roomId);
@@ -685,6 +718,7 @@ export function LogListPage({ initialLogs, isAdmin = false, isPremium = true, ro
                 variant="outline"
                 size="sm"
                 disabled={isBulkDownloading}
+                aria-busy={isBulkDownloading}
                 onClick={() => void handleBulkDownload()}
               >
                 {isBulkDownloading ? (
@@ -738,7 +772,8 @@ export function LogListPage({ initialLogs, isAdmin = false, isPremium = true, ro
                 key={log.id}
                 log={log}
                 canEdit={canEdit}
-                downloadingLogId={downloadingLogId}
+                isDownloading={downloadingLogIds.has(log.id)}
+                isFavoritePending={pendingFavoriteIds.has(log.id)}
                 onDownload={() => void handleDownload(log)}
                 onDelete={() => {
                   setDeleteErrorMessage(null);

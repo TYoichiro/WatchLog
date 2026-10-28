@@ -105,6 +105,7 @@ export function BlockListPage({ roomId }: { roomId: string }) {
     target: ProfileTarget,
     profile: RoomUserProfile | null,
   ) => {
+    if (isBlockActionPending) return;
     setIsBlockActionPending(true);
     setBlockErrorMessage(null);
 
@@ -120,7 +121,7 @@ export function BlockListPage({ roomId }: { roomId: string }) {
   };
 
   const handleConfirmDelete = async () => {
-    if (!pendingDeleteBlock) {
+    if (!pendingDeleteBlock || isDeleting) {
       return;
     }
 
@@ -267,6 +268,7 @@ export function BlockListPage({ roomId }: { roomId: string }) {
             <AlertDialogAction
               variant="destructive"
               disabled={isDeleting}
+              aria-busy={isDeleting}
               onClick={(event) => {
                 event.preventDefault();
                 void handleConfirmDelete();
@@ -275,7 +277,7 @@ export function BlockListPage({ roomId }: { roomId: string }) {
               {isDeleting ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : null}
-              はい
+              {isDeleting ? "解除中..." : "はい"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

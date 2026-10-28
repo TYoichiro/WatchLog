@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useNavigationRouter as useRouter } from "@/components/navigation/navigation-progress";
+import { useEffect, useRef, useState } from "react";
 import type { SubmitEvent } from "react";
 import { Hash, KeyRound, Loader2, Search } from "lucide-react";
 import { AppShell } from "@/components/navigation/app-sidebar";
@@ -105,13 +105,15 @@ function SearchArea({
             type="submit"
             className="h-12 rounded-xl px-8"
             disabled={isLoading}
+            aria-busy={isLoading}
+            aria-live="polite"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             ) : (
               <Search className="h-4 w-4" aria-hidden />
             )}
-            検索
+            {isLoading ? "検索中..." : "検索"}
           </Button>
         </form>
       </CardContent>
@@ -186,13 +188,15 @@ function InvitationCodeModal({
             type="submit"
             className="h-12 w-full rounded-xl"
             disabled={isSubmitting}
+            aria-busy={isSubmitting}
+            aria-live="polite"
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             ) : (
               <KeyRound className="h-4 w-4" aria-hidden />
             )}
-            確認
+            {isSubmitting ? "確認中..." : "確認"}
           </Button>
         </form>
       </div>
@@ -201,21 +205,23 @@ function InvitationCodeModal({
 }
 
 function ConfirmRegisterModal({
+  isRegistering,
   onClose,
   onConfirm,
   room,
 }: {
+  isRegistering: boolean;
   onClose: () => void;
   onConfirm: (room: RoomResult) => void;
   room: RoomResult;
 }) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !isRegistering) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [isRegistering, onClose]);
 
   return (
     <div
@@ -246,6 +252,7 @@ function ConfirmRegisterModal({
             variant="outline"
             className="rounded-xl"
             onClick={onClose}
+            disabled={isRegistering}
           >
             いいえ
           </Button>
@@ -253,8 +260,12 @@ function ConfirmRegisterModal({
             type="button"
             className="rounded-xl"
             onClick={() => onConfirm(room)}
+            disabled={isRegistering}
+            aria-busy={isRegistering}
+            aria-live="polite"
           >
-            はい
+            {isRegistering ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            {isRegistering ? "登録中..." : "はい"}
           </Button>
         </div>
       </div>
@@ -442,6 +453,10 @@ function RoomSearchBody() {
   >(null);
   const [isInviteCodeSubmitting, setIsInviteCodeSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const inviteSubmittingRef = useRef(false);
+  const searchPendingRef = useRef(false);
+  const registerPendingRef = useRef(false);
   const [query, setQuery] = useState("");
   const [registerErrorMessage, setRegisterErrorMessage] = useState<
     string | null
@@ -453,6 +468,7 @@ function RoomSearchBody() {
     null
   );
   const handleInviteCodeSubmit = async (rawInviteCode: string) => {
+    if (inviteSubmittingRef.current) return;
     const inviteCode = normalizeInviteCodeInput(rawInviteCode);
 
     if (!isInviteCodeFormatValid(inviteCode)) {
@@ -460,7 +476,10 @@ function RoomSearchBody() {
       return;
     }
 
+    inviteSubmittingRef.current = true;
     setIsInviteCodeSubmitting(true);
+    setInviteCodeErrorMessage(null);
+    let isNavigating = false;
 
     try {
       const result = await verifyInvitationCode(inviteCode);
@@ -476,6 +495,7 @@ function RoomSearchBody() {
           "招待コードの入力に3回失敗したため、アカウントがBANされました。"
         );
         router.push("/banned");
+        isNavigating = true;
         return;
       }
 
@@ -487,12 +507,16 @@ function RoomSearchBody() {
         "招待コードを確認できませんでした。時間をおいて再試行してください。"
       );
     } finally {
-      setIsInviteCodeSubmitting(false);
+      if (!isNavigating) {
+        inviteSubmittingRef.current = false;
+        setIsInviteCodeSubmitting(false);
+      }
     }
   };
 
   const handleSearch = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (searchPendingRef.current || registerPendingRef.current) return;
 
     const keyword = query.trim();
     setSelectedRoom(null);
@@ -506,6 +530,7 @@ function RoomSearchBody() {
     }
 
     setErrorMessage(null);
+    searchPendingRef.current = true;
     setIsLoading(true);
     setResults([]);
     setSearchedKeyword(keyword);
@@ -527,11 +552,13 @@ function RoomSearchBody() {
         "検索結果を取得できませんでした。時間をおいて再試行してください。"
       );
     } finally {
+      searchPendingRef.current = false;
       setIsLoading(false);
     }
   };
 
   const handleRegister = async (room: RoomResult) => {
+    if (registerPendingRef.current) return;
     setRegisterErrorMessage(null);
 
     if (!verifiedInviteCode) {
@@ -540,15 +567,22 @@ function RoomSearchBody() {
       return;
     }
 
+    registerPendingRef.current = true;
+    setIsRegistering(true);
+
     try {
       const isDuplicate = await checkRoomDuplicate(room.roomId, room.roomUrl);
 
       if (isDuplicate) {
+        registerPendingRef.current = false;
+        setIsRegistering(false);
         setSelectedRoom(null);
         setRegisterErrorMessage("既に登録されているため登録できません");
         return;
       }
     } catch {
+      registerPendingRef.current = false;
+      setIsRegistering(false);
       setSelectedRoom(null);
       setRegisterErrorMessage(
         "ルームの重複確認ができませんでした。時間をおいて再試行してください。"
@@ -563,6 +597,8 @@ function RoomSearchBody() {
       });
       router.replace("/dashboard");
     } catch (error) {
+      registerPendingRef.current = false;
+      setIsRegistering(false);
       const message =
         error instanceof Error
           ? error.message
@@ -599,6 +635,7 @@ function RoomSearchBody() {
 
       {canRegisterRoom(selectedRoom) ? (
         <ConfirmRegisterModal
+          isRegistering={isRegistering}
           room={selectedRoom}
           onClose={() => setSelectedRoom(null)}
           onConfirm={handleRegister}
@@ -666,7 +703,14 @@ export default function ShowroomRoomSearchPage() {
   }, [router]);
 
   if (!canShowSearch) {
-    return null;
+    return (
+      <AppShell activeKey="search" showMenu={false}>
+        <div role="status" className="flex min-h-64 items-center justify-center gap-3 text-sm text-slate-600">
+          <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+          登録情報を確認中...
+        </div>
+      </AppShell>
+    );
   }
 
   return (

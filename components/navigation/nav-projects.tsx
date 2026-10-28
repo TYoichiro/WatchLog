@@ -1,5 +1,6 @@
 "use client"
 
+import { NavigationLink as Link } from "@/components/navigation/navigation-link"
 import {
   Folder,
   Forward,
@@ -50,10 +51,10 @@ export function NavProjects({
 
     return (
       <SidebarMenuButton asChild>
-        <a href={url}>
+        <Link href={url}>
           <Icon />
           <span>{name}</span>
-        </a>
+        </Link>
       </SidebarMenuButton>
     )
   }

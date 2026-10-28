@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AppNotice } from "@/lib/dashboard-notices";
@@ -33,6 +33,24 @@ afterEach(() => {
 });
 
 describe("LoginScreen", () => {
+  it("keeps login disabled until the server action finishes", async () => {
+    let finishLogin!: () => void;
+    const signInWithGoogle = vi.fn(() => new Promise<void>((resolve) => {
+      finishLogin = resolve;
+    }));
+    renderLoginScreen({ signInWithGoogle });
+
+    fireEvent.click(screen.getByRole("button", { name: googleLoginLabel }));
+    const pendingButton = await screen.findByRole("button", { name: "ログイン中..." });
+    expect((pendingButton as HTMLButtonElement).disabled).toBe(true);
+    expect(pendingButton.getAttribute("aria-busy")).toBe("true");
+    fireEvent.click(pendingButton);
+    expect(signInWithGoogle).toHaveBeenCalledTimes(1);
+
+    await act(async () => finishLogin());
+    expect((screen.getByRole("button", { name: googleLoginLabel }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("renders the available login actions", () => {
     renderLoginScreen();
 

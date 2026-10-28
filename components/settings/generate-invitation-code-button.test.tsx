@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Suspense, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GenerateInvitationCodeButton } from "./generate-invitation-code-button";
@@ -35,6 +36,44 @@ afterEach(() => {
 });
 
 describe("GenerateInvitationCodeButton", () => {
+  it("API 成功後もページ更新が完了するまでローディングを維持する", async () => {
+    let finishRefresh!: () => void;
+    let refreshComplete = false;
+    const refreshPromise = new Promise<void>((resolve) => {
+      finishRefresh = () => {
+        refreshComplete = true;
+        resolve();
+      };
+    });
+    function UpdatedContent({ refreshing }: { refreshing: boolean }) {
+      if (refreshing && !refreshComplete) throw refreshPromise;
+      return <p>{refreshing ? "更新されたコード" : "現在のコード"}</p>;
+    }
+    function Settings() {
+      const [refreshing, setRefreshing] = useState(false);
+      routerRefresh.mockImplementation(() => setRefreshing(true));
+      return (
+        <Suspense fallback={<p>ページ更新中</p>}>
+          <GenerateInvitationCodeButton />
+          <UpdatedContent refreshing={refreshing} />
+        </Suspense>
+      );
+    }
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    render(<Settings />);
+    fireEvent.click(screen.getByRole("button", { name: "招待コード生成" }));
+
+    await waitFor(() => expect(routerRefresh).toHaveBeenCalledTimes(1));
+    const button = screen.getByRole("button", { name: "生成中..." }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => finishRefresh());
+    expect(screen.getByText("更新されたコード")).toBeDefined();
+    expect((screen.getByRole("button", { name: "招待コード生成" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("「招待コード生成」ボタンを表示する", () => {
     render(<GenerateInvitationCodeButton />);
     expect(screen.getByRole("button", { name: /招待コード生成/ })).toBeDefined();
@@ -90,6 +129,11 @@ describe("GenerateInvitationCodeButton", () => {
     fireEvent.click(button);
 
     expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(button.textContent).toBe("生成中...");
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.querySelector(".animate-spin")).not.toBeNull();
+    fireEvent.click(button);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     resolveRequest(jsonResponse({ ok: true }));
 
